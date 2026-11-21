@@ -32,6 +32,12 @@
 - `scripts/check-vercel-build-hygiene.mjs`: PASS, 21/21.
 - `scripts/check-phase24-release-review.mjs`: PASS after adding this current worklog.
 
+## Run #269 follow-up — source-of-truth whitespace false negative
+
+The supplied Vercel log shows Run #269 at 19/20: its source-of-truth release assertion rejected the valid Markdown hard-break spaces after `**Current source version:** `0.338.110``. The document was correct; the checker was too strict. Updated only the assertion to permit trailing horizontal whitespace while still requiring the exact package version and line structure. Run #269 now passes 20/20. The check remains registered once in both prebuild and static verification, and the database ACL, browser-write prohibitions, service-role boundary, migration classification and Testnet/Mainnet hold assertions are unchanged.
+
+Follow-up focused verification: project truth 11/11; migration duplicate integrity 231/231 unique; release hygiene 21/21; Run #267 header/wallet authorization 12/12; Run #269 ACL contract 20/20; Run #270 community integrity 53/53; Run #271 social publishing integrity 42/42; Phase 24 release review PASS.
+
 ## Outstanding verification and risks
 
 - The supplied Vercel build log reports 22 npm audit vulnerabilities (1 critical, 13 high, 6 moderate, 2 low). A fresh audit in this workspace could not reach `registry.npmjs.org` (`EAI_AGAIN`); no speculative or forced dependency upgrade was made. The existing dependency-security CI policy is retained and must produce a fresh report when registry access is available.
