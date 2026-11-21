@@ -6,7 +6,7 @@ contain secrets. All other variables are server-only unless code review proves
 otherwise. Blank values are placeholders for deployment-specific credentials.
 Do not invent URLs, client IDs, fee amounts, keys, passwords or private seeds.
 
-Vercel Testnet deployment scope: Preview, Git branch `testnet`. Keep Pi SDK Sandbox enabled and `PI_NETWORK=testnet`. The Testnet overlay is connectivity-only by default: keep money-moving and ledger-mutating features fail-closed until their provider credentials, Testnet database authority, user authorization, settlement/reconciliation and authenticated E2E prerequisites are independently verified. Keep Paystack transfers disabled.
+Vercel Testnet deployment scope: Preview, Git branch `testnet`. Keep Pi SDK Sandbox enabled and `PI_NETWORK=testnet`. `.env.example` remains fail-closed as the canonical safe default. For Testnet feature exercise, use `docs/TESTNET-PREVIEW-ENVIRONMENT.template`, which explicitly enables supported Testnet feature gates while retaining Testnet-only fences and mandatory provider/database/user-authorization/settlement controls. Paystack is Testnet-enabled only when a server-side `sk_test_` key is supplied; live approval remains false.
 
 ## RUN376 economy safety gates (2026-11-19)
 
@@ -19,4 +19,4 @@ Vercel Testnet deployment scope: Preview, Git branch `testnet`. Keep Pi SDK Sand
 
 ## Testnet profile reconciliation (0.338.111)
 
-`docs/TESTNET-PREVIEW-ENVIRONMENT.template` is the single source for the branch-scoped Preview overlay. It must not override the canonical fail-closed defaults for Pi purchases, Pi payouts/A2U, GHC withdrawals, marketplace payouts, Paystack transfers, rewards, referral settlement, tips or curation redistribution. `*_TESTNET_ONLY=true` values are network fences only; they do not authorize execution. `DOMAIN_VALIDATION_KEY` and `PI_API_KEY` are server-only credentials provisioned from the Pi Developer Portal and must never be committed.
+`docs/TESTNET-PREVIEW-ENVIRONMENT.template` is the feature-enabled, branch-scoped Preview overlay. It does not alter `.env.example` Production/local defaults. Feature flags do not override runtime controls: Testnet network checks, authenticated user and wallet authorization, PIN proof, idempotency, database RPCs, provider credentials, funding and reconciliation remain required. SQL-dependent V2/atomic allocator gates remain disabled until their proposals are reconciled and tested. `*_TESTNET_ONLY=true` values are network fences, not independent authorization. `DOMAIN_VALIDATION_KEY` and `PI_API_KEY` are server-only credentials provisioned from the Pi Developer Portal and must never be committed.
