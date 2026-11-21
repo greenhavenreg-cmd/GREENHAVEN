@@ -1,16 +1,24 @@
-# Current project truth — 0.338.109 full-project audit and safe maintenance (2026-11-19)
+# Current project truth — 0.338.110 Pi authentication repair and release-integrity synchronization (2026-11-21)
 
-- Current local derivative: `0.338.109`, based on the user-designated Greenhaven 0.338.108 Testnet Safe Upgrades candidate; source-only, not pushed or deployed.
-- Full source audit added `scripts/check-project-script-integrity.mjs`, registered it in `verify:static`, and removed one repeated RUN288 type-safety command from `pretypecheck`. No application business logic or historical SQL was changed in this increment.
-- Full `npm run verify:static` passed on the available Node 22.16.0 runner (exit 0; over 5,200 passing assertion/output lines). Migration integrity: 231/231 unique versions, hashes and basenames. Release hygiene 21/21; project truth 11/11; RUN378 10/10; RUN379 21/21; RUN380 12/12; RLS source coverage 176 executable table names; SECURITY DEFINER source audit 492 declarations; production-safety scan 21/21 across 1,193 source files; security headers 7/7; JSX safety 1,177 files; npm command manifest 1,209 entries with no duplicate commands or missing local script references.
-- API route inventory remains 280 route files and 368 exported methods; 186/186 mutating routes have one declared domain owner; 90/90 direct route fetch call sites are bounded by deadlines.
-- Dependency security remains a blocker: the prior project truth records 22 advisories (1 critical, 13 high, 6 moderate, 2 low). Fresh `npm audit` could not reach registry.npmjs.org (`EAI_AGAIN`); no speculative dependency upgrade was made.
-- Node 24.15.0 dependency-backed `npm ci`, TypeScript, ESLint, Next.js production build and browser/device E2E remain outstanding; this runner is Node 22.16.0 and has no installed dependencies. The project pins Node 24.15.0 and CI is configured for it.
-- Atomic reward allocator, durable GHPV daily cap and curation redistribution idempotency remain gated behind reviewed forward-only SQL and PostgreSQL concurrency/idempotency rehearsal. Pi Sandbox authorization, live Testnet database reconciliation and multi-account acceptance remain outstanding.
-- No historical migration was changed, no live Supabase schema or ledger was mutated, no payment/payout/transfer was initiated, and no GitHub push or Vercel deployment occurred. Testnet certification and Production remain NOT APPROVED.
+- Current local derivative: `0.338.110`, based on the user-designated GreenHaven 0.338.110 Pi authentication repair archive. This is a source-only candidate for `testnet` / Vercel Preview; it has not been pushed or deployed.
+- Repaired the Vercel failure's release-truth drift: package and lockfile were `0.338.110`, while the app release marker, README, current project-truth baseline, and verified manifest were `0.338.109`; the generated migration inventory outputs were stale. Synchronized the release marker and derived inventory documents from the canonical source files.
+- Added the missing `docs/UPGRADE-WORKLOG-0.338.110.md` required by the Phase 24 release-review gate.
+- Focused checks passed: project script integrity (1,209 command entries); migration integrity (231 unique versions, SHA-256 digests and basenames); release hygiene (21/21); project truth (11/11); Phase 10 release closure (19/19); Phase 10 platform acceptance (24/24); dependency-security policy (11/11); Vercel build hygiene (21/21); Phase 24 release review.
+- The complete 411-check Node 24 prebuild was not run: this workspace only has Node 22.16.0, and the project's runtime guard correctly rejects it. Node 24.15.0 dependency-backed install, TypeScript, ESLint, Next.js production build, and browser/device E2E remain outstanding.
+- The supplied Vercel log reports 22 npm audit vulnerabilities (1 critical, 13 high, 6 moderate, 2 low). A fresh audit could not reach `registry.npmjs.org` (`EAI_AGAIN`); no speculative dependency upgrade or audit-gate bypass was made.
+- No historical migration SQL, live Supabase schema/history, wallet, ledger, payment, payout, Pi transfer, GitHub branch, Vercel environment, or deployment was changed. Mainnet remains untouched; Testnet certification and Production remain NOT APPROVED.
 
-**Current source version:** `0.338.109`  
-**Package identity:** `gh-connect@0.338.109`  
+
+## 0.338.110 — Pi authentication repair and release-integrity synchronization (2026-11-21)
+
+- Preserved the existing Testnet-only release boundary; this source update does not authorize Mainnet, Production, or database migration changes.
+- Synchronized README, project-truth, verified manifest, migration checklist, CSV source manifest, and Testnet apply-order records from the package version and canonical migration directory.
+- Migration inventory generation remains deterministic and read-only in `--check` mode; historical SQL files and database history are not modified.
+- Build acceptance remains contingent on the full ordered prebuild suite, TypeScript, lint, and Next.js production compilation passing on the declared Node 24 runtime.
+- Dependency audit findings must be remediated through reviewed, lockfile-consistent updates; no forced major upgrades or security-check bypasses are permitted.
+
+**Current source version:** `0.338.110`  
+**Package identity:** `gh-connect@0.338.110`  
 **Baseline candidate:** `GREENHAVEN-0_338_108-TESTNET-SAFE-UPGRADES-2026-11-19.zip`  
 **Current derivative:** Full-project audit, command-manifest integrity check, duplicate pretypecheck command removal, synchronized release metadata; source-only.  
 **Current status:** **NOT APPROVED** for live Testnet certification or Production.
