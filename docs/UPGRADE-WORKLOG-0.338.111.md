@@ -28,6 +28,23 @@ The Vercel build at commit `ff9505a` reached prebuild check 54/412 and failed on
 
 This is a documentation/source-of-truth synchronization repair. It does not change runtime behavior, dependency versions, financial controls, authentication, authorization, migrations, or provider configuration.
 
+## Release blockers and separate environment holds
+
+The consolidated release register remains fail-closed and distinguishes source completion from external operational evidence. The following blockers are still open and must not be represented as completed by a source-only repair:
+
+- Pi Developer Portal / Sandbox authorization and valid Testnet credentials must be verified by the operator.
+- Testnet migration history and live schema must be reconciled against the canonical source inventory; unresolved history rows must not be guessed, reconstructed, or replayed.
+- Held SQL proposals/migrations require disposable PostgreSQL rehearsal, dependency review, and explicit operator approval before any application.
+- Authenticated multi-account Pi Browser / Testnet Preview acceptance, provider funding, and end-to-end checkout evidence remain outstanding.
+- Trusted scanner/provider infrastructure and provenance-backed geographic data remain external dependencies for the affected research/evidence workflows.
+- A clean dependency-backed install, typecheck, lint, and production build on the supported Node 24.15.x runtime remain required; the supplied Vercel log's dependency vulnerability findings remain unresolved.
+
+**Testnet:** source work is limited to the `testnet` branch and Vercel Preview. Operational readiness remains NOT CERTIFIED until the external gates above are evidenced.
+
+**Mainnet:** Mainnet remains untouched and NOT APPROVED. No Mainnet configuration, credentials, schema, migration history, financial state, or deployment is authorized by this work.
+
+**Production:** Production remains NOT APPROVED. No source-level pass changes this release decision.
+
 ## Safety boundaries
 
 - No SQL migration was added, edited, reordered, deleted, or applied.
