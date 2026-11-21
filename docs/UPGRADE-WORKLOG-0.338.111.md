@@ -22,6 +22,10 @@ Reconciled the Testnet Preview environment overlay with the canonical `.env.exam
 - Added `scripts/check-testnet-profile-safety.mjs` to enforce the profile contract in both static verification and prebuild.
 - Bumped synchronized project metadata to 0.338.111 and regenerated the migration checklist/verified manifest from the unchanged canonical SQL inventory.
 
+## Membership session-integrity metadata — Phase 9
+
+The current release metadata explicitly records the Phase 9 membership session-integrity guarantees: abortable refreshes, stale-response sequence fencing, immediate clearing of prior-account entitlement on wallet identity changes, and authoritative no-store rehydration after wallet-auth/session-resume/visible-tab events. The implementation and existing regression assertions remain unchanged; this metadata repair keeps the current increment’s release summary aligned with the verified source contract.
+
 ## Release-integrity follow-up — Run #300 current-worklog identity
 
 The Vercel build at commit `ff9505a` reached prebuild check 54/412 and failed only the Run #300 assertion `current upgrade worklog identifies the current package identity`. The current worklog already described release 0.338.111, but omitted the exact canonical package identity string required by the existing release-integrity contract. Added the explicit package metadata above; the checker and its assertion were not relaxed or bypassed.
