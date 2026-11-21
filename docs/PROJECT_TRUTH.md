@@ -1,15 +1,16 @@
-# Current project truth — 0.338.110 Pi authentication repair and release-integrity synchronization (2026-11-21)
+# Current project truth — 0.338.111 Testnet Preview environment policy reconciliation (2026-11-21)
+- Reconciled the dedicated Testnet Preview profile with canonical fail-closed defaults: all money-moving and ledger-mutating feature switches remain off pending provider, database, authorization, settlement and authenticated E2E verification. Added private blank `DOMAIN_VALIDATION_KEY` / `PI_API_KEY` inputs and a 12-check profile regression gate. No live Vercel values or secrets were changed.
 
-- Current local derivative: `0.338.110`, based on the user-designated GreenHaven 0.338.110 Pi authentication repair archive. This is a source-only candidate for `testnet` / Vercel Preview; it has not been pushed or deployed.
-- Repaired the Vercel failure's release-truth drift: package and lockfile were `0.338.110`, while the app release marker, README, current project-truth baseline, and verified manifest were `0.338.109`; the generated migration inventory outputs were stale. Synchronized the release marker and derived inventory documents from the canonical source files.
-- Added the missing `docs/UPGRADE-WORKLOG-0.338.110.md` required by the Phase 24 release-review gate.
+- Current local derivative: `0.338.111`, based on the user-designated GreenHaven 0.338.110 Run #269 ACL-checker repair archive. This is a source-only candidate for `testnet` / Vercel Preview; it has not been pushed or deployed.
+- Repaired the Vercel failure's release-truth drift: package and lockfile were `0.338.111`, while the app release marker, README, current project-truth baseline, and verified manifest were `0.338.109`; the generated migration inventory outputs were stale. Synchronized the release marker and derived inventory documents from the canonical source files.
+- Added the missing `docs/UPGRADE-WORKLOG-0.338.111.md` required by the Phase 24 release-review gate.
 - Focused checks passed: project script integrity (1,209 command entries); migration integrity (231 unique versions, SHA-256 digests and basenames); release hygiene (21/21); project truth (11/11); Phase 10 release closure (19/19); Phase 10 platform acceptance (24/24); dependency-security policy (11/11); Vercel build hygiene (21/21); Phase 24 release review.
 - The complete 411-check Node 24 prebuild was not run: this workspace only has Node 22.16.0, and the project's runtime guard correctly rejects it. Node 24.15.0 dependency-backed install, TypeScript, ESLint, Next.js production build, and browser/device E2E remain outstanding.
 - The supplied Vercel log reports 22 npm audit vulnerabilities (1 critical, 13 high, 6 moderate, 2 low). A fresh audit could not reach `registry.npmjs.org` (`EAI_AGAIN`); no speculative dependency upgrade or audit-gate bypass was made.
 - No historical migration SQL, live Supabase schema/history, wallet, ledger, payment, payout, Pi transfer, GitHub branch, Vercel environment, or deployment was changed. Mainnet remains untouched; Testnet certification and Production remain NOT APPROVED.
 
 
-## 0.338.110 — Pi authentication repair and release-integrity synchronization (2026-11-21)
+## 0.338.111 — Pi authentication repair and release-integrity synchronization (2026-11-21)
 
 - Preserved the existing Testnet-only release boundary; this source update does not authorize Mainnet, Production, or database migration changes.
 - Synchronized README, project-truth, verified manifest, migration checklist, CSV source manifest, and Testnet apply-order records from the package version and canonical migration directory.
@@ -17,8 +18,8 @@
 - Build acceptance remains contingent on the full ordered prebuild suite, TypeScript, lint, and Next.js production compilation passing on the declared Node 24 runtime.
 - Dependency audit findings must be remediated through reviewed, lockfile-consistent updates; no forced major upgrades or security-check bypasses are permitted.
 
-**Current source version:** `0.338.110`  
-**Package identity:** `gh-connect@0.338.110`  
+**Current source version:** `0.338.111`  
+**Package identity:** `gh-connect@0.338.111`  
 **Baseline candidate:** `GREENHAVEN-0_338_108-TESTNET-SAFE-UPGRADES-2026-11-19.zip`  
 **Current derivative:** Full-project audit, command-manifest integrity check, duplicate pretypecheck command removal, synchronized release metadata; source-only.  
 **Current status:** **NOT APPROVED** for live Testnet certification or Production.

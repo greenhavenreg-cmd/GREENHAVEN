@@ -9,21 +9,20 @@ This is the operator guide for `docs/TESTNET-PREVIEW-ENVIRONMENT.template`. The 
 - Keep `PI_NETWORK=testnet`, `NEXT_PUBLIC_PI_SANDBOX=true`, and `PI_ENV=production` together. `PI_ENV=production` selects the official Pi Platform API mode; it does not select Pi Mainnet.
 - Set the actual Preview URL in `GHC_E2E_BASE_URL` and `GREENHAVEN_PREVIEW_URL` after the first Preview deployment.
 
-## Enabled feature switches
+## Safe Testnet profile policy
 
-The overlay enables the Testnet unlock, Pi purchase/payment surfaces, registration welcome bonus, activity rewards, referral settlement, tips, the legacy curation redistribution surface, Pi earnings payout requests, explicit A2U execution, GHC-to-Pi withdrawal intake, marketplace payout surface, Paystack transfer integration (test credentials only), and the Phase 4/5/42 Testnet E2E suites.
+The profile is a **Testnet connectivity and verification overlay**, not a blanket feature-enable list. It keeps `PI_NETWORK=testnet`, `NEXT_PUBLIC_PI_SANDBOX=true`, `PI_ENV=production`, `GHC_ENV=testnet`, and the Testnet unlock. It does not activate money-moving or ledger-mutating rails by default.
 
-The overlay does not fabricate provider credentials, database keys, wallet seeds, operator keys, user sessions, payout rates, or test accounts. Those values must be provisioned separately as Vercel Preview secrets/configuration.
+The following remain explicitly disabled in the profile and must not be switched on merely to make a UI surface appear active:
 
-## Explicit safety holds — do not override by setting every flag to true
+- Pi purchases and payout adapters/requests/execution/A2U (`GHC_BUY_WITH_PI_ENABLED`, `PI_EARNINGS_ADAPTERS_ENABLED`, `PI_EARNINGS_PAYOUT_REQUESTS_ENABLED`, `PI_EARNINGS_PAYOUT_EXECUTION_ENABLED`, `PI_A2U_ENABLED`).
+- GHC withdrawals and marketplace payouts (`GHC_WITHDRAWALS_ENABLED`, `GHC_MARKETPLACE_GHC_PAYOUTS_ENABLED`). `GHC_WITHDRAWALS_TESTNET_ONLY=true` is a fence, not an enable switch. The conversion rate remains blank until owner-approved.
+- Paystack transfers (`PAYSTACK_TRANSFERS_ENABLED=false`) and live approval (`PAYSTACK_LIVE_TRANSFERS_APPROVED=false`). Never use an `sk_live_` key in Preview.
+- Registration/activity rewards, referral settlement, tips and curation redistribution until their ledger paths and deployed Testnet prerequisites are verified.
+- Atomic emission V13, curation redistribution V2 and daily calibration-cap V2 remain false while their SQL proposals/required durable enforcement are not reconciled and tested.
+- `PI_EARNINGS_AUTO_EXECUTE=false` permanently remains the default; unattended payout execution is not part of this profile.
 
-1. `PI_EARNINGS_AUTO_EXECUTE=false`: do not run unattended/background payouts. The operator-triggered Testnet executor remains available when fully configured and still enforces a real Testnet payout request, user wallet authorization, PIN proof, executor secret, Pi API key, valid Testnet wallet seed and database authority.
-2. `GHC_CURATION_REDISTRIBUTE_V2_ENABLED=false`: the current V2 idempotency-safe wrapper is held until its review SQL is reconciled, applied and replay-tested. The legacy curation surface flag is enabled, but this does not bypass the V2 server gate.
-3. `GH_GHPV_CALIBRATION_DAILY_CAP_V2_ENABLED=false`: automated GHPV settlement remains held until durable per-reviewer daily-cap SQL is applied and verified.
-4. `GHC_ATOMIC_GLOBAL_EMISSION_V13_ENABLED` remains off: its allocator is a review-only SQL proposal and must not be activated before database reconciliation and rehearsal.
-5. `GHC_WITHDRAWAL_GHC_PER_PI` is intentionally blank. Obtain and approve the exact Testnet conversion rate before GHC-to-Pi withdrawal requests can be accepted.
-6. `PAYSTACK_SECRET_KEY` must be a Paystack **test** key (`sk_test_...`). `PAYSTACK_LIVE_TRANSFERS_APPROVED=false` is retained. Never use a live key in Preview.
-7. E2E flags are on, but authenticated suites require disposable real Testnet accounts, session cookies and the deployed Preview URL. Tests that lack these inputs skip; they do not invent identities or payment state.
+The profile keeps Testnet E2E flags available, but authenticated suites require disposable Testnet accounts, valid session cookies and the actual Preview URL. Missing inputs must cause tests to skip, not create identities or payment state.
 
 ## Required Preview configuration
 
@@ -32,7 +31,8 @@ Set real values in Vercel Preview Environment Variables, never in Git:
 - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (or publishable key)
 - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_DB_URL` or `DATABASE_URL` where the deployment's DB tooling requires it
-- `PI_API_KEY` or `PI_SERVER_API_KEY`
+- `DOMAIN_VALIDATION_KEY` — exact validation string from the Pi Developer Portal; server-only, served by `/validation-key.txt`
+- `PI_API_KEY` (preferred) or `PI_SERVER_API_KEY` — Testnet app API key; server-only, never `NEXT_PUBLIC_*`
 - `PI_WALLET_PRIVATE_SEED` (Pi Testnet wallet only; restrict access)
 - `PI_EARNINGS_EXECUTOR_KEY` (random secret, at least 32 bytes)
 - `GHC_A2U_ADMIN_KEY` / other operator keys only where the corresponding route requires them

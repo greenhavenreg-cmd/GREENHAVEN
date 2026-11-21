@@ -3,18 +3,18 @@
 
 ## Testnet Preview configuration
 
-For the dedicated Testnet feature-enable profile, see [`TESTNET-VERCEL-ENVIRONMENT.md`](./TESTNET-VERCEL-ENVIRONMENT.md) and the safe overlay template [`docs/TESTNET-PREVIEW-ENVIRONMENT.template`](./docs/TESTNET-PREVIEW-ENVIRONMENT.template). Apply the overlay to Vercel **Preview only**; do not apply it to Production or Mainnet.
+For the dedicated Testnet connectivity and verification profile, see [`TESTNET-VERCEL-ENVIRONMENT.md`](./TESTNET-VERCEL-ENVIRONMENT.md) and the safe overlay template [`docs/TESTNET-PREVIEW-ENVIRONMENT.template`](./docs/TESTNET-PREVIEW-ENVIRONMENT.template). Apply the overlay to Vercel **Preview only**; do not apply it to Production or Mainnet.
 
-**Current source version:** `0.338.110` (Pi authentication repair and release-integrity synchronization; based on 0.338.109)
+**Current source version:** `0.338.111` (Testnet Preview environment policy reconciliation; based on the 0.338.110 Run #269 repair archive)
 
 Production status: **NOT APPROVED** — supported Node 24.15.0 dependency-backed typecheck/lint/build, browser/device, live database/provider and operator acceptance remain outstanding.
 
 This repository is the canonical GreenHaven source tree. See `docs/SOURCE_OF_TRUTH.md` and `docs/CURRENT_BUILD_CONTEXT.md` before implementation or release work.
 
 
-## Latest maintenance — 0.338.110 / Pi authentication repair and release-integrity synchronization
+## Latest maintenance — 0.338.111 / Testnet Preview environment policy reconciliation
 
-Repairs the failing Vercel prebuild release-truth gate. The package and lockfile were already `0.338.110`, while the app release marker, README baseline, current project-truth record, and verified migration manifest were stale at `0.338.109`; generated migration inventory outputs were also out of sync. The release marker and current documentation are now aligned, and the canonical 231-file migration inventory has been regenerated deterministically. A follow-up Run #269 false negative caused by strict matching of Markdown hard-break whitespace was corrected without weakening the exact version assertion; Run #269 passes 20/20. Added the required `docs/UPGRADE-WORKLOG-0.338.110.md` evidence record, restoring the Phase 24 release-review gate. No historical migration SQL, database history, payment authority, wallet controls, Supabase state, Production settings, or Mainnet state was changed.
+Resolves conflicting Testnet Preview environment guidance by making the profile a connectivity/verification overlay rather than a blanket feature-enable list. Pi purchases, payout adapters/requests/execution/A2U, GHC withdrawals, marketplace payouts, Paystack transfers, rewards, referral settlement, tips and curation redistribution remain fail-closed pending their independent provider, database, authorization, settlement and authenticated E2E prerequisites. Adds explicit private `DOMAIN_VALIDATION_KEY` and `PI_API_KEY` placeholders, a 12-check profile safety contract registered in static verification and prebuild, and synchronized release metadata. No historical SQL, database history, payment authority, wallet controls, Supabase state, live Vercel environment, Production or Mainnet settings were changed.
 
 Focused source checks pass: project script integrity, migration duplicate integrity, release hygiene (21/21), project truth (11/11), Phase 10 release closure (19/19), Phase 10 platform acceptance (24/24), dependency-security policy (11/11), Vercel build hygiene (21/21), and Phase 24 release review. The complete 411-check Node 24.15.0 prebuild, dependency-backed install/typecheck/lint/Next.js build, browser/device E2E, and fresh dependency audit remain unverified: this workspace has Node 22.16.0 and registry access failed with `EAI_AGAIN`. The supplied Vercel log reports 22 dependency vulnerabilities; no speculative or forced dependency upgrades were made. Source-only candidate; push to `testnet` and verify a Vercel Preview build before considering any further release. Production remains NOT APPROVED.
 

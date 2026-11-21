@@ -1,4 +1,4 @@
-# GREENHAVEN TESTNET PREVIEW PROFILE — SAFE FEATURE-ENABLEMENT OVERLAY
+# GREENHAVEN TESTNET PREVIEW PROFILE — SAFE CONNECTIVITY OVERLAY
 # Apply ONLY to Vercel Preview (and disposable local Testnet environments).
 # This file contains no credentials. Supply real provider/database secrets separately.
 # Never apply this profile to Vercel Production or a Mainnet deployment.
@@ -11,46 +11,48 @@ GHC_ENV=testnet
 GHC_TESTNET_UNLOCK=1
 NEXT_PUBLIC_GHC_TESTNET_UNLOCK=true
 
-# Pi payments and Pi-to-GHC purchase surfaces.
-NEXT_PUBLIC_GHC_BUY_WITH_PI=true
-NEXT_PUBLIC_GHC_BUY_WITH_PI_ENABLED=true
-GHC_BUY_WITH_PI_ENABLED=true
+# Pi purchase surfaces remain off until provider credentials, database authority and authenticated Testnet E2E are verified.
+NEXT_PUBLIC_GHC_BUY_WITH_PI=false
+NEXT_PUBLIC_GHC_BUY_WITH_PI_ENABLED=false
+GHC_BUY_WITH_PI_ENABLED=false
 GHC_PI_ONLY_COMMERCE=true
 
-# Rewards, onboarding, referral and tips.
-GHC_REGISTRATION_BONUS_ENABLED=1
-GHC_ACTIVITY_REWARDS_ENABLED=1
-GHC_REFERRAL_SETTLEMENT_ENABLED=1
-NEXT_PUBLIC_GHC_REFERRAL_SETTLEMENT_ENABLED=true
-GHC_TIPS_ENABLED=true
+# Ledger-affecting rewards, referral settlement and tips remain off until their Testnet ledger paths are accepted.
+GHC_REGISTRATION_BONUS_ENABLED=0
+GHC_ACTIVITY_REWARDS_ENABLED=0
+GHC_REFERRAL_SETTLEMENT_ENABLED=0
+NEXT_PUBLIC_GHC_REFERRAL_SETTLEMENT_ENABLED=false
+GHC_TIPS_ENABLED=false
 
-# Curation surface / legacy balance-funded redistribution.
-GHC_CURATION_REDISTRIBUTE_ENABLED=1
-NEXT_PUBLIC_GHC_CURATION_REDISTRIBUTE_ENABLED=true
+# Balance-funded curation redistribution remains off; V2 idempotency proposal is not applied/replay-tested.
+GHC_CURATION_REDISTRIBUTE_ENABLED=0
+NEXT_PUBLIC_GHC_CURATION_REDISTRIBUTE_ENABLED=false
 # Intentionally held: V2 idempotency SQL proposal is not yet reconciled/applied/replay-tested.
 GHC_CURATION_REDISTRIBUTE_V2_ENABLED=false
 # Intentionally held: durable per-reviewer daily-cap SQL is not applied/verified.
 GH_GHPV_CALIBRATION_DAILY_CAP_V2_ENABLED=false
+# Intentionally held: RUN376 atomic allocator proposal is review-only and unapplied.
+GHC_ATOMIC_GLOBAL_EMISSION_V13_ENABLED=false
 
-# Pi earnings withdrawal requests + explicit Testnet A2U execution.
-PI_EARNINGS_ADAPTERS_ENABLED=true
-PI_EARNINGS_PAYOUT_REQUESTS_ENABLED=true
-PI_EARNINGS_PAYOUT_EXECUTION_ENABLED=true
-PI_A2U_ENABLED=true
+# Pi payout request and execution rails remain off until provider credentials, wallet funding, consent, PIN proof, settlement and reconciliation are verified.
+PI_EARNINGS_ADAPTERS_ENABLED=false
+PI_EARNINGS_PAYOUT_REQUESTS_ENABLED=false
+PI_EARNINGS_PAYOUT_EXECUTION_ENABLED=false
+PI_A2U_ENABLED=false
 PI_A2U_TESTNET_ONLY=true
 # Keep unattended/background payout execution off. Operator-triggered execution
 # still requires a real Testnet API key, valid Testnet wallet seed, executor key,
 # user wallet authorization, PIN proof and an owned eligible payout request.
 PI_EARNINGS_AUTO_EXECUTE=false
 
-# GHC-to-Pi withdrawal surface. Set an owner-approved rate before accepting requests.
-GHC_WITHDRAWALS_ENABLED=true
+# GHC-to-Pi withdrawal intake remains off until the owner approves a rate and Testnet database/provider prerequisites are verified.
+GHC_WITHDRAWALS_ENABLED=false
 GHC_WITHDRAWALS_TESTNET_ONLY=true
 GHC_WITHDRAWAL_GHC_PER_PI=
 
-# Marketplace payout / bank transfer test rails.
-GHC_MARKETPLACE_GHC_PAYOUTS_ENABLED=true
-PAYSTACK_TRANSFERS_ENABLED=true
+# Marketplace payout and Paystack transfer rails remain off until isolated Testnet acceptance; live transfers are never approved here.
+GHC_MARKETPLACE_GHC_PAYOUTS_ENABLED=false
+PAYSTACK_TRANSFERS_ENABLED=false
 PAYSTACK_LIVE_TRANSFERS_APPROVED=false
 # Supply ONLY a Paystack test secret beginning sk_test_. Never use sk_live_ here.
 PAYSTACK_SECRET_KEY=
@@ -73,6 +75,13 @@ GHC_E2E_PEER_USER_ID_B=
 GHC_E2E_START_SERVER=0
 GHC_E2E_TARGET=preview
 
+# Required private provider credentials (populate only in Vercel Preview, branch testnet):
+# DOMAIN_VALIDATION_KEY — exact Pi Developer Portal domain-validation string.
+# PI_API_KEY — Testnet Pi Developer Portal API key; server-only.
+# PI_WALLET_PRIVATE_SEED, PI_EARNINGS_EXECUTOR_KEY, PIN proof and Supabase service-role credentials
+# are optional until the related payout/database workflow is explicitly approved.
 # Provider/database credentials are deliberately NOT populated here.
+DOMAIN_VALIDATION_KEY=
+PI_API_KEY=
 # Configure the required Supabase, Pi, webhook, operator and security secrets
 # individually in Vercel Preview Environment Variables.

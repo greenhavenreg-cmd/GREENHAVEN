@@ -1,13 +1,12 @@
-# GreenHaven source authority — 0.338.110 Pi authentication repair and release-integrity synchronization (2026-11-21)
+# GreenHaven source authority — 0.338.111 Testnet Preview profile reconciliation (2026-11-21)
 
-**Current source version:** `0.338.110`  
-**Package identity:** `gh-connect@0.338.110`  
-**Baseline:** user-designated 0.338.110 Pi authentication repair archive.  
-**Current derivative:** release marker, README/project-truth baseline, verified migration manifest and generated inventory synchronization; required 0.338.110 upgrade worklog added. Source-only for `testnet` / Vercel Preview; not pushed or deployed.
+**Current source version:** `0.338.111`  
+**Package identity:** `gh-connect@0.338.111`  
+**Baseline:** user-designated 0.338.110 Run #269 ACL-checker repair archive.  
+**Current derivative:** Testnet Preview environment policy reconciliation, fail-closed profile regression gate, synchronized 0.338.111 release metadata and migration inventory. Source-only for `testnet` / Vercel Preview; not pushed or deployed.
 
-The supplied Vercel failure was caused by stale release metadata and generated migration inventory documents. A subsequent Run #269 check false negative was fixed by allowing the Markdown source-version line’s valid trailing hard-break spaces while retaining exact version matching; Run #269 now passes 20/20. The current app release marker, README, project-truth baseline, verified manifest, migration checklist, CSV source manifest and Testnet apply-order guide are now synchronized to the package version and 231 canonical SQL source files. The Phase 24 release-review check now passes. Focused project script, migration integrity, release hygiene, project truth, Phase 10 closure/platform, dependency-security policy, Vercel build hygiene and Pi authentication/API regression checks are recorded in `docs/UPGRADE-WORKLOG-0.338.110.md`.
+The 0.338.111 update resolves contradictory Testnet Preview instructions. The PDF deployment profile had enabled payout execution, withdrawal intake, Paystack transfers, rewards, referral settlement and curation surfaces even though the canonical `.env.example` and release checks intentionally kept those rails disabled. The dedicated profile is now a connectivity/verification overlay: Testnet identity and E2E scaffolding remain available, while money-moving and ledger-mutating gates remain closed until provider, database, authorization, settlement and authenticated E2E prerequisites are proven. `DOMAIN_VALIDATION_KEY` and `PI_API_KEY` are documented as private Preview-only inputs and remain blank in source. A dedicated regression checker is registered in static verification and prebuild. No live Vercel settings or secrets were modified.
 
-The supplied Vercel log reports 22 dependency vulnerabilities (1 critical, 13 high, 6 moderate, 2 low). A fresh audit could not reach the npm registry in this workspace; no speculative dependency upgrade or audit-gate bypass was made. The full 411-check Node 24.15.0 prebuild, dependency-backed install/typecheck/lint/build and browser/device acceptance remain outstanding because this workspace only has Node 22.16.0. No historical SQL, database, ledger, payment, payout, GitHub branch or Vercel environment was changed. Testnet certification and Production remain **NOT APPROVED**.
 
 ---
 
