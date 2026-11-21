@@ -17,6 +17,10 @@ const errors = []
 const versions = new Map()
 const hashes = new Map()
 const basenames = new Map()
+const legacyProposalMigrations = [
+  '20261022010016_community_join_reasons_proposal.sql',
+  '20261022010017_community_governance_log_proposal.sql',
+]
 
 for (const file of files) {
   const path = join(migrationDir, file)
@@ -42,9 +46,19 @@ for (const file of files) {
 
 if (!files.length) errors.push('no SQL migrations found')
 
-// Review-only proposals must remain outside the canonical migration directory.
+// New review-only proposals must remain outside the canonical migration directory.
+// Two legacy proposal migrations are already historical canonical files; retain their
+// versioned bytes, but explicitly verify they remain DO_NOT_APPLY in the operator plan.
 for (const proposal of readdirSync(proposalDir).filter((name) => name.endsWith('.sql'))) {
   if (files.includes(proposal)) errors.push(`review proposal is present in canonical migrations: ${proposal}`)
+}
+const applyOrder = readFileSync(join(root, 'supabase', 'TESTNET_APPLY_ORDER.md'), 'utf8')
+for (const proposal of legacyProposalMigrations) {
+  if (!files.includes(proposal)) errors.push(`legacy proposal migration unexpectedly missing from canonical history: ${proposal}`)
+  const row = applyOrder.split('\n').find((line) => line.includes(`\`${proposal}\``))
+  if (!row || !row.includes('PROPOSAL') || !row.includes('DO_NOT_APPLY')) {
+    errors.push(`legacy proposal must remain classified PROPOSAL / DO_NOT_APPLY: ${proposal}`)
+  }
 }
 
 if (errors.length) {
@@ -53,5 +67,6 @@ if (errors.length) {
 }
 
 console.log(`PASS migration duplicate integrity: ${files.length} files; ${versions.size} unique versions; ${hashes.size} unique SHA-256 digests; ${basenames.size} unique basenames`)
-console.log('PASS review-only proposal boundary: proposal SQL remains outside canonical migrations')
-console.log('NOTE repeated SQL object declarations across different migrations require semantic review; historical migrations were not modified')
+console.log(`PASS new proposal boundary: ${readdirSync(proposalDir).filter((name) => name.endsWith('.sql')).length} proposal file(s) remain outside canonical migrations`)
+console.warn('BLOCK bulk apply: 2 legacy proposal migrations remain in the canonical history; 20261022010017 contains executable DDL and must be excluded from any curated Testnet release. Supabase CLI does not enforce the DO_NOT_APPLY classification.')
+console.log('NOTE repeated SQL object declarations across different migrations require semantic review; historical migration bytes were not modified')

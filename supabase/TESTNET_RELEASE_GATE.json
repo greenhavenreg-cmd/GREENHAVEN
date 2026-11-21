@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "release": "greenhaven-testnet",
+  "status": "BLOCKED",
+  "target_project_ref": "jhlsjnmfpakvibuuoygx",
+  "target_history": {
+    "reconciled": false,
+    "evidence": "",
+    "note": "Current live target reports an empty migration history while historical repository snapshots disagree."
+  },
+  "postgres_rehearsal": {
+    "status": "NOT_RUN",
+    "postgres_version": "",
+    "supabase_cli_version": "",
+    "clean_install_passed": false,
+    "upgrade_replay_passed": false,
+    "rollback_or_restore_verified": false,
+    "evidence": ""
+  },
+  "approved_migrations": [],
+  "excluded_migrations": [
+    "20261022010016_community_join_reasons_proposal.sql",
+    "20261022010017_community_governance_log_proposal.sql"
+  ],
+  "blocking_reasons": [
+    "Target migration history and historical Testnet snapshots are not reconciled.",
+    "A complete clean-install and upgrade replay has not passed on PostgreSQL/Supabase.",
+    "Migration classifications and dependencies have not been approved individually.",
+    "121 repeated-object groups still require semantic and ACL continuity review."
+  ]
+}
