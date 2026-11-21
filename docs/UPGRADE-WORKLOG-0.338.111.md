@@ -2,6 +2,10 @@
 
 Date: 2026-11-21
 
+**Package:** `gh-connect@0.338.111`  
+**Target:** `testnet` branch / Vercel Preview only  
+**Status:** source-only repair candidate; not pushed or deployed.
+
 ## Scope
 
 Reconciled the Testnet Preview environment overlay with the canonical `.env.example`, `docs/ENVIRONMENT-VARIABLES.md`, server-side feature gates, and the owner-provided `GREENHAVEN-VERCEL-PREVIEW-ENV-ONLY-0_338_109.pdf` profile. This is a source configuration and documentation release only.
@@ -17,6 +21,12 @@ Reconciled the Testnet Preview environment overlay with the canonical `.env.exam
 - Rewrote the operator guide and environment policy to remove the previous contradictory instruction to enable money-moving rails.
 - Added `scripts/check-testnet-profile-safety.mjs` to enforce the profile contract in both static verification and prebuild.
 - Bumped synchronized project metadata to 0.338.111 and regenerated the migration checklist/verified manifest from the unchanged canonical SQL inventory.
+
+## Release-integrity follow-up — Run #300 current-worklog identity
+
+The Vercel build at commit `ff9505a` reached prebuild check 54/412 and failed only the Run #300 assertion `current upgrade worklog identifies the current package identity`. The current worklog already described release 0.338.111, but omitted the exact canonical package identity string required by the existing release-integrity contract. Added the explicit package metadata above; the checker and its assertion were not relaxed or bypassed.
+
+This is a documentation/source-of-truth synchronization repair. It does not change runtime behavior, dependency versions, financial controls, authentication, authorization, migrations, or provider configuration.
 
 ## Safety boundaries
 
@@ -40,4 +50,4 @@ Reconciled the Testnet Preview environment overlay with the canonical `.env.exam
 - Phase 10 release closure: 19/19; Phase 10 platform acceptance: 24/24; Phase 24 final release review: PASS.
 - Vercel build hygiene: 21/21; migration duplicate integrity: 231 unique versions, SHA-256 digests and basenames; generated inventory check: PASS.
 
-The complete 411-check prebuild and dependency-backed TypeScript/lint/Next.js production build were not run because this workspace uses Node 22.16.0 while the project correctly requires Node 24.15.x. The supplied deployment log's 22 npm audit findings (1 critical, 13 high, 6 moderate, 2 low) remain a separate dependency-remediation task; no forced upgrades or audit-gate bypasses were made. Testnet operational readiness remains NOT CERTIFIED until provider credentials, Testnet migration history/schema, wallet/provider funding, and authenticated Preview E2E are independently verified.
+The complete 412-check prebuild and dependency-backed TypeScript/lint/Next.js production build were not run because this workspace uses Node 22.16.0 while the project correctly requires Node 24.15.x. The supplied deployment log's 22 npm audit findings (1 critical, 13 high, 6 moderate, 2 low) remain a separate dependency-remediation task; no forced upgrades or audit-gate bypasses were made. Testnet operational readiness remains NOT CERTIFIED until provider credentials, Testnet migration history/schema, wallet/provider funding, and authenticated Preview E2E are independently verified.
