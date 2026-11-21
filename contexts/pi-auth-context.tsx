@@ -21,6 +21,7 @@ import {
   reportPiAuthDiagnostic,
   getPiSandboxLaunchHint,
   isPiSandboxFrame,
+  getPiRuntimeSnapshot,
 } from "@/lib/pi-runtime";
 import {
   INITIAL_AUTH_LIFECYCLE,
@@ -318,14 +319,10 @@ function writeSignedOutFlag(value: boolean): void {
 export function PiAuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authMessage, setAuthMessage] = useState("Initializing Pi Network...");
-  const softRetryRef = useRef(0);
   // The initial bootstrap and a user's Retry tap can overlap in a slow Pi
   // WebView. Pi.authenticate must be single-flight or competing prompts can
   // invalidate each other's bridge state.
   const authAttemptRef = useRef(false);
-  // Preserve an explicit user Retry tap even when automatic bootstrap is still
-  // in flight. The request is drained after the active attempt settles.
-  const retryRequestedRef = useRef(false);
   const [hasError, setHasError] = useState(false);
   const [sdk, setSdk] = useState<SDKLiteInstance | null>(null);
   const [products, setProducts] = useState<Product[] | null>(null);
@@ -344,7 +341,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const initialize = useCallback(async () => {
+  const initialize = useCallback(async (userGestureAuth?: ReturnType<typeof piAuthenticateOfficial>) => {
     if (authAttemptRef.current) return;
     let diagnosticStage = "PI_BOOTSTRAP_START";
     authAttemptRef.current = true;
@@ -352,14 +349,15 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
     setRestoredPurchases(null);
     setAuthLifecycle(INITIAL_AUTH_LIFECYCLE);
     try {
-      // 1) App Studio parent credentials (iframe)
+      // 1) App Studio parent credentials (iframe). An explicit Pi Browser
+      // gesture bypasses this asynchronous probe: Pi.authenticate must be
+      // invoked in the original click task, before any await or postMessage.
       setAuthMessage("Connecting to Pi Network...");
       setAuthLifecycle((s) => transitionAuth(s, "PI_AUTHENTICATING"));
-      // Pi Developer Sandbox is not the legacy App Studio parent bridge. Skip
-      // the 4-second postMessage probe there so a user's Retry tap can reach the
-      // already-initialized Pi.authenticate call without an intervening await.
       const sandboxFrame = isPiSandboxFrame()
-      const parentCredentials = sandboxFrame ? null : await requestParentCredentials();
+      const parentCredentials = userGestureAuth || sandboxFrame
+        ? null
+        : await requestParentCredentials();
       if (parentCredentials?.accessToken) {
         setAuthMessage("Authenticated via App Studio...");
         // Establish a GH server session so uploads / profile saves are authorized.
@@ -424,15 +422,13 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       diagnosticStage = "PI_SDK_INIT";
       setAuthMessage("Loading Pi SDK...");
       try {
-        // Sandbox iframe bootstrap has already initialized the SDK before the
-        // sign-in button is shown. Other hosts initialize here as before.
-        // Crucially, Sandbox skips this await so a user's tap reaches
-        // Pi.authenticate in the same task.
-        if (!sandboxFrame) await ensurePiInitialized();
+        // For Pi Browser, the click handler creates userGestureAuth before
+        // calling initialize(). Never insert SDK init or bridge awaits before it.
+        if (!userGestureAuth && !sandboxFrame) await ensurePiInitialized();
         diagnosticStage = "PI_AUTHENTICATE";
         setAuthMessage("Authenticating with Pi...");
         setAuthLifecycle((s) => transitionAuth(s, "PI_AUTHENTICATING"));
-        const identity = await officialPiAuthenticate();
+        const identity = await (userGestureAuth || officialPiAuthenticate());
         setAuthLifecycle((s) =>
           transitionAuth(s, "PI_AUTHENTICATED", {
             piUid: identity.uid,
@@ -934,14 +930,6 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       const diagnosticCode = diagnosticStage === "PI_SDK_INIT" ? "PI_SDK_INIT_FAILED" : diagnosticStage === "PI_AUTHENTICATE" ? "PI_AUTHENTICATE_FAILED" : diagnosticStage === "PI_SERVER_VERIFY" ? "PI_SERVER_VERIFY_FAILED" : "PI_BOOTSTRAP_FAILED";
       reportPiAuthDiagnostic(diagnosticCode, { stage: diagnosticStage, errorName: err instanceof Error ? err.name : "UnknownError" });
       console.error("[PiAuth] initialization failed", { code: diagnosticCode, stage: diagnosticStage, errorName: err instanceof Error ? err.name : "UnknownError" });
-      const env = detectPiEnvironment();
-      if ((env.uaLooksLikePi || env.hasWindowPi) && softRetryRef.current < 1) {
-        softRetryRef.current += 1;
-        setHasError(false);
-        setAuthMessage("Pi Browser detected — retrying authentication…");
-        window.setTimeout(() => { void initialize(); }, 1200);
-        return;
-      }
       setHasError(true);
       const sandboxHint = diagnosticCode === "PI_AUTHENTICATE_FAILED" ? getPiSandboxLaunchHint() : null;
       const failureMessage = `${humanizePiAuthError(err)} (${diagnosticCode})${sandboxHint ? ` ${sandboxHint}` : ""}`;
@@ -955,12 +943,6 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       );
     } finally {
       authAttemptRef.current = false;
-      if (retryRequestedRef.current) {
-        retryRequestedRef.current = false;
-        // Start a fresh attempt after the active promise has unwound. Do not
-        // overlap Pi.authenticate calls or bypass server-side token verification.
-        window.setTimeout(() => { void initialize(); }, 0);
-      }
     }
   }, [fetchProducts]);
 
@@ -999,14 +981,15 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // User explicitly logged out: do not silently sign back in on reload.
     if (readSignedOutFlag()) {
-      if (isPiSandboxFrame()) {
+      const signedOutPiEnvironment = detectPiEnvironment()
+      if (isPiSandboxFrame() || signedOutPiEnvironment.uaLooksLikePi || signedOutPiEnvironment.hasWindowPi) {
         let cancelled = false
         setHasError(false)
-        setAuthMessage("Preparing Pi Sandbox sign-in…")
+        setAuthMessage("Preparing Pi Browser sign-in…")
         void ensurePiInitialized().then(() => {
           if (cancelled) return
           setHasError(true)
-          setAuthMessage("You are signed out. Pi Sandbox is ready. Tap Sign in with Pi to continue.")
+          setAuthMessage("You are signed out. Pi Browser is ready. Tap Sign in with Pi to continue.")
         }).catch((error) => {
           if (cancelled) return
           setHasError(true)
@@ -1024,12 +1007,15 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       return undefined;
     }
     let cancelled = false;
-    if (isPiSandboxFrame()) {
-      setAuthMessage("Preparing Pi Sandbox sign-in…")
+    const piEnvironment = detectPiEnvironment()
+    if (isPiSandboxFrame() || piEnvironment.uaLooksLikePi || piEnvironment.hasWindowPi) {
+      // Page load prepares the SDK only. Authorization is never requested
+      // automatically: Pi.authenticate is reserved for an explicit user tap.
+      setAuthMessage("Preparing Pi Browser sign-in…")
       void ensurePiInitialized().then(() => {
         if (cancelled) return
         setHasError(true)
-        setAuthMessage("Pi Sandbox is ready. Tap Sign in with Pi to authorize your account.")
+        setAuthMessage("Pi Browser is ready. Tap Sign in with Pi to authorize your account.")
       }).catch((error) => {
         if (cancelled) return
         setHasError(true)
@@ -1092,10 +1078,30 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
   const reinitialize = async () => {
     writeSignedOutFlag(false);
     if (authAttemptRef.current) {
-      retryRequestedRef.current = true;
-      setHasError(false);
-      setAuthMessage("Finishing the current Pi connection attempt before retrying…");
+      setHasError(true);
+      setAuthMessage("A Pi sign-in attempt is still finishing. Wait for its result, then tap Sign in with Pi again.");
       return;
+    }
+    const piEnvironment = detectPiEnvironment()
+    if (isPiSandboxFrame() || piEnvironment.uaLooksLikePi || piEnvironment.hasWindowPi) {
+      const snapshot = getPiRuntimeSnapshot()
+      if (!snapshot.initialized || !snapshot.hasAuthenticate) {
+        setHasError(true)
+        setAuthMessage("Pi is still preparing its sign-in bridge. Wait a moment, then tap Retry Pi authentication again.")
+        return
+      }
+      // CRITICAL: call the SDK in the synchronous click task. Do not await
+      // initialize(), the parent bridge, or any network operation first.
+      let authPromise: ReturnType<typeof piAuthenticateOfficial>
+      try {
+        authPromise = piAuthenticateOfficial(["username"])
+      } catch (error) {
+        setHasError(true)
+        setAuthMessage(humanizePiAuthError(error))
+        return
+      }
+      await initialize(authPromise)
+      return
     }
     await initialize();
   };
