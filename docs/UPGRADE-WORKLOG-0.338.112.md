@@ -31,12 +31,21 @@ The following financial/ledger-mutating flags were explicitly upserted to `false
 
 No Pi authentication flow rewrite; no change to `Pi.authenticate(["username"])`; no token/client-side identity fallback; no secrets added; no SQL/migrations; no Supabase mutation; no GitHub push; no Vercel deployment; no financial operation; no Mainnet change.
 
+## External blockers and separate environment release holds
+
+- **Testnet Preview: NOT CERTIFIED / NOT APPROVED.** The `testnet` Preview branch remains a connectivity/authentication-only candidate. External blockers are Pi Developer Portal authorization for the registered app, a successful live Pi Sandbox sign-in, successful server-side `/v2/me` token verification, durable Supabase identity/session creation and restoration, authenticated multi-account Testnet acceptance, and a fresh supported-runtime Node 24.15.0 CI/build. The Vercel Preview environment flags were made fail-closed, but this does not certify the deployment or prove the encrypted credentials are valid.
+- **Mainnet: NOT APPROVED; remains untouched.** No Mainnet environment variables, credentials, database, migration history, financial state or provider configuration were changed. Mainnet requires its own independent migration-history reconciliation, database/ACL review, provider authorization, financial controls, operator approval and acceptance evidence. Testnet evidence must not be reused as Mainnet approval.
+- **Production: NOT APPROVED.** No production release or promotion is authorized by this source-only candidate.
+
 ## Verification
 
 Passed on available Node 22.16.0:
 
 - Release hygiene: 21/21.
 - Project truth: 11/11.
+- Phase 1–10 upgrade pack: 20/20 (P1-B documentation contract repaired and rerun).
+- Phase 10 release closure: 19/19.
+- Phase 24 final release review: PASS.
 - Project script integrity: 1,211 entries, no duplicates/missing scripts.
 - Migration duplicate integrity: 231 files, unique versions/digests/basenames.
 - Testnet profile safety: 13/13.
