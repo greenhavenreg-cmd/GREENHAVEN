@@ -932,7 +932,12 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       console.error("[PiAuth] initialization failed", { code: diagnosticCode, stage: diagnosticStage, errorName: err instanceof Error ? err.name : "UnknownError" });
       setHasError(true);
       const sandboxHint = diagnosticCode === "PI_AUTHENTICATE_FAILED" ? getPiSandboxLaunchHint() : null;
-      const failureMessage = `${humanizePiAuthError(err)} (${diagnosticCode})${sandboxHint ? ` ${sandboxHint}` : ""}`;
+      const piEnvironment = detectPiEnvironment();
+      const inPiHost = isPiSandboxFrame() || piEnvironment.uaLooksLikePi || piEnvironment.hasWindowPi;
+      const isSlowSdkHandshake = diagnosticStage === "PI_SDK_INIT" || diagnosticStage === "PI_BOOTSTRAP";
+      const failureMessage = inPiHost && isSlowSdkHandshake
+        ? `Pi Browser detected. Still connecting to Pi. Tap Retry Pi authentication. (${diagnosticCode})`
+        : `${humanizePiAuthError(err)} (${diagnosticCode})${sandboxHint ? ` ${sandboxHint}` : ""}`;
       setAuthMessage(failureMessage);
       setAuthLifecycle((s) =>
         transitionAuth(s, "ERROR", {
