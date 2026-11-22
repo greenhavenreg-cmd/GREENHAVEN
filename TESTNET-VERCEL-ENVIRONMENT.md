@@ -1,49 +1,44 @@
 # GreenHaven Testnet Preview environment profile
 
-This is the operator guide for `docs/TESTNET-PREVIEW-ENVIRONMENT.template`. The profile enables the supported Testnet feature surfaces without changing the canonical `.env.example`, whose disabled-by-default values are deliberately asserted by the repository's release/security checks.
+This guide documents `docs/TESTNET-PREVIEW-ENVIRONMENT.template`. The template is a **connectivity/authentication-only** Preview overlay. The canonical `.env.example` remains the fail-closed source for Production/local defaults and is not replaced by this overlay.
 
 ## Deployment target
 
-- Use a dedicated GitHub repository and a Vercel project connected to that repository.
-- Configure this profile in **Vercel Preview** only. Do not copy it into Vercel Production.
+- Use the dedicated GREENHAVEN GitHub repository and its Vercel project.
+- Configure this profile in **Vercel Preview** only, scoped to Git branch `testnet`. Never copy it into Vercel Production.
 - Keep `PI_NETWORK=testnet`, `NEXT_PUBLIC_PI_SANDBOX=true`, and `PI_ENV=production` together. `PI_ENV=production` selects the official Pi Platform API mode; it does not select Pi Mainnet.
-- Set the actual Preview URL in `GHC_E2E_BASE_URL` and `GREENHAVEN_PREVIEW_URL` after the first Preview deployment.
+- Set the actual Preview URL in `GHC_E2E_BASE_URL` and `GREENHAVEN_PREVIEW_URL` only when running authenticated browser acceptance.
+- The Pi Developer Portal app slug for this registered Sandbox app is `greenhaven-2tm2`; keep `lib/system-config.ts` aligned with that registered app identity.
 
-## Safe Testnet profile policy
+## Testnet safety policy
 
-The profile is a **Testnet connectivity and verification overlay**, not a blanket feature-enable list. It keeps `PI_NETWORK=testnet`, `NEXT_PUBLIC_PI_SANDBOX=true`, `PI_ENV=production`, `GHC_ENV=testnet`, and the Testnet unlock. It does not activate money-moving or ledger-mutating rails by default.
+This profile enables Testnet identity/connectivity and explicit Pi Browser authentication testing only. It does **not** enable purchases, rewards, referrals, tips, curation settlement, payouts, A2U, withdrawals, marketplace payouts or Paystack transfers. Those flags are explicitly false in the profile and must remain fail-closed until their separate provider, database, authorization, settlement, reconciliation and authenticated E2E gates have been approved.
 
-The following remain explicitly disabled in the profile and must not be switched on merely to make a UI surface appear active:
+- `GHC_ATOMIC_GLOBAL_EMISSION_V13_ENABLED=false`, `GH_GHPV_CALIBRATION_DAILY_CAP_V2_ENABLED=false` and `GHC_CURATION_REDISTRIBUTE_V2_ENABLED=false` remain mandatory held gates while their SQL proposals and durable enforcement are unreconciled and untested.
+- `PI_EARNINGS_AUTO_EXECUTE=false`; unattended/background payout execution remains disabled.
+- `PI_A2U_ENABLED=false`, payout request/execution flags false, and withdrawals false. `*_TESTNET_ONLY=true` is a network fence, not authorization to execute.
+- `PAYSTACK_TRANSFERS_ENABLED=false` and `PAYSTACK_LIVE_TRANSFERS_APPROVED=false`. Never put a live `sk_live_` key in Preview.
+- The Testnet unlock is for connectivity/verification only; it does not authorize ledger writes or financial operations.
 
-- Pi purchases and payout adapters/requests/execution/A2U (`GHC_BUY_WITH_PI_ENABLED`, `PI_EARNINGS_ADAPTERS_ENABLED`, `PI_EARNINGS_PAYOUT_REQUESTS_ENABLED`, `PI_EARNINGS_PAYOUT_EXECUTION_ENABLED`, `PI_A2U_ENABLED`).
-- GHC withdrawals and marketplace payouts (`GHC_WITHDRAWALS_ENABLED`, `GHC_MARKETPLACE_GHC_PAYOUTS_ENABLED`). `GHC_WITHDRAWALS_TESTNET_ONLY=true` is a fence, not an enable switch. The conversion rate remains blank until owner-approved.
-- Paystack transfers (`PAYSTACK_TRANSFERS_ENABLED=false`) and live approval (`PAYSTACK_LIVE_TRANSFERS_APPROVED=false`). Never use an `sk_live_` key in Preview.
-- Registration/activity rewards, referral settlement, tips and curation redistribution until their ledger paths and deployed Testnet prerequisites are verified.
-- Atomic emission V13, curation redistribution V2 and daily calibration-cap V2 remain false while their SQL proposals/required durable enforcement are not reconciled and tested.
-- `PI_EARNINGS_AUTO_EXECUTE=false` permanently remains the default; unattended payout execution is not part of this profile.
-
-The profile keeps Testnet E2E flags available, but authenticated suites require disposable Testnet accounts, valid session cookies and the actual Preview URL. Missing inputs must cause tests to skip, not create identities or payment state.
+Testnet E2E scaffolding remains available, but authenticated suites require disposable Testnet accounts, valid session cookies and the actual Preview URL. Missing inputs must cause tests to skip, not create identities or payment state.
 
 ## Required Preview configuration
 
-Set real values in Vercel Preview Environment Variables, never in Git:
+Configure actual values directly in Vercel Preview Environment Variables; never commit them or paste them into chat/build logs:
 
-- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (or publishable key)
-- `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
-- `SUPABASE_DB_URL` or `DATABASE_URL` where the deployment's DB tooling requires it
-- `DOMAIN_VALIDATION_KEY` — exact validation string from the Pi Developer Portal; server-only, served by `/validation-key.txt`
-- `PI_API_KEY` (preferred) or `PI_SERVER_API_KEY` — Testnet app API key; server-only, never `NEXT_PUBLIC_*`
-- `PI_WALLET_PRIVATE_SEED` (Pi Testnet wallet only; restrict access)
-- `PI_EARNINGS_EXECUTOR_KEY` (random secret, at least 32 bytes)
-- `GHC_A2U_ADMIN_KEY` / other operator keys only where the corresponding route requires them
-- `GHC_PIN_PROOF_SECRET`, `GHC_BENEFICIARY_FINGERPRINT_KEY`, and required auth/security secrets
-- `PAYSTACK_SECRET_KEY` beginning `sk_test_...` if testing Paystack bank-transfer test flows
-- `GHC_E2E_BASE_URL`, `GHC_E2E_COOKIE_A`, and `GHC_E2E_COOKIE_B` for authenticated E2E; use disposable Testnet accounts only
+- `NEXT_PUBLIC_PI_CLIENT_ID` — exact Client ID for the GREENHAVEN Testnet app in the Pi Developer Portal; verify it matches the registered app, do not infer it from the slug.
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (or publishable key).
+- `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` — service-role credential is required for durable server-side identity/session persistence; keep it server-only.
+- `DOMAIN_VALIDATION_KEY` — exact Pi Developer Portal domain-validation string, server-only, served by `/validation-key.txt`.
+- `PI_API_KEY` (or the supported `PI_SERVER_API_KEY` alias) — server-only app credential for Pi Platform API operations that require it. Pi `/v2/me` user authentication verification uses the user's bearer access token; do not misdiagnose a missing app API key as the cause of that specific request failing.
+- `GHC_PIN_PROOF_SECRET`, `GHC_BENEFICIARY_FINGERPRINT_KEY` and other auth/security secrets required by the enabled identity/session routes.
+- Database connection URLs only where deployment tooling explicitly requires them.
+- Wallet seeds, executor keys, Paystack keys and operator credentials are **not needed** for this connectivity-only profile. Do not provision them merely to make sign-in work.
 
-Do not set `GHC_ALLOW_DEV_AUTH=true` on a deployed Preview environment as a substitute for real authentication. Do not commit populated `.env` files or paste secrets into issues, chat, build logs or test reports.
+Do not set `GHC_ALLOW_DEV_AUTH=true` on a deployed Preview environment as a substitute for real authentication. Never use client-side identity fallback.
 
-## Verification and known release blockers
+## Verification and release blockers
 
-Run the repository's static checks and supported-runtime checks under Node.js 24.15.x, then run the configured Playwright suites against the deployed Preview URL. A passing source/static check is not evidence that Supabase migrations are applied, Pi A2U is funded, Paystack test transfers are configured, or live authenticated E2E has passed.
+Run static checks and supported-runtime checks under Node.js 24.15.x, then run Pi Browser Sandbox sign-in, server-side token verification, durable session restoration and authenticated Playwright suites against the deployed Preview URL. A passing source/static check does not prove the Pi Portal Client ID or authorization is correct, Supabase credentials work, migrations are reconciled, or live authenticated E2E has passed.
 
-The current source-of-truth worklog still records unresolved Testnet migration-history discrepancies, held SQL proposals, outstanding provider/device acceptance and an unapproved release status. Do not bulk-push migrations or claim Testnet certification until those items are reconciled and verified. Mainnet remains out of scope.
+The current source-of-truth worklog records unresolved Testnet migration-history discrepancies, held SQL proposals and outstanding provider/device acceptance. Do not bulk-push migrations or claim Testnet certification until those items are reconciled and verified. No Mainnet operation is in scope.

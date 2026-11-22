@@ -1,3 +1,18 @@
+# GreenHaven source authority — 0.338.112 Pi Testnet identity and fail-closed Preview reconciliation (2026-11-22)
+
+**Current source version:** `0.338.112`  
+**Package identity:** `gh-connect@0.338.112`  
+**Baseline:** user-supplied `GREENHAVEN-0_338_111-TESTNET-FEATURE-ENABLEMENT-2026-11-21-1.zip` (SHA-256 `4992c71befdc6e6c21ce011e08c5c2f93fb68b034d5beb71a2b4720196bac604`).  
+**Current derivative:** surgical Pi app identity correction and Testnet Preview profile reconciliation. Source-only candidate; not pushed to GitHub, deployed to Vercel, or applied to Supabase.
+
+The registered Pi Developer Portal Sandbox launch URL supplied by the operator identifies the app slug as `greenhaven-2tm2`; `lib/system-config.ts` is aligned to that slug. The Testnet Preview profile is corrected to match this document's fail-closed release policy: Pi network/Sandbox identity and authentication/E2E scaffolding remain available, while Pi purchases, rewards, referrals, tips, curation settlement, payouts, A2U, withdrawals, marketplace payouts and Paystack transfers are explicitly disabled. The previous 0.338.111 template contradicted this source-of-truth policy by enabling those financial and ledger-mutating paths. Its regression checker and operator guide now enforce the connectivity/authentication-only contract.
+
+The operator-provided Pi diagnostic proves SDK initialization, Sandbox frame recognition and a user-gesture authentication invocation, followed by a generic SDK rejection without an access token. The source already invokes `Pi.authenticate(["username"])` from the explicit user gesture and preserves server-side bearer-token verification; no unsupported SDK workaround or client identity fallback was introduced. A missing app API key must not be asserted as the cause of `/v2/me` user-token verification failure. A read-only Vercel Preview inspection confirms that `NEXT_PUBLIC_PI_CLIENT_ID`, `PI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY` and `DOMAIN_VALIDATION_KEY` entries exist for branch `testnet`; encrypted values were not decrypted, so their correctness and provider acceptance remain unverified. This corrects the earlier audit statement that these entries were empty. The Vercel Preview `testnet` branch financial/ledger feature flags were then explicitly set false (and Testnet-only network fences retained); no Production variables or credentials were changed.
+
+No credentials were added or decrypted. No Supabase migration, database mutation, financial operation, GitHub push, Vercel deployment, or Mainnet action occurred. The only live Vercel mutation was setting the Testnet Preview branch financial/ledger feature flags to false. Full Node 24.15.x typecheck/lint/build, fresh CI, Pi Portal authorization, live Sandbox sign-in, `/v2/me` verification, durable session restoration and authenticated Testnet acceptance remain required. Production remains **NOT APPROVED**.
+
+---
+
 # GreenHaven source authority — 0.338.111 Testnet Preview profile reconciliation (2026-11-21)
 
 **Current source version:** `0.338.111`  

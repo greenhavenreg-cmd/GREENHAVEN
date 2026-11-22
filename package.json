@@ -1,8 +1,8 @@
 {
   "name": "gh-connect",
-  "version": "0.338.111",
+  "version": "0.338.112",
   "private": true,
-  "description": "GreenHaven \u2014 social, matching, community, messaging, marketplace and GHC utility platform",
+  "description": "GreenHaven — social, matching, community, messaging, marketplace and GHC utility platform",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -312,8 +312,7 @@
     "check:run379-phase3-api-hardening": "node scripts/check-run379-phase3-timeout-error-rate-limit.mjs",
     "check:run380-phase6-readiness": "node scripts/check-run380-phase6-readiness.mjs",
     "test:e2e:phase5": "playwright test e2e/phase5-runtime-acceptance.spec.ts",
-    "check:migration-integrity": "node scripts/check-clean-migrations.mjs && node scripts/check-migration-duplicate-integrity.mjs && node scripts/check-migration-release-readiness.mjs && node scripts/check-migration-source-manifest.mjs && node scripts/check-phase23-migration-integrity.mjs && node scripts/test-held-migrations-readiness.mjs",
-    "check:testnet-migration-release-gate": "node scripts/check-testnet-migration-release-gate.mjs"
+    "check:migration-integrity": "node scripts/check-clean-migrations.mjs && node scripts/check-migration-duplicate-integrity.mjs && node scripts/check-migration-release-readiness.mjs && node scripts/check-migration-source-manifest.mjs && node scripts/check-phase23-migration-integrity.mjs && node scripts/test-held-migrations-readiness.mjs"
   },
   "dependencies": {
     "@simplewebauthn/browser": "13.2.2",

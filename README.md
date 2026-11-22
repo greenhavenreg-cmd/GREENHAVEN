@@ -5,18 +5,18 @@
 
 For the dedicated Testnet connectivity and verification profile, see [`TESTNET-VERCEL-ENVIRONMENT.md`](./TESTNET-VERCEL-ENVIRONMENT.md) and the safe overlay template [`docs/TESTNET-PREVIEW-ENVIRONMENT.template`](./docs/TESTNET-PREVIEW-ENVIRONMENT.template). Apply the overlay to Vercel **Preview only**; do not apply it to Production or Mainnet.
 
-**Current source version:** `0.338.111` (Testnet Preview environment policy reconciliation; based on the 0.338.110 Run #269 repair archive)
+**Current source version:** `0.338.112` (Pi Testnet app identity and connectivity-only Preview policy repair; based on the user-supplied 0.338.111 archive)
 
 Production status: **NOT APPROVED** — supported Node 24.15.0 dependency-backed typecheck/lint/build, browser/device, live database/provider and operator acceptance remain outstanding.
 
 This repository is the canonical GreenHaven source tree. See `docs/SOURCE_OF_TRUTH.md` and `docs/CURRENT_BUILD_CONTEXT.md` before implementation or release work.
 
 
-## Latest maintenance — 0.338.111 / Testnet Preview environment policy reconciliation
+## Latest maintenance — 0.338.112 / Pi Testnet identity and Preview policy repair
 
-Resolves conflicting Testnet Preview environment guidance by making the profile a connectivity/verification overlay rather than a blanket feature-enable list. Pi purchases, payout adapters/requests/execution/A2U, GHC withdrawals, marketplace payouts, Paystack transfers, rewards, referral settlement, tips and curation redistribution remain fail-closed pending their independent provider, database, authorization, settlement and authenticated E2E prerequisites. Adds explicit private `DOMAIN_VALIDATION_KEY` and `PI_API_KEY` placeholders, a 12-check profile safety contract registered in static verification and prebuild, and synchronized release metadata. No historical SQL, database history, payment authority, wallet controls, Supabase state, live Vercel environment, Production or Mainnet settings were changed.
+Aligns the Pi Developer Portal app slug with the operator-provided registered Sandbox slug `greenhaven-2tm2`. Reconciles the Testnet Preview template and operator guide with the authoritative connectivity/authentication-only release policy: Pi purchases, payouts, A2U, withdrawals, marketplace payouts, Paystack transfers, rewards, referrals, tips and curation settlement are explicitly disabled. Corrects the distinction between user bearer-token `/v2/me` verification and app API-key operations, adds a 13-check profile safety contract, and synchronizes release metadata. No Pi authentication rewrite, client identity fallback, credentials, SQL, database history, GitHub branch, Production or Mainnet settings were changed. Vercel Preview `testnet` financial/ledger flags were set to false; no secrets were decrypted or modified.
 
-Focused source checks pass: project script integrity, migration duplicate integrity, release hygiene (21/21), project truth (11/11), Phase 10 release closure (19/19), Phase 10 platform acceptance (24/24), dependency-security policy (11/11), Vercel build hygiene (21/21), and Phase 24 release review. The complete 411-check Node 24.15.0 prebuild, dependency-backed install/typecheck/lint/Next.js build, browser/device E2E, and fresh dependency audit remain unverified: this workspace has Node 22.16.0 and registry access failed with `EAI_AGAIN`. The supplied Vercel log reports 22 dependency vulnerabilities; no speculative or forced dependency upgrades were made. Source-only candidate; push to `testnet` and verify a Vercel Preview build before considering any further release. Production remains NOT APPROVED.
+Targeted source checks are run on the available Node 22.16.0 runtime. The full Node 24.15.0 prebuild, dependency-backed typecheck/lint/Next.js build, browser/device E2E, Pi Portal authorization and live Sandbox authentication remain unverified. Production remains NOT APPROVED.
 
 ## Previous maintenance — 0.338.105 / RUN378–RUN380 API reliability, Phase 4–6 and runtime acceptance
 

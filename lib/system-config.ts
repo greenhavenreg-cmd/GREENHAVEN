@@ -17,7 +17,7 @@ export const PI_NETWORK_CONFIG = {
   ] as readonly string[],
   BACKEND_URL: "https://backend.appstudio-u7cm9zhmha0ruwv8.piappengine.com",
   /** Pi Developer Portal app slug (public) */
-  APP_SLUG: "gh-connect-4a60bc91d8ef4a84",
+  APP_SLUG: "greenhaven-2tm2",
   /**
    * Connected app wallet on Pi (public identifier for U2A — not a secret).
    * Server API Key must NEVER be placed in client code — use env PI_API_KEY only.

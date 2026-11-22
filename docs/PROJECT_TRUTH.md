@@ -1,13 +1,17 @@
-# Current project truth — 0.338.111 Testnet Preview environment policy reconciliation (2026-11-21)
-- Reconciled the dedicated Testnet Preview profile with canonical fail-closed defaults: all money-moving and ledger-mutating feature switches remain off pending provider, database, authorization, settlement and authenticated E2E verification. Added private blank `DOMAIN_VALIDATION_KEY` / `PI_API_KEY` inputs and a 12-check profile regression gate. No live Vercel values or secrets were changed.
+# Current project truth — 0.338.112 Pi Testnet identity and Preview policy repair (2026-11-22)
+- Aligned `PI_NETWORK_CONFIG.APP_SLUG` to the operator-provided registered Pi Developer Portal Sandbox slug `greenhaven-2tm2`.
+- Reconciled Testnet Preview profile, operator guide and safety checker to the authoritative connectivity/authentication-only policy. Financial and ledger-mutating feature flags remain disabled; Testnet identity and E2E scaffolding remain available.
+- Corrected documentation: Pi `/v2/me` user identity verification uses the user's bearer access token; `PI_API_KEY` is for app-level provider operations that require it. Durable identity/session persistence still requires server-side Supabase credentials.
+- No secrets were added or decrypted; no Pi auth rewrite, client identity fallback, migration, database mutation, GitHub push, deployment, financial operation or Mainnet action occurred. Vercel Preview `testnet` financial/ledger feature flags were explicitly set false; Production variables were not changed. A read-only audit confirmed the Pi Client ID, Pi API key, Supabase service-role key and domain-validation key entries exist, but encrypted values were not decrypted or validated against Pi Portal.
+- Current local derivative: `0.338.112`, based on user-supplied `GREENHAVEN-0_338_111-TESTNET-FEATURE-ENABLEMENT-2026-11-21-1.zip`; source-only candidate, not pushed or deployed.
+- Targeted source checks run under Node 22.16.0; full Node 24.15.0 prebuild, dependency-backed typecheck/lint/build, browser/device E2E, Pi Portal authorization and live Sandbox sign-in remain outstanding. Production remains NOT APPROVED.
 
-- Current local derivative: `0.338.111`, based on the user-designated GreenHaven 0.338.110 Run #269 ACL-checker repair archive. This is a source-only candidate for `testnet` / Vercel Preview; it has not been pushed or deployed.
-- Repaired the Vercel failure's release-truth drift: package and lockfile were `0.338.111`, while the app release marker, README, current project-truth baseline, and verified manifest were `0.338.109`; the generated migration inventory outputs were stale. Synchronized the release marker and derived inventory documents from the canonical source files.
-- Added the missing `docs/UPGRADE-WORKLOG-0.338.111.md` required by the Phase 24 release-review gate.
-- Focused checks passed: project script integrity (1,209 command entries); migration integrity (231 unique versions, SHA-256 digests and basenames); release hygiene (21/21); project truth (11/11); Phase 10 release closure (19/19); Phase 10 platform acceptance (24/24); dependency-security policy (11/11); Vercel build hygiene (21/21); Phase 24 release review.
-- The complete 411-check Node 24 prebuild was not run: this workspace only has Node 22.16.0, and the project's runtime guard correctly rejects it. Node 24.15.0 dependency-backed install, TypeScript, ESLint, Next.js production build, and browser/device E2E remain outstanding.
-- The supplied Vercel log reports 22 npm audit vulnerabilities (1 critical, 13 high, 6 moderate, 2 low). A fresh audit could not reach `registry.npmjs.org` (`EAI_AGAIN`); no speculative dependency upgrade or audit-gate bypass was made.
-- No historical migration SQL, live Supabase schema/history, wallet, ledger, payment, payout, Pi transfer, GitHub branch, Vercel environment, or deployment was changed. Mainnet remains untouched; Testnet certification and Production remain NOT APPROVED.
+## 0.338.112 — Pi Testnet identity and Preview policy repair (2026-11-22)
+
+**Current source version:** `0.338.112`  
+**Package identity:** `gh-connect@0.338.112`  
+**Baseline:** `GREENHAVEN-0_338_111-TESTNET-FEATURE-ENABLEMENT-2026-11-21-1.zip`  
+**Current derivative:** Pi app slug alignment, fail-closed connectivity-only Testnet Preview profile, documentation/regression-gate reconciliation; source-only.
 
 
 ## 0.338.111 — Pi authentication repair and release-integrity synchronization (2026-11-21)
