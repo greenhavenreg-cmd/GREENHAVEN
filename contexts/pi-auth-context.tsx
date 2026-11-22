@@ -979,90 +979,50 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // User explicitly logged out: do not silently sign back in on reload.
-    if (readSignedOutFlag()) {
-      const signedOutPiEnvironment = detectPiEnvironment()
-      if (isPiSandboxFrame() || signedOutPiEnvironment.uaLooksLikePi || signedOutPiEnvironment.hasWindowPi) {
-        let cancelled = false
-        setHasError(false)
-        setAuthMessage("Preparing Pi Browser sign-in…")
-        void ensurePiInitialized().then(() => {
-          if (cancelled) return
-          setHasError(true)
-          setAuthMessage("You are signed out. Pi Browser is ready. Tap Sign in with Pi to continue.")
-        }).catch((error) => {
-          if (cancelled) return
-          setHasError(true)
-          setAuthMessage(humanizePiAuthError(error) + " (PI_SDK_INIT_FAILED)")
-          reportPiAuthDiagnostic("PI_SDK_INIT_FAILED", {
-            stage: "sdk_init",
-            sandbox: true,
-            errorName: error instanceof Error ? error.name : "UnknownError",
-          })
-        })
-        return () => { cancelled = true }
-      }
+    // Mount is preparation only. Never authenticate, exchange parent
+    // credentials, or create a session as a side effect of page loading.
+    // Pi.authenticate is invoked only by an explicit user action below.
+    let cancelled = false
+    const signedOut = readSignedOutFlag()
+    const piEnvironment = detectPiEnvironment()
+    const shouldPreparePi =
+      isPiSandboxFrame() || piEnvironment.uaLooksLikePi || piEnvironment.hasWindowPi
+
+    if (signedOut) {
       setHasError(true)
       setAuthMessage("You are signed out. Tap Sign in with Pi to continue.")
-      return undefined;
+    } else {
+      setHasError(true)
+      setAuthMessage(
+        shouldPreparePi
+          ? "Preparing Pi Browser sign-in…"
+          : "Ready to sign in. Choose Sign in with Pi to continue."
+      )
     }
-    let cancelled = false;
-    const piEnvironment = detectPiEnvironment()
-    if (isPiSandboxFrame() || piEnvironment.uaLooksLikePi || piEnvironment.hasWindowPi) {
-      // Page load prepares the SDK only. Authorization is never requested
-      // automatically: Pi.authenticate is reserved for an explicit user tap.
-      setAuthMessage("Preparing Pi Browser sign-in…")
+
+    if (shouldPreparePi) {
       void ensurePiInitialized().then(() => {
         if (cancelled) return
         setHasError(true)
-        setAuthMessage("Pi Browser is ready. Tap Sign in with Pi to authorize your account.")
+        setAuthMessage(
+          signedOut
+            ? "You are signed out. Pi Browser is ready. Tap Sign in with Pi to continue."
+            : "Pi Browser is ready. Tap Sign in with Pi to authorize your account."
+        )
       }).catch((error) => {
         if (cancelled) return
         setHasError(true)
         setAuthMessage(humanizePiAuthError(error) + " (PI_SDK_INIT_FAILED)")
+        reportPiAuthDiagnostic("PI_SDK_INIT_FAILED", {
+          stage: "sdk_init",
+          sandbox: isPiSandboxFrame(),
+          errorName: error instanceof Error ? error.name : "UnknownError",
+        })
       })
-      return () => { cancelled = true }
     }
-    const hardTimeout = window.setTimeout(() => {
-      if (cancelled) return;
-      setIsAuthenticated((prev) => {
-        if (prev) return prev;
-        // Production / Pi-required hosts: show error, do NOT fake a user
-        if (!allowLocalAuthFallback()) {
-          const env = detectPiEnvironment();
-          if (env.uaLooksLikePi) {
-            // Keep a slow Pi webview handshake in a connecting state instead of
-            // falsely telling a user already in Pi Browser that it is required.
-            setHasError(false);
-            setAuthMessage("Pi Browser detected. Still connecting to Pi… You can retry authentication if this takes too long.");
-          } else {
-            setHasError(true);
-            setAuthMessage(
-              "Pi sign-in is not connected yet. If you are in Pi Browser, tap Retry Pi authentication. Otherwise open this URL from Pi → Develop → your app."
-            );
-          }
-          return false;
-        }
-        console.info("[PiAuth] Auth hard-timeout — activating local preview session");
-        const localSdk = createLocalSdkLite("timeout-preview-user");
-        setSdk(localSdk);
-        setProducts([]);
-        setRestoredPurchases([]);
-        setHasError(false);
-        setAuthMessage("Local preview session ready");
-        return true;
-      });
-    }, 20000);
 
-    initialize().finally(() => {
-      window.clearTimeout(hardTimeout);
-    });
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(hardTimeout);
-    };
-  }, [initialize]);
+    return () => { cancelled = true }
+  }, [])
 
   const signOut = () => {
     writeSignedOutFlag(true);

@@ -88,7 +88,7 @@ export function AuthLoadingScreen() {
         {hasError ? (
           <>
             <h1 className="text-lg font-bold tracking-tight text-white">
-              {/Pi Sandbox is ready/i.test(String(authMessage || ""))
+              {/Pi Sandbox is ready|Pi Browser is ready|Ready to sign in|You are signed out/i.test(String(authMessage || ""))
                 ? "Ready to sign in"
                 : authMessage &&
               /server unavailable|api offline|redeploy|identity service/i.test(authMessage)
