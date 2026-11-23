@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     if (!auth?.userId) {
       return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 })
     }
-    const __rateLimited = await enforceUserMutationRateLimit(auth.userId, "connections/request:POST", 60, 60_000, { failClosed: false })
+    const __rateLimited = await enforceUserMutationRateLimit(auth.userId, "connections/request:POST", 60, 60_000, { failClosed: true })
     if (__rateLimited) return __rateLimited
     const parsedBody = await readBoundedJson(req, 8 * 1024)
     if (!parsedBody.ok) {

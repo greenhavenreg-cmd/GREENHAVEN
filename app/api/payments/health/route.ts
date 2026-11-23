@@ -39,14 +39,14 @@ export async function GET(request: Request) {
     )
   }
 
-  const paymentReady = paymentBlockers.length === 0
-  const status =
-    foundation.environment.isProduction &&
-    (!paymentReady || foundation.status === "not_ready")
-      ? 503
-      : 200
+  // This is configuration readiness only: credentials being present does not
+  // prove that Pi's API is reachable or that a payment can complete end-to-end.
+  const paymentConfigurationReady = paymentBlockers.length === 0
+  const platformReady = foundation.ready
+  const overallReady = paymentConfigurationReady && platformReady
+  const status = foundation.environment.isProduction && !overallReady ? 503 : 200
 
-  const readinessLabel = !paymentReady
+  const readinessLabel = !paymentConfigurationReady
     ? foundation.environment.isProduction
       ? "not_ready"
       : "degraded"
@@ -54,7 +54,16 @@ export async function GET(request: Request) {
 
   if (!diagnosticsDetailAllowed(request)) {
     return NextResponse.json(
-      { ok: true, ready: paymentReady && foundation.status !== "not_ready", status: readinessLabel, service: "gh-pay", detail: "restricted" },
+      {
+        ok: true,
+        ready: overallReady,
+        status: readinessLabel,
+        service: "gh-pay",
+        paymentConfigurationReady,
+        platformReady,
+        platformStatus: foundation.status,
+        detail: "restricted",
+      },
       { status, headers: { "Cache-Control": "no-store" } },
     )
   }
@@ -62,9 +71,12 @@ export async function GET(request: Request) {
   return NextResponse.json(
     {
       ok: true,
-      ready: paymentReady && foundation.status !== "not_ready",
+      ready: overallReady,
       status: readinessLabel,
       service: "gh-pay",
+      paymentConfigurationReady,
+      platformReady,
+      platformStatus: foundation.status,
       piApiKeyConfigured: Boolean(key),
       clientIdConfigured: clientId,
       sandbox,

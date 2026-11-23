@@ -76,8 +76,8 @@ export function CollapsingAppHeader({
       </div>
 
       {/* Expanded header yields completely to the compact bar after the scroll threshold. */}
-      <div
-        role="banner" id="gh-main-header"
+      <header
+        id="gh-main-header"
         inert={compact}
         className={`gh-app-header gh-app-header-expanded sticky top-0 z-20 shrink-0 border-b border-border/50 bg-background/95 backdrop-blur-md transition-[opacity,transform,max-height] duration-200 ease-out ${
           compact
@@ -106,7 +106,7 @@ export function CollapsingAppHeader({
           </div>
           {secondary ? <div className="mt-1 pb-1">{secondary}</div> : null}
         </div>
-      </div>
+      </header>
     </>
   )
 }

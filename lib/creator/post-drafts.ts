@@ -5,6 +5,7 @@
 
 import type { PostDraft } from "@/lib/ghc-types"
 import { IdentityService } from "@/lib/identity/identity-service"
+import { isDurableMediaUrl } from "@/lib/media/durable-url"
 
 const KEY_PREFIX = "ghc.post-drafts.v2:"
 const LEGACY_KEY = "ghc.post-drafts.v1"
@@ -31,10 +32,17 @@ function readRaw(): PostDraft[] {
         return {
           id: String(x.id),
           content: typeof x.content === "string" ? x.content : "",
-          images: Array.isArray(x.images) ? x.images.filter((u) => typeof u === "string") : [],
-          video: typeof x.video === "string" ? x.video : null,
-          hashtags: Array.isArray(x.hashtags) ? x.hashtags.map(String) : [],
-          mentions: Array.isArray(x.mentions) ? x.mentions.map(String) : [],
+          images: Array.isArray(x.images) ? x.images.filter((u) => typeof u === "string" && isDurableMediaUrl(u)).slice(0, 10) : [],
+          video: typeof x.video === "string" && isDurableMediaUrl(x.video) ? x.video : null,
+          pdf: typeof x.pdf === "string" && isDurableMediaUrl(x.pdf) ? x.pdf : null,
+          pdfName: typeof x.pdfName === "string" ? x.pdfName.slice(0, 200) : null,
+          visibility: ["public", "followers", "mutuals", "private"].includes(String(x.visibility)) ? x.visibility : "public",
+          communityId: typeof x.communityId === "string" ? x.communityId.slice(0, 120) : null,
+          communityName: typeof x.communityName === "string" ? x.communityName.slice(0, 120) : null,
+          publishRequestId: typeof x.publishRequestId === "string" && /^post_[a-z0-9_-]{6,80}$/i.test(x.publishRequestId) ? x.publishRequestId : null,
+          publishRequestSignature: typeof x.publishRequestSignature === "string" ? x.publishRequestSignature.slice(0, 4000) : null,
+          hashtags: Array.isArray(x.hashtags) ? x.hashtags.map(String).slice(0, 30) : [],
+          mentions: Array.isArray(x.mentions) ? x.mentions.map(String).slice(0, 30) : [],
           createdAt: Number(x.createdAt) || Date.now(),
           lastEditedAt: Number(x.lastEditedAt) || Date.now(),
         }
@@ -74,6 +82,13 @@ export function upsertPostDraft(input: {
   content: string
   images?: string[]
   video?: string | null
+  pdf?: string | null
+  pdfName?: string | null
+  visibility?: "public" | "followers" | "mutuals" | "private"
+  communityId?: string | null
+  communityName?: string | null
+  publishRequestId?: string | null
+  publishRequestSignature?: string | null
   hashtags?: string[]
   mentions?: string[]
 }): PostDraft {
@@ -84,10 +99,17 @@ export function upsertPostDraft(input: {
   const next: PostDraft = {
     id,
     content: String(input.content || "").slice(0, 5000),
-    images: (input.images || existing?.images || []).filter(Boolean).slice(0, 10),
-    video: input.video !== undefined ? input.video : existing?.video ?? null,
-    hashtags: input.hashtags || existing?.hashtags || [],
-    mentions: input.mentions || existing?.mentions || [],
+    images: (input.images || existing?.images || []).filter((url) => typeof url === "string" && isDurableMediaUrl(url)).slice(0, 10),
+    video: input.video !== undefined ? (typeof input.video === "string" && isDurableMediaUrl(input.video) ? input.video : null) : existing?.video ?? null,
+    pdf: input.pdf !== undefined ? (typeof input.pdf === "string" && isDurableMediaUrl(input.pdf) ? input.pdf : null) : existing?.pdf ?? null,
+    pdfName: input.pdfName !== undefined ? input.pdfName : existing?.pdfName ?? null,
+    visibility: input.visibility || existing?.visibility || "public",
+    communityId: input.communityId !== undefined ? input.communityId : existing?.communityId ?? null,
+    communityName: input.communityName !== undefined ? input.communityName : existing?.communityName ?? null,
+    publishRequestId: input.publishRequestId !== undefined ? input.publishRequestId : existing?.publishRequestId ?? null,
+    publishRequestSignature: input.publishRequestSignature !== undefined ? input.publishRequestSignature : existing?.publishRequestSignature ?? null,
+    hashtags: (input.hashtags || existing?.hashtags || []).map(String).slice(0, 30),
+    mentions: (input.mentions || existing?.mentions || []).map(String).slice(0, 30),
     createdAt: existing?.createdAt || now,
     lastEditedAt: now,
   }

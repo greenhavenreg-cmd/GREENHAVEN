@@ -6,6 +6,7 @@
 import { appendSecurityEvent } from "@/lib/server/security/control-plane"
 import { readGhcServerEnv } from "@/lib/server/economy/env"
 import { touchLastSeen } from "@/lib/server/identity/pi-identity-store"
+import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
 export type PioneerActivityKind =
   | "session_verified"
@@ -56,21 +57,10 @@ export async function countEngagedPioneers(options?: {
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
     return { totalIdentities: null, engagedEstimate: null, onboardingCompleted: null }
   }
-  const base = env.supabaseUrl.replace(/\/$/, "")
-  const headers = {
-    apikey: env.supabaseServiceRoleKey,
-    Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-    Prefer: "count=exact",
-    Range: "0-0",
-  }
-
   async function countQuery(qs: string): Promise<number | null> {
     try {
-      const res = await fetch(`${base}/rest/v1/gh_pi_identities?${qs}`, {
-        headers,
-        cache: "no-store",
-        signal: AbortSignal.timeout(12_000),
-      })
+      const res = await supabaseRest(`gh_pi_identities?${qs}`, { method: "GET", headers: { Prefer: "count=exact", Range: "0-0" }, timeoutMs: 12000 })
+      if (!res.ok) return null
       const range = res.headers.get("content-range") || ""
       const m = range.match(/\/(\d+)\s*$/)
       if (m) return Number(m[1])

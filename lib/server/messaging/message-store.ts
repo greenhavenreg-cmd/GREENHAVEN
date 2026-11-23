@@ -7,6 +7,7 @@
 
 import { createHash, randomBytes } from "crypto"
 import { readGhcServerEnv, hasPrivilegedDatabase } from "@/lib/server/economy/env"
+import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
 export type ConversationKind = "direct" | "group" | "community"
 
@@ -59,6 +60,8 @@ export type DurableMessage = {
   mediaAttachments?: DurableMediaAttachment[]
   deliveredAt?: number | null
   readAt?: number | null
+  reactionCounts?: Record<string, number>
+  viewerReactions?: string[]
 }
 
 const memConv = new Map<string, DurableConversation>()
@@ -165,12 +168,7 @@ async function rest<T>(
     if (init?.body && !headers["Content-Type"]) {
       headers["Content-Type"] = "application/json"
     }
-    const res = await fetch(`${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/${path}`, {
-      ...init,
-      headers,
-      cache: "no-store",
-      signal: init?.signal || AbortSignal.timeout(8_000),
-    })
+    const res = await (async () => { const r = await supabaseRest(`${path}`, { method: "GET", timeoutMs: 8000 }); return { ok: r.ok, status: r.status, json: async () => r.ok ? r.data : r.body, text: async () => JSON.stringify(r.ok ? r.data : r.body) }; })()
     if (res.status === 204) return { ok: res.ok, status: res.status, data: null }
     const data = (await res.json().catch(() => null)) as T | null
     return { ok: res.ok, status: res.status, data }
@@ -782,9 +780,36 @@ export async function listMessages(input: {
           }
         }
       }
+      const reactionRowsByMessage = new Map<string, Array<{ actor_id: string; emoji: string }>>()
+      if (ids.length) {
+        const inList = ids.map((id) => encodeURIComponent(id)).join(",")
+        // Reaction hydration is additive: if the new migration is not installed yet,
+        // older messages remain readable and simply return an empty reaction projection.
+        const reactionRows = await rest<Array<{ message_id: string; actor_id: string; emoji: string }>>(
+          `gh_message_reactions?conversation_id=eq.${encodeURIComponent(cid)}&message_id=in.(${inList})&select=message_id,actor_id,emoji&limit=4000`
+        )
+        if (reactionRows.ok && Array.isArray(reactionRows.data)) {
+          for (const reaction of reactionRows.data) {
+            const list = reactionRowsByMessage.get(reaction.message_id) || []
+            list.push({ actor_id: reaction.actor_id, emoji: reaction.emoji })
+            reactionRowsByMessage.set(reaction.message_id, list)
+          }
+        }
+      }
       const members = await listMemberIds(cid)
       const messages = rows.map((row) => {
         const message = rowToMessage(row)
+        const reactions = reactionRowsByMessage.get(message.id) || []
+        if (reactions.length) {
+          message.reactionCounts = reactions.reduce<Record<string, number>>((counts, reaction) => {
+            counts[reaction.emoji] = (counts[reaction.emoji] || 0) + 1
+            return counts
+          }, {})
+          message.viewerReactions = [...new Set(reactions.filter((reaction) => reaction.actor_id === uid).map((reaction) => reaction.emoji))]
+        } else {
+          message.reactionCounts = {}
+          message.viewerReactions = []
+        }
         if (message.deletedAt) {
           message.status = "deleted"
           return message
@@ -866,6 +891,22 @@ function rowToMessage(row: Record<string, unknown>): DurableMessage {
   }
 }
 
+
+function matchesMessageIdempotencyPayload(
+  existing: DurableMessage,
+  expected: { body: string; replyToMessageId?: string | null; sharedPostId?: string | null; mediaAttachments: DurableMediaAttachment[] },
+): boolean {
+  const stableAttachments = (items: DurableMediaAttachment[] | undefined) =>
+    JSON.stringify((items || []).map((item) => ({
+      id: item.id, type: item.type, url: item.url, fileName: item.fileName || "",
+      mimeType: item.mimeType || "", sizeBytes: item.sizeBytes ?? null,
+    })))
+  return existing.body === expected.body
+    && (existing.replyTo || "") === String(expected.replyToMessageId || "")
+    && (existing.sharedPostId || "") === String(expected.sharedPostId || "")
+    && stableAttachments(existing.mediaAttachments) === stableAttachments(expected.mediaAttachments)
+}
+
 async function validateSharedPostForConversation(input: { senderId: string; conversationId: string; postId: string }): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!dbConfigured()) return { ok: false, error: "STORE_UNAVAILABLE" }
   const postResult = await rest<Array<{ id: string; author_id: string; visibility: string; deleted_at: string | null }>>(
@@ -938,6 +979,8 @@ export async function appendMessage(input: {
   const clientMessageId = input.clientMessageId
     ? String(input.clientMessageId).trim().slice(0, 80)
     : null
+  const expectedReplyToMessageId = String(input.replyToMessageId || "").trim().slice(0, 180)
+  const expectedSharedPostId = String(input.sharedPostId || "").trim().slice(0, 180)
 
   if (!body && !mediaAttachments.length) return { ok: false, error: "EMPTY_BODY" }
   if (input.mediaAttachments && Array.isArray(input.mediaAttachments) && input.mediaAttachments.length && !mediaAttachments.length) {
@@ -979,7 +1022,11 @@ export async function appendMessage(input: {
     const q = `gh_messages?conversation_id=eq.${encodeURIComponent(cid)}&sender_id=eq.${encodeURIComponent(uid)}&client_message_id=eq.${encodeURIComponent(clientMessageId)}&select=*&limit=1`
     const existing = await rest<Array<Record<string, unknown>>>(q)
     if (existing.ok && existing.data?.[0]) {
-      return { ok: true, message: rowToMessage(existing.data[0]), idempotent: true }
+      const prior = rowToMessage(existing.data[0])
+      if (!matchesMessageIdempotencyPayload(prior, { body, replyToMessageId: expectedReplyToMessageId, sharedPostId: expectedSharedPostId, mediaAttachments })) {
+        return { ok: false, error: "IDEMPOTENCY_CONFLICT" }
+      }
+      return { ok: true, message: prior, idempotent: true }
     }
   }
 
@@ -1063,11 +1110,11 @@ export async function appendMessage(input: {
         const q = `gh_messages?conversation_id=eq.${encodeURIComponent(cid)}&sender_id=eq.${encodeURIComponent(uid)}&client_message_id=eq.${encodeURIComponent(clientMessageId)}&select=*&limit=1`
         const existing = await rest<Array<Record<string, unknown>>>(q)
         if (existing.ok && existing.data?.[0]) {
-          return {
-            ok: true,
-            message: rowToMessage(existing.data[0]),
-            idempotent: true,
+          const prior = rowToMessage(existing.data[0])
+          if (!matchesMessageIdempotencyPayload(prior, { body, replyToMessageId: expectedReplyToMessageId, sharedPostId: expectedSharedPostId, mediaAttachments })) {
+            return { ok: false, error: "IDEMPOTENCY_CONFLICT" }
           }
+          return { ok: true, message: prior, idempotent: true }
         }
       }
       if (isProd()) return { ok: false, error: "PERSIST_FAILED" }
@@ -1104,11 +1151,11 @@ export async function appendMessage(input: {
 
   const list = memMessages.get(cid) || []
   if (clientMessageId && list.some((m) => m.clientMessageId === clientMessageId)) {
-    return {
-      ok: true,
-      message: list.find((m) => m.clientMessageId === clientMessageId)!,
-      idempotent: true,
+    const prior = list.find((m) => m.clientMessageId === clientMessageId)!
+    if (!matchesMessageIdempotencyPayload(prior, { body, replyToMessageId: expectedReplyToMessageId, sharedPostId: expectedSharedPostId, mediaAttachments })) {
+      return { ok: false, error: "IDEMPOTENCY_CONFLICT" }
     }
+    return { ok: true, message: prior, idempotent: true }
   }
   list.push(msg)
   memMessages.set(cid, list)
@@ -1307,6 +1354,61 @@ export async function markConversationRead(input: {
   return { ok: true }
 }
 
+/** Toggle a durable message reaction. Actor identity is supplied by the authenticated route only. */
+export async function toggleMessageReaction(input: {
+  conversationId: string
+  messageId: string
+  actorId: string
+  emoji: string
+}): Promise<
+  | { ok: true; durable: boolean; active: boolean; reactionCounts: Record<string, number>; viewerReactions: string[] }
+  | { ok: false; error: string }
+> {
+  const cid = String(input.conversationId || "").trim()
+  const mid = String(input.messageId || "").trim()
+  const uid = String(input.actorId || "").trim()
+  const emoji = String(input.emoji || "").trim()
+  const allowed = new Set(["❤️", "👍", "😂", "😮", "😢", "🙏", "🔥", "🎉"])
+  if (!allowed.has(emoji)) return { ok: false, error: "INVALID_REACTION" }
+  if (!(await isMember(cid, uid))) return { ok: false, error: "FORBIDDEN" }
+
+  if (dbConfigured()) {
+    const env = readGhcServerEnv()
+    if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return { ok: false, error: "STORE_UNAVAILABLE" }
+    try {
+      const response = await (async () => { const rpcResult = await supabaseRpc('gh_message_toggle_reaction', { p_conversation_id: cid, p_message_id: mid, p_actor_id: uid, p_emoji: emoji }, { timeoutMs: 8000 }); return { ok: rpcResult.ok, status: rpcResult.status, json: async () => rpcResult.ok ? rpcResult.data : (rpcResult.body ?? null) }; })()
+      const result = await response.json().catch(() => null) as {
+        ok?: boolean; error?: string; active?: boolean;
+        reaction_counts?: Record<string, number>; viewer_reactions?: string[]
+      } | null
+      if (!response.ok || !result?.ok) {
+        return { ok: false, error: String(result?.error || "REACTION_FAILED") }
+      }
+      const counts = result.reaction_counts && typeof result.reaction_counts === "object" ? result.reaction_counts : {}
+      const viewer = Array.isArray(result.viewer_reactions) ? result.viewer_reactions.filter((v): v is string => typeof v === "string") : []
+      return { ok: true, durable: true, active: Boolean(result.active), reactionCounts: counts, viewerReactions: viewer }
+    } catch {
+      return { ok: false, error: "STORE_UNAVAILABLE" }
+    }
+  }
+
+  // Local-only mode is explicitly non-production and exists for isolated development.
+  if (isProd()) return { ok: false, error: "STORE_UNAVAILABLE" }
+  const list = memMessages.get(cid) || []
+  const message = list.find((item) => item.id === mid && !item.deletedAt)
+  if (!message) return { ok: false, error: "NOT_FOUND" }
+  const reactions = (message as DurableMessage & { reactions?: Record<string, string[]> }).reactions || {}
+  const actors = new Set(reactions[emoji] || [])
+  const active = !actors.has(uid)
+  if (active) actors.add(uid); else actors.delete(uid)
+  if (actors.size) reactions[emoji] = [...actors]; else delete reactions[emoji]
+  ;(message as DurableMessage & { reactions?: Record<string, string[]> }).reactions = reactions
+  memMessages.set(cid, list)
+  const reactionCounts = Object.fromEntries(Object.entries(reactions).map(([key, users]) => [key, users.length]))
+  const viewerReactions = Object.entries(reactions).filter(([, users]) => users.includes(uid)).map(([key]) => key)
+  return { ok: true, durable: false, active, reactionCounts, viewerReactions }
+}
+
 /**
  * Edit own message body. Durable when DB configured (requires migration 55 RPCs
  * or direct PATCH). Sender + membership enforced.
@@ -1332,30 +1434,12 @@ export async function editMessage(input: {
     if (env.supabaseUrl && env.supabaseServiceRoleKey) {
       // Prefer RPC when migration 55 applied
       try {
-        const rpcRes = await fetch(
-          `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/gh_edit_message`,
-          {
-            method: "POST",
-            headers: {
-              apikey: env.supabaseServiceRoleKey,
-              Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-              "Content-Type": "application/json",
-              Prefer: "return=representation",
-            },
-            body: JSON.stringify({
-              p_message_id: mid,
-              p_actor_id: uid,
-              p_body: body,
-            }),
-            cache: "no-store",
-          }
+        const rpcRes = await supabaseRpc<{ ok?: boolean; error?: string; body?: string; edited_at?: string }>(
+          "gh_edit_message",
+          { p_message_id: mid, p_actor_id: uid, p_body: body },
+          { timeoutMs: 15_000 },
         )
-        const rpcData = (await rpcRes.json().catch(() => null)) as {
-          ok?: boolean
-          error?: string
-          body?: string
-          edited_at?: string
-        } | null
+        const rpcData = rpcRes.ok ? rpcRes.data : rpcRes.body as { ok?: boolean; error?: string; body?: string; edited_at?: string } | undefined
         if (rpcRes.ok && rpcData && rpcData.ok === true) {
           const q = `gh_messages?id=eq.${encodeURIComponent(mid)}&select=*&limit=1`
           const fetched = await rest<Array<Record<string, unknown>>>(q)
@@ -1438,27 +1522,12 @@ export async function pinMessage(input: {
     const env = readGhcServerEnv()
     if (env.supabaseUrl && env.supabaseServiceRoleKey) {
       try {
-        const rpcRes = await fetch(
-          `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/gh_pin_message`,
-          {
-            method: "POST",
-            headers: {
-              apikey: env.supabaseServiceRoleKey,
-              Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              p_message_id: mid,
-              p_actor_id: uid,
-              p_pinned: Boolean(input.pinned),
-            }),
-            cache: "no-store",
-          }
+        const rpcRes = await supabaseRpc<{ ok?: boolean; error?: string }>(
+          "gh_pin_message",
+          { p_message_id: mid, p_actor_id: uid, p_pinned: Boolean(input.pinned) },
+          { timeoutMs: 15_000 },
         )
-        const rpcData = (await rpcRes.json().catch(() => null)) as {
-          ok?: boolean
-          error?: string
-        } | null
+        const rpcData = rpcRes.ok ? rpcRes.data : rpcRes.body as { ok?: boolean; error?: string } | undefined
         if (rpcRes.ok && rpcData?.ok === true) return { ok: true, durable: true }
         if (rpcData?.ok === false) return { ok: false, error: String(rpcData.error || "PIN_FAILED") }
       } catch {
@@ -1503,33 +1572,19 @@ export async function setConversationPrefs(input: {
     const env = readGhcServerEnv()
     if (env.supabaseUrl && env.supabaseServiceRoleKey) {
       try {
-        const rpcRes = await fetch(
-          `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/gh_set_conversation_prefs`,
+        const rpcRes = await supabaseRpc<{ ok?: boolean; error?: string }>(
+          "gh_set_conversation_prefs",
           {
-            method: "POST",
-            headers: {
-              apikey: env.supabaseServiceRoleKey,
-              Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              p_conversation_id: cid,
-              p_actor_id: uid,
-              p_is_pinned: input.isPinned ?? null,
-              p_is_archived: input.isArchived ?? null,
-              p_muted_until:
-                input.mutedUntil != null
-                  ? new Date(input.mutedUntil).toISOString()
-                  : null,
-              p_clear_mute: input.mutedUntil === null,
-            }),
-            cache: "no-store",
-          }
+            p_conversation_id: cid,
+            p_actor_id: uid,
+            p_is_pinned: typeof input.isPinned === "boolean" ? input.isPinned : null,
+            p_is_archived: typeof input.isArchived === "boolean" ? input.isArchived : null,
+            p_muted_until: typeof input.mutedUntil === "number" ? new Date(input.mutedUntil).toISOString() : null,
+            p_clear_mute: input.mutedUntil === null,
+          },
+          { timeoutMs: 15_000 },
         )
-        const rpcData = (await rpcRes.json().catch(() => null)) as {
-          ok?: boolean
-          error?: string
-        } | null
+        const rpcData = rpcRes.ok ? rpcRes.data : rpcRes.body as { ok?: boolean; error?: string } | undefined
         if (rpcRes.ok && rpcData?.ok === true) return { ok: true, durable: true }
         if (rpcData?.ok === false) {
           return { ok: false, error: String(rpcData.error || "PREFS_FAILED") }

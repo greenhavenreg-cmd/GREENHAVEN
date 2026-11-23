@@ -1,8 +1,16 @@
-/**
- * Transaction and Atomicity System
- * Ensures atomic operations for critical actions with rollback capability
- */
+import { securePrefixedId } from "./secure-id.ts"
 
+/**
+ * In-memory transaction workflow coordinator.
+ *
+ * IMPORTANT: this is not a database transaction and must never be used as the
+ * authority for wallets, payments, rewards, orders, or entitlements. Those
+ * domains must use their server-side RPC/ledger/intent lifecycle.
+ *
+ * Registered operations are executed in order. A failed operation triggers
+ * compensations for already-executed operations in reverse order. A successful
+ * commit therefore requires an executor for every registered operation.
+ */
 export interface Transaction {
   id: string
   status: "pending" | "committed" | "rolled_back" | "failed"
@@ -15,22 +23,21 @@ export interface Transaction {
 export interface Operation {
   id: string
   type: string
-  data: any
-  reverse?: any
+  data: unknown
+  /** Legacy descriptive metadata; never executed as code. */
+  reverse?: unknown
+  /** Real operation handler. */
+  execute?: () => void | Promise<void>
+  /** Compensating handler for a successfully executed operation. */
+  compensate?: () => void | Promise<void>
   status: "pending" | "executed" | "rolled_back"
 }
 
-/**
- * Transaction Manager for atomic operations
- */
 export class TransactionManager {
-  private activeTransactions: Map<string, Transaction> = new Map()
+  private activeTransactions = new Map<string, Transaction>()
   private completedTransactions: Transaction[] = []
   private readonly MAX_HISTORY = 50
 
-  /**
-   * Begin a new transaction
-   */
   beginTransaction(): Transaction {
     const transaction: Transaction = {
       id: this.generateId(),
@@ -38,228 +45,161 @@ export class TransactionManager {
       operations: [],
       startTime: Date.now(),
     }
-
     this.activeTransactions.set(transaction.id, transaction)
     return transaction
   }
 
-  /**
-   * Add operation to transaction
-   */
-  addOperation(transactionId: string, operation: Omit<Operation, "id" | "status">): boolean {
+  addOperation(
+    transactionId: string,
+    operation: Omit<Operation, "id" | "status">,
+  ): boolean {
     const transaction = this.activeTransactions.get(transactionId)
-
-    if (!transaction) {
-      console.error("[v0] Transaction not found:", transactionId)
-      return false
-    }
-
-    const op: Operation = {
-      id: this.generateId(),
-      ...operation,
-      status: "pending",
-    }
-
-    transaction.operations.push(op)
+    if (!transaction || transaction.status !== "pending") return false
+    transaction.operations.push({ ...operation, id: this.generateId("op"), status: "pending" })
     return true
   }
 
-  /**
-   * Commit transaction - execute all operations
-   */
-  commitTransaction(transactionId: string): boolean {
+  async commitTransaction(transactionId: string): Promise<boolean> {
     const transaction = this.activeTransactions.get(transactionId)
-
-    if (!transaction) {
-      console.error("[v0] Transaction not found:", transactionId)
-      return false
-    }
+    if (!transaction || transaction.status !== "pending") return false
 
     try {
-      // Execute all operations
-      transaction.operations.forEach((op) => {
-        op.status = "executed"
-      })
-
+      for (const operation of transaction.operations) {
+        if (typeof operation.execute !== "function") {
+          throw new Error(`Operation ${operation.type || operation.id} has no executor`)
+        }
+        await operation.execute()
+        operation.status = "executed"
+      }
       transaction.status = "committed"
       transaction.endTime = Date.now()
-
-      this.moveToHistory(transaction)
-      this.activeTransactions.delete(transactionId)
-
-      console.log("[v0] Transaction committed:", transactionId)
+      this.finish(transaction)
       return true
     } catch (error) {
-      transaction.status = "failed"
       transaction.error = error instanceof Error ? error : new Error(String(error))
+      const rollbackOk = await this.compensateExecuted(transaction)
+      transaction.status = rollbackOk ? "rolled_back" : "failed"
       transaction.endTime = Date.now()
-
-      console.error("[v0] Transaction commit failed:", error)
+      this.finish(transaction)
       return false
     }
   }
 
-  /**
-   * Rollback transaction - undo all operations
-   */
-  rollbackTransaction(transactionId: string): boolean {
+  async rollbackTransaction(transactionId: string): Promise<boolean> {
     const transaction = this.activeTransactions.get(transactionId)
-
-    if (!transaction) {
-      console.error("[v0] Transaction not found:", transactionId)
-      return false
-    }
-
-    try {
-      // Rollback in reverse order
-      const reversed = [...transaction.operations].reverse()
-
-      reversed.forEach((op) => {
-        if (op.reverse) {
-          // Execute reverse operation
-          op.status = "rolled_back"
-        }
-      })
-
-      transaction.status = "rolled_back"
-      transaction.endTime = Date.now()
-
-      this.moveToHistory(transaction)
-      this.activeTransactions.delete(transactionId)
-
-      console.log("[v0] Transaction rolled back:", transactionId)
-      return true
-    } catch (error) {
-      console.error("[v0] Rollback failed:", error)
-      return false
-    }
+    if (!transaction || transaction.status !== "pending") return false
+    const ok = await this.compensateExecuted(transaction)
+    transaction.status = ok ? "rolled_back" : "failed"
+    transaction.endTime = Date.now()
+    this.finish(transaction)
+    return ok
   }
 
   /**
-   * Execute function within transaction
+   * Convenience lifecycle wrapper for a single callback. It tracks success or
+   * failure only; arbitrary callback side effects cannot be rolled back. Use
+   * registered execute/compensate operations when compensation is required.
    */
   async executeTransaction<T>(
-    callback: (transactionId: string) => Promise<T>
+    callback: (transactionId: string) => Promise<T>,
   ): Promise<{ success: boolean; data?: T; error?: Error }> {
     const transaction = this.beginTransaction()
-
     try {
-      const result = await callback(transaction.id)
-      this.commitTransaction(transaction.id)
-
-      return {
-        success: true,
-        data: result,
-      }
+      const data = await callback(transaction.id)
+      transaction.status = "committed"
+      transaction.endTime = Date.now()
+      this.finish(transaction)
+      return { success: true, data }
     } catch (error) {
-      this.rollbackTransaction(transaction.id)
-
-      return {
-        success: false,
-        error: error instanceof Error ? error : new Error(String(error)),
-      }
+      transaction.error = error instanceof Error ? error : new Error(String(error))
+      transaction.status = "failed"
+      transaction.endTime = Date.now()
+      this.finish(transaction)
+      return { success: false, error: transaction.error }
     }
   }
 
-  /**
-   * Get transaction status
-   */
   getTransactionStatus(transactionId: string): Transaction | null {
-    return this.activeTransactions.get(transactionId) || null
+    const active = this.activeTransactions.get(transactionId)
+    if (active) return active
+    return this.completedTransactions.find((item) => item.id === transactionId) ?? null
   }
 
-  /**
-   * List active transactions
-   */
   getActiveTransactions(): Transaction[] {
-    return Array.from(this.activeTransactions.values())
+    return [...this.activeTransactions.values()]
   }
 
-  /**
-   * Get transaction history
-   */
   getTransactionHistory(): Transaction[] {
     return [...this.completedTransactions]
   }
 
-  /**
-   * Check if operation is atomic
-   */
   isOperationAtomic(operation: Operation): boolean {
-    return operation.status === "executed" && !!operation.reverse
+    return operation.status === "executed" && typeof operation.compensate === "function"
   }
 
-  /**
-   * Clean up old transactions
-   */
-  private moveToHistory(transaction: Transaction): void {
-    this.completedTransactions.push(transaction)
+  private async compensateExecuted(transaction: Transaction): Promise<boolean> {
+    let ok = true
+    for (const operation of [...transaction.operations].reverse()) {
+      if (operation.status !== "executed") continue
+      if (typeof operation.compensate !== "function") {
+        ok = false
+        continue
+      }
+      try {
+        await operation.compensate()
+        operation.status = "rolled_back"
+      } catch {
+        ok = false
+      }
+    }
+    return ok
+  }
 
+  private finish(transaction: Transaction): void {
+    this.activeTransactions.delete(transaction.id)
+    this.completedTransactions.push(transaction)
     if (this.completedTransactions.length > this.MAX_HISTORY) {
-      this.completedTransactions.shift()
+      this.completedTransactions.splice(0, this.completedTransactions.length - this.MAX_HISTORY)
     }
   }
 
-  /**
-   * Generate unique ID (overridable by nested managers)
-   */
-  protected generateId(prefix: string = "tx"): string {
-    return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  protected generateId(prefix = "tx"): string {
+    // IDs are generated with Web Crypto; do not downgrade to Math.random().
+    return securePrefixedId(prefix)
   }
 
-  /**
-   * Clear completed transactions (for testing)
-   */
   clearHistory(): void {
     this.completedTransactions = []
   }
 }
 
-/**
- * Savepoint for nested transactions
- */
 export class Savepoint {
   id: string
   timestamp: number
-  state: any
+  state: unknown
 
-  constructor(id: string, state: any) {
+  constructor(id: string, state: unknown) {
     this.id = id
     this.timestamp = Date.now()
     this.state = state
   }
 }
 
-/**
- * Nested transaction support
- */
 export class NestedTransactionManager extends TransactionManager {
-  private savepoints: Map<string, Savepoint> = new Map()
+  private savepoints = new Map<string, Savepoint>()
 
-  /**
-   * Create savepoint
-   */
-  createSavepoint(state: any): Savepoint {
+  createSavepoint(state: unknown): Savepoint {
     const savepoint = new Savepoint(this.generateId("sp"), state)
     this.savepoints.set(savepoint.id, savepoint)
     return savepoint
   }
 
-  /**
-   * Restore from savepoint
-   */
-  restoreSavepoint(savepointId: string): any {
+  restoreSavepoint(savepointId: string): unknown {
     const savepoint = this.savepoints.get(savepointId)
-
-    if (!savepoint) {
-      console.error("[v0] Savepoint not found:", savepointId)
-      return null
-    }
-
+    if (!savepoint) return null
     this.savepoints.delete(savepointId)
     return savepoint.state
   }
-
 }
 
 export const transactionManager = new TransactionManager()

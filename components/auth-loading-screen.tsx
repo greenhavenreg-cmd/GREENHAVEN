@@ -1,12 +1,33 @@
 "use client"
 
+import { useState } from "react"
 import { usePiAuth } from "@/contexts/pi-auth-context"
+import { buildPiAuthDiagnosticReport } from "@/lib/pi-runtime"
 import { allowLocalAuthFallback } from "@/lib/system-config"
 import { BrandLogo } from "@/components/ghc/brand-logo"
 import { SignInWithPiButton } from "@/components/auth/sign-in-with-pi-button"
+import { isPiBrowserRuntime, markPiBrowserRuntime } from "@/lib/pi-native"
 
 export function AuthLoadingScreen() {
   const { authMessage, hasError, reinitialize, continueLocalPreview } = usePiAuth()
+  const [diagnosticReport, setDiagnosticReport] = useState<string | null>(null)
+  const [diagnosticCopied, setDiagnosticCopied] = useState(false)
+  async function showDiagnostics() {
+    const report = buildPiAuthDiagnosticReport()
+    setDiagnosticReport(report)
+    try {
+      await navigator.clipboard.writeText(report)
+      setDiagnosticCopied(true)
+    } catch {
+      // Clipboard can be blocked in embedded browsers; the report stays visible to screenshot.
+      setDiagnosticCopied(false)
+    }
+  }
+  // Soft-connect mode: if we already know this is Pi Browser, remember it for the session
+  // so a slow SDK bridge does not surface a hard "Couldn’t sign you in".
+  if (typeof window !== "undefined" && isPiBrowserRuntime()) {
+    try { markPiBrowserRuntime() } catch { /* */ }
+  }
 
   return (
     <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[#050a08] px-6">
@@ -67,10 +88,14 @@ export function AuthLoadingScreen() {
         {hasError ? (
           <>
             <h1 className="text-lg font-bold tracking-tight text-white">
-              {authMessage &&
+              {/Pi Sandbox is ready/i.test(String(authMessage || ""))
+                ? "Ready to sign in"
+                : authMessage &&
               /server unavailable|api offline|redeploy|identity service/i.test(authMessage)
                 ? "Server temporarily unavailable"
-                : "Couldn’t sign you in"}
+                : (isPiBrowserRuntime() || /Pi Browser is open|bridge is still loading|Still connecting|SDK not ready|authentication timed out|timeout|network/i.test(String(authMessage || "")))
+                  ? "Still connecting to Pi"
+                  : "Couldn’t sign you in"}
             </h1>
             <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-rose-300/90">{authMessage}</p>
           </>
@@ -87,7 +112,7 @@ export function AuthLoadingScreen() {
                 onClick={() => void reinitialize()}
                 className="w-full rounded-full bg-emerald-500 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-400 active:scale-[0.98]"
               >
-                Retry Pi Browser authentication
+                Retry Pi authentication
               </button>
               {allowLocalAuthFallback() ? (
                 <>
@@ -104,10 +129,24 @@ export function AuthLoadingScreen() {
                 </>
               ) : (
                 <p className="max-w-xs text-center text-[11px] text-white/40">
-                  Prefer Pi Browser for payments. Or use Sign in with Pi above in a normal browser.
+                  {isPiBrowserRuntime()
+                    ? "You appear to be in Pi Browser. Use Retry if the bridge is slow to load."
+                    : "Prefer Pi Browser for payments. Or use Sign in with Pi above in a normal browser."}
                 </p>
               )}
             </>
+            <button
+              type="button"
+              onClick={() => void showDiagnostics()}
+              className="text-[11px] font-semibold text-white/45 underline underline-offset-2"
+            >
+              {diagnosticReport ? (diagnosticCopied ? "Diagnostics copied" : "Diagnostics shown below") : "Copy sign-in diagnostics"}
+            </button>
+            {diagnosticReport ? (
+              <pre className="max-h-48 w-full overflow-auto whitespace-pre-wrap break-words rounded-lg bg-black/40 p-3 text-left text-[10px] leading-snug text-white/60">
+                {diagnosticReport}
+              </pre>
+            ) : null}
           </div>
         ) : null}
       </div>

@@ -8,6 +8,7 @@
  * - EXECUTE is granted to service_role only; browser never calls these RPCs.
  */
 import { readGhcServerEnv } from "@/lib/server/economy/env"
+import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
 const SOCIAL_UPSTREAM_TIMEOUT_MS = 12_000
 
@@ -74,60 +75,24 @@ async function socialRpcOnce(
     return { ok: false, data: null, error: "DB_UNAVAILABLE", status: 503, fn }
   }
   try {
-    const res = await fetch(
-      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/${encodeURIComponent(fn)}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          // Explicit public schema — avoids profile mismatch on multi-schema projects
-          "Content-Profile": "public",
-          "Accept-Profile": "public",
-          apikey: env.supabaseServiceRoleKey,
-          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-        },
-        body: JSON.stringify(body),
-        cache: "no-store",
-        // Bound upstream latency so a stalled PostgREST request cannot pin a
-        // serverless invocation indefinitely. Callers receive the existing fail-closed result.
-        signal: AbortSignal.timeout(SOCIAL_UPSTREAM_TIMEOUT_MS),
-      }
-    )
-    const text = await res.text()
-    const parsed = parsePostgrestBody(text)
+    const res = await supabaseRpc(fn, body, { timeoutMs: SOCIAL_UPSTREAM_TIMEOUT_MS })
     if (!res.ok) {
-      logRpcFailure({
-        fn,
-        status: res.status,
-        code: parsed.code,
-        message: parsed.message,
-      })
+      const parsed = parsePostgrestBody(JSON.stringify(res.body ?? null))
+      logRpcFailure({ fn, status: res.status, code: parsed.code, message: parsed.message })
       return {
         ok: false,
         data: parsed.data,
-        error: `RPC_${fn}_HTTP_${res.status}`,
+        error: res.error || `RPC_${fn}_HTTP_${res.status}`,
         status: res.status,
         fn,
         diagnosticCode: parsed.code,
         diagnosticMessage: parsed.message || parsed.hint || parsed.details,
       }
     }
-    return {
-      ok: true,
-      data: parsed.data,
-      status: 200,
-      fn,
-    }
+    return { ok: true, data: res.data, status: res.status, fn }
   } catch (e) {
     const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")
-    return {
-      ok: false,
-      data: null,
-      error: timedOut ? "RPC_TIMEOUT" : "RPC_NETWORK",
-      status: 503,
-      fn,
-    }
+    return { ok: false, data: null, error: timedOut ? "RPC_TIMEOUT" : "RPC_NETWORK", status: 503, fn }
   }
 }
 
@@ -163,46 +128,16 @@ export async function socialRest<T = unknown>(
     return { ok: false, data: null, error: "DB_UNAVAILABLE", status: 503 }
   }
   try {
-    const res = await fetch(
-      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/${pathAndQuery.replace(/^\//, "")}`,
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Accept-Profile": "public",
-          apikey: env.supabaseServiceRoleKey,
-          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-        },
-        cache: "no-store",
-        // Keep direct table reads within the same upstream latency budget as RPCs.
-        signal: AbortSignal.timeout(SOCIAL_UPSTREAM_TIMEOUT_MS),
-      }
-    )
-    const text = await res.text()
-    let data: T | null = null
-    if (text && text !== "null") {
-      try {
-        data = JSON.parse(text) as T
-      } catch {
-        data = null
-      }
-    }
+    const res = await supabaseRest<T>(pathAndQuery.replace(/^\//, ""), {
+      method: "GET",
+      timeoutMs: SOCIAL_UPSTREAM_TIMEOUT_MS,
+    })
     if (!res.ok) {
-      return {
-        ok: false,
-        data: null,
-        error: `REST_HTTP_${res.status}`,
-        status: res.status,
-      }
+      return { ok: false, data: null, error: res.error || `REST_HTTP_${res.status}`, status: res.status }
     }
-    return { ok: true, data, status: 200 }
+    return { ok: true, data: res.data, status: res.status }
   } catch (e) {
     const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")
-    return {
-      ok: false,
-      data: null,
-      error: timedOut ? "REST_TIMEOUT" : "REST_NETWORK",
-      status: 503,
-    }
+    return { ok: false, data: null, error: timedOut ? "REST_TIMEOUT" : "REST_NETWORK", status: 503 }
   }
 }

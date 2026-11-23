@@ -1,476 +1,236 @@
-## Run #248 — Release-gate contract repair (2026-11-10)
+# Current project truth — 0.338.104 RUN377 + RUN376 + RUN373 (2026-11-23)
+
+- User-designated source baseline is `GREENHAVEN-0_338_102-RUN375-PI-SDK-EARLY-LOAD-2026-11-23 (1).zip`. RUN376 and RUN377 are local source-only derivatives of that archive; no derivative has been pushed or deployed.
+- Inherited RUN373–RUN375 checks remain part of the supplied parent baseline. RUN377 ACL source contract 17/17; RUN376 readiness-policy regression 14 assertions; project-truth 11/11; release hygiene 17/17; migration inventory 232/232 synchronized. Full `npm run verify:static` exceeded the workspace execution window after 4,641 output lines with no reported assertion failure before timeout; completion is not claimed.
+- RUN376 fixes Preview readiness evaluation: the readiness check now uses the effective `readGhcServerEnv().allowDevAuth` policy, which hard-denies development auth whenever `NODE_ENV=production`, including Vercel Preview. A stale `GHC_ALLOW_DEV_AUTH` opt-in no longer becomes a false critical blocker; the report advises removing the ineffective flag. Pi payment health separately reports payment-configuration readiness and platform readiness. Detailed diagnostics remain operator-key protected. This is source-level only; it does not prove a live Pi API request or end-to-end payment.
+- RUN373 fixes Pi frame classification: only an iframe whose exact referrer host is `sandbox.minepi.com` is treated as the Developer Sandbox. `app-cdn.minepi.com` is a Pi SDK/bridge host and no longer bypasses the App Studio parent-credentials handshake.
+- RUN372 establishes one canonical GreenHaven account principal (`userId`) from the durable server-verified Pi→GreenHaven mapping. The Pi UID is retained only as the authentication-provider subject and a transitional legacy lookup alias; it is not allowed to become a GreenHaven account ID before mapping verification.
+- Pi SDK identity alone now remains unbound (`current-user` local placeholder). Profile hydration cannot promote an unverified Pi subject into an account. `server_verified` requires both a Pi UID and a non-placeholder canonical account ID. Account switches clear prior account-bound credentials and state.
+- Existing `gh_pi_identities`, `gh_sessions`, wallet, ledger, marketplace, membership and community records continue using their established canonical GreenHaven user key. No mass identity rewrite or database migration is included. Transitional Pi UID aliases are not authorization evidence and must not be used by server-side financial ownership checks.
+- RUN372 identity principal checks: 9/9; canonical identity runtime: 44 assertions; Phase 2 canonical identity: 18/18; Phase 4 identity authentication: 16/16; Phase 4 identity integration: 17/17; Phase 4 identity/community/messaging: 32/32; Run 250 immutable mapping integrity: 10/10; Run 251 RPC ACL: 8/8; Run 252 search-path hardening: 5/5; account-switch engagement: 15/15; Pi auth scope isolation: 6/6; profile identity snapshot: 8/8 plus 13 runtime assertions.
+- Node 22.16.0 is available in this workspace; the project requires Node `^24.15.0`. Dependency-backed typecheck, lint and production build are not claimed. Live Testnet two-account, cross-device and IDOR acceptance remain outstanding. Production remains NOT APPROVED.
+- No database writes, migrations, wallet/payment operations, GitHub push, Vercel deployment or Mainnet actions were performed.
 
-GitHub Actions #248 failed because the Phase 10 release-closure checker looked for individual gate names inside `prebuild`, which now intentionally delegates to `scripts/run-prebuild-checks.mjs`. The actual declared checks are in `prebuild:checks`. The checker now reads the declared manifest using a shared safe parser, while preserving all five release controls in both prebuild and static verification. The parser rejects malformed entries, shell syntax, path traversal and missing checker files; execution remains shell-free. A focused 15-check Run #248 contract is registered in both suites. A repository-wide sweep updated legacy programme and feature checkers to inspect `prebuild:checks` instead of the wrapper-only `prebuild` command. Vercel's build command also clears npm cache-dir environment aliases in the separate build shell. Phase 10 closure passes 16/16, Phase 10 platform acceptance 24/24, Phase 24 final review passes, Pass 36 passes 8/8, Run #248 passes 15/15, Run #247 diagnostics passes 15/15, and the complete `npm run verify:static` suite exits 0. The prebuild dry-run discovers 278 commands (the prior 277 plus the new contract). This repairs the confirmed #248 failure but does not establish the full Node 24.15.0 build or Testnet acceptance. No dependencies, migrations, balances, ledger entries, reservations, Pi transfers, GitHub branches or deployments were changed. Production remains NOT APPROVED.
+**Current source version:** `0.338.104`  
+**Package identity:** `gh-connect@0.338.104`  
+**User-designated source archive:** RUN375 Pi SDK early-load archive  
+**Current local working derivative:** RUN377 identity/session ACL audit on top of RUN376 and the user-supplied RUN375 archive; not pushed or deployed.  
+**Current status:** **NOT APPROVED** for production.
 
-## Run #247 — Build diagnostics and dependency warning policy (2026-11-10)
+## RUN377 identity/session privilege audit
 
-Run #247's visible source checks passed, but the supplied log ends at the generic `BUILD_UTILS_SPAWN_1` wrapper error and does not include the underlying Next.js diagnostic. The prebuild chain is now executed by a numbered, no-shell runner that identifies the exact failed checker while retaining all 277 baseline checks. CI now removes stale user-level npm `cache-dir` configuration, records the npm version and preserves Next.js trace/diagnostic artifacts on build failure. Dependency warnings were triaged without speculative package upgrades: Pi's transitive Stellar packages remain unchanged; ESLint 9 remains paired with the current Next 15 lint config; DOMPurify 4.x and native install-script approvals require focused compatibility review.
+The connected Supabase project inspected in this run has `gh_pi_identities` and `gh_sessions`, and records both base migration versions. Its live ACLs deny `service_role` the SELECT/INSERT/UPDATE rights used by the application. RUN377 adds a least-privilege source migration and corrects `/api/health` so Supabase credential presence is reported as `configured_unverified`, not verified table durability. The Preview deployment-to-project reference is unconfirmed; no live database migration was applied.
 
-The available review runtime was Node.js 22.16.0, below the repository's Node.js 24.15.0 requirement, and npm registry requests failed with `EAI_AGAIN`. Therefore this run does not claim a dependency-backed typecheck, lint or Next.js production build pass, nor does it claim the underlying Run #247 build root cause is fixed. No financial state, migration, provider transfer, GitHub branch or deployment was changed. Production remains NOT APPROVED.
+## Historical RUN364 and earlier records
 
-## Run #246 — Withdrawal Supabase permissions, PIN recovery and account hydration (2026-11-10)
 
-The earnings payout worker no longer directly selects from `gh_pi_earnings_payout_requests`, whose migration intentionally revokes direct `service_role` table access. It now uses the new ownership-scoped `gh_pi_earnings_payout_get_owned` SECURITY DEFINER RPC, which returns only the execution fields for the exact authenticated owner. Lookup permission/schema failures now produce a sanitized retryable service response instead of an unhandled route exception. PIN recovery now uses service-role-only RPCs for status, insert-only setup, atomic failed-attempt recording, and transactional PIN replacement plus recovery-lock reset and 24-hour cooldown. The new migration reasserts the PIN storage service-role grants while keeping client roles denied and recovery-table direct access revoked. The withdrawals health endpoint now probes the payout lookup and PIN recovery RPCs with synthetic non-user identities, without creating payments or mutating user data. Account-anchor hydration now distinguishes server-confirmed cache values from profile hints and skips repeated idempotent POSTs only when a server-confirmed immutable anchor is already available. The additive migration `20261110100001_withdrawal_rpc_acl_and_recovery_atomicity.sql` is REVIEW_REQUIRED and unapplied; reconcile target migration history and validate on disposable PostgreSQL before any Testnet application. No Pi transfer, ledger change, payout execution, or production deployment was performed. Production remains NOT APPROVED. Run #249 also adds `20261110110001_wallet_recovery_reset_lock_race_guard.sql` as REVIEW_REQUIRED: the reset RPC re-checks recovery lock state under `FOR UPDATE`, serializes against PIN reset attempts, and refuses to extend an already-active 24-hour cooldown. It is additive and unapplied; validate concurrency and target migration history on disposable PostgreSQL before Testnet review.
 
-## 0.330.49 — Phase 3 wallet, rewards and membership concurrency hardening (2026-11-08)
+## RUN364 full-project audit and gate repair (2026-11-19)
 
-**Current source version:** `0.338.20`
+- RUN364 is a local source-only derivative of the RUN363 archive; it is not pushed or deployed. Production remains **NOT APPROVED**.
+- Fixed the Phase 8 documentation-path failure and related historical-document lookup failures across the registered phase/release checks. The shared resolver now supports canonical docs, historical implementation records, archived worklogs and phase notes.
+- Updated stale Run 277 Pi-auth assertions to match the current bounded SDK bridge wait and 25-second official authorization timeout.
+- Changed `.env.example` registration bonus default to disabled (`GHC_REGISTRATION_BONUS_ENABLED=0`); explicit enablement and Testnet sandbox checks remain required.
+- `npm run verify:static` completed successfully (exit 0); consolidated static verifier 63/63. The 396 prebuild checks were enumerated only, not executed, because this workspace is Node 22.16.0 while the project requires Node `^24.15.0`. Typecheck, lint and Next.js build remain unverified.
+- The supplied npm audit artifact confirms 22 unresolved findings (2 critical, 13 high, 6 moderate, 1 low). Next.js 15.5.26 and DOMPurify 3.4.15 are the critical affected packages. The Pi backend/Stellar/Axios/TOML chain has no fix reported by that artifact; Zod's offered fix is a major update. No dependency or lockfile changes were made, no audit gate was bypassed, and no unsafe Pi SDK override was introduced. See `docs/RUN364-FULL-PROJECT-AUDIT-AND-GATE-REPAIR-2026-11-19.md`.
+- No GitHub push, Vercel deployment, Supabase mutation, migration application, Mainnet action, payment operation or financial-state change occurred.
 
-This increment closes several Phase 3 financial-reliability gaps. Pi withdrawal reservation recovery now reports per-request reasons and unlock conditions, and only releases a Pi Testnet reservation when it is still `reserved`, has no provider payment/txid, has no execution start/lease and has zero execution attempts. Processing/uncertain requests remain protected until an authoritative provider result; timeouts do not forfeit earned funds. Wallet ledger history prioritizes human-readable reasons over opaque references, and the withdrawal request response no longer contradicts its own execution gate. GHC membership purchase now serializes entitlement preflight and debit per account and prevents duplicate active same-tier charges or active VVIP downgrades during concurrent requests. Reward claim replay by either pending-row ID or rewardId alias resolves to the one posted credit. Pi payment recovery now looks up and validates the provider object before binding its ID, checks payer identity/network/direction/amount, and requires a verified transaction and txid before completion; recovery is durably rate limited and no-store. The new SQL migration `20261108110001_phase3_wallet_rewards_membership_concurrency_recovery.sql` is REVIEW_REQUIRED and unapplied. Its 43-check source contract passes; existing targeted Phase 3 ledger, request guard, membership, payout lifecycle/settlement/execution, wallet recovery and cross-feature reconciliation contracts pass. Live PostgreSQL concurrency, authenticated Pi Testnet payment/entitlement recovery, actual 3π reservation reconciliation, Node 24.15.0 dependency-backed typecheck/lint/build and browser/device acceptance remain outstanding. Production remains NOT APPROVED.
+**Current source version:** `0.338.99`  
+**Package identity:** `gh-connect@0.338.99`  
+**Latest user-provided source archive:** `GREENHAVEN-0.338.99-RUN331-PHASE1-6-GAP-REGISTER-PHASE7-COMMUNITIES.zip`  
+**RUN331 archive SHA-256:** `851ac3a540b76572b1325c6e06a35de069649f37db5cb11d24aca124d239fafa`  
+**Current local working derivative:** RUN337 GitHub audit/environment-template repair on top of RUN336; not pushed or deployed.  
+**Current status:** **NOT APPROVED** for production.
 
----
+## RUN337 GitHub Actions audit / packaging repair
 
-## 0.330.48 — Project-wide maintenance programme (2026-11-08)
+- Restored the exact safe `.env.example` from the parent of failing GitHub commit `9ceeaeafcf0f4b08c2b390fadfed0111a70ce285`; the failing branch and RUN336 archive both lacked the file even though repository ignore rules explicitly allow it.
+- Corrected the dependency audit workflow diagnostic. npm audit's normal exit 1 for vulnerability findings is now reported distinctly from registry/report errors; the gate still fails closed on any findings.
+- Added RUN337 regression gate (7/7) and updated RUN332 audit source check (16/16).
+- The actual uploaded GitHub audit artifact reports 29 findings: 2 critical, 21 high, 5 moderate, 1 low. Dependency remediation is NOT complete. The exact Pi SDK dependency chain and the registry-unavailable constraint are documented in `docs/RUN337-GITHUB-AUDIT-AND-ENV-TEMPLATE-REPAIR-2026-11-18.md`.
+- The package manifest and lockfile were not hand-edited. No npm audit gate was bypassed, no unsafe Pi SDK override was introduced, and no clean audit/build claim is made.
+- No GitHub push or Vercel deployment occurred. Production remains NOT APPROVED.
 
-**Current source version:** `0.330.48`
+## Source authority
 
-The source baseline is retained from 0.330.46. This increment establishes `docs/PROJECT-WIDE-MAINTENANCE-150-0.330.48.md`: 15 product/system sections and 10 explicit engineering essentials each (150 total), with security, financial authority, migration approval and external acceptance guardrails. A stale Wallet source-contract assertion was corrected to match the current UI wording (“held against Pi withdrawal requests”); no wallet ledger, reservation, payout or payment behavior changed. The maintenance register contract passes 22/22, and the complete source regression chain passes when the Node 24 runtime gate is isolated. The normal prebuild correctly blocks under the available Node 22.16.0 runtime; Node 24.15.0, dependencies, live services and device acceptance remain unavailable. Production remains NOT APPROVED.
+RUN331 is the latest user-provided 0.338.99 archive. RUN332 and RUN333 are local source derivatives of that archive; neither has been pushed or deployed. RUN333 uses the existing GH Connect Supabase Testnet project directly and applied one narrow grant-revocation migration, documented in `docs/RUN333-TESTNET-SECURITY-RECONCILIATION-2026-11-18.md`. Testnet now records 46 migration entries; the canonical source inventory contains 230 files. Twenty applied history entries still lack matching source filenames and eleven same-slug/different-version records remain unverified. The three research/media/scoped-evidence migrations remain held. Preview/testnet-only Vercel environment update requests were accepted; sensitive values are masked and runtime verification awaits a fresh preview build. Preserve the existing GreenHaven and Pi identity, wallet and financial boundaries, and migration history.
 
-## Historical 0.330.46 — Phase 11.2.5 Push Secret and Privacy Hardening (2026-11-08)
+## RUN336 GitHub / Vercel build cleanup
 
-**Current source version:** `0.330.46`
+- Corrected the tally route count parsing with explicit `number | null | "invalid"` optional-count normalization and explicit numeric required-count assignments. All count bounds and consistency checks remain.
+- Fixed the missing public-route policy import, the field-agent `assignmentId` model, the Communities `useRef` import, the invalid `selected.isJoined` property access, and the unknown `reduce` accumulator.
+- Research Studio loader callback dependencies are present; no hook lint suppression was added.
+- Updated the dependent Phase 4 assertion to verify the computed `joined` membership decision.
+- RUN336 build cleanup checks pass 12/12; RUN335 tally checks 8/8; election UI 13/13; reconciliation runtime 6/6; Phase 4 identity/community/messaging 32/32. Full `npm run verify:static` passes.
+- The source errors in the supplied seven-error typecheck log are addressed. Full dependency-backed typecheck/lint/Next build remain unverified because this packaging environment lacks `node_modules` and uses Node 22.16.0 rather than required `^24.15.0`.
+- Remaining npm warnings are documented in `docs/RUN336-GITHUB-VERCEL-BUILD-CLEANUP-2026-11-18.md`: deprecated `isomorphic-dompurify@3.20.0`, Stellar packages transitively required by the exact official `pi-backend@0.1.3` pin, and ESLint 9 EOL while Next 15's ESLint 10 compatibility remains unverified. No unsafe overrides or hand-edited lock metadata were introduced.
+- These are source-only changes. No GitHub push, Vercel deployment or database mutation occurred. Production remains NOT APPROVED.
 
-Phase 11.2.4 selects standards-based Web Push with VAPID as the provider-neutral protocol. Phase 11.2.5 adds AES-256-GCM encryption for endpoint and subscription key material before storage, cryptographic P-256 VAPID keypair matching, ciphertext-only outbox claims, generic privacy-safe payloads and opaque per-notification tags. Provider acceptance is distinguished from actual device display. The SQL remains a proposal outside `supabase/migrations`, not applied and not part of the migration manifest. The vetted `web-push` package could not be installed because the npm registry is unreachable in this environment; no sender, scheduled worker, deployment keys, provider receipts or offline delivery are configured. Three channels remain separate: server-backed in-app inbox, local browser alerts and remote Web Push (disabled). Focused source/runtime contracts are added. PostgreSQL/Testnet/Mainnet, Node 24 dependency-backed build, provider sender, offline device, multi-account, browser/mobile and screen-reader acceptance remain open. Production remains NOT APPROVED.
+## RUN333 current Testnet state (retained by RUN336)
 
-## 0.330.44 — Phase 11.2.3 Notification Preferences and Account/Device Boundaries (2026-11-08)
+- Existing Testnet project only; no additional Supabase branch created.
+- Applied `20261118033839_revoke_client_select_on_server_only_tables` and verified that the eight target tables retain RLS, client SELECT privileges are absent, and service-role SELECT/INSERT/UPDATE/DELETE remain.
+- Live migration history: 46 entries. Canonical source migration inventory: 230 files. Current mapping: `docs/RUN333-MIGRATION-HISTORY-RECONCILIATION.csv`.
+- Historical source gaps remain: 20 applied history entries have no matching filename; 11 same-slug/different-version candidates are unverified. Do not reconstruct or bulk-replay.
+- RUN333 adds the authenticated field-agent tally desk, own-assignment acceptance, and owner/reviewer-only read-only independent comparison. Tally submission remains gated on the held atomic RPC and a provenance-backed polling-unit dataset; no result is certified.
+- Testnet currently has `gh_research_projects`, but not the dependent research membership, geography, election contest/candidate/assignment/tally tables or atomic tally RPC. The new field-agent desk fails closed until those dependencies are safely installed.
+- Three research/media/scoped-evidence migrations remain held. No scanner/geography acceptance is inferred.
+- RUN336 retains all RUN333 Testnet state. Its project-wide static verification passes, but supported Node 24.15.x dependency-backed typecheck/lint/build remain outstanding.
+- Mainnet untouched; no GitHub push or Vercel deployment. Production remains NOT APPROVED.
 
-Phase 11.2.3 separates account-level in-app inbox preferences from browser/device-level local alert preferences. Authenticated GET/PATCH `/api/notifications/preferences` derives ownership from the server-verified session and persists account choices through the existing `gh_user_profiles.profile_payload.notificationPreferences` namespace when the durable profile store is configured. Browser alert choices are stored separately under account + browser-device local keys, so another device or another account on the same browser does not inherit them. Settings shows independent In-app and This device controls and refreshes browser permission state when the app regains focus/visibility. Browser permission remains an independent platform gate; denied permission must be changed in browser site settings. Legacy preference records remain readable for migration compatibility. No database migration, remote push provider, PushManager subscription lifecycle, or financial authority was added. Important limitation: profile payload persistence uses read/merge/upsert rather than a dedicated atomic preference store; concurrent profile payload writes can be last-write-wins. Cross-device sync requires the durable profile store and live acceptance. Remote Web Push remains NOT CONFIGURED. Focused preference source/runtime checks pass 17/17 and 12/12; prior notification action, priority, account-isolation, delivery, service-worker and RPC privilege suites pass. Node 24 dependency-backed build, live cross-device, mobile/browser/screen-reader and Testnet/Mainnet acceptance remain open. Production remains NOT APPROVED.
+## 0.338.92 implementation
 
-**Current source version:** `0.330.44`
+- Public respondents can upload images, video, audio and PDF files to a published project using short-lived signed Storage URLs and a one-hour project/submission-key scoped upload session. Up to five files per submission key are accepted. Files attach to the response only when that exact submission key is submitted.
+- Field agents can upload evidence only to a durable report created by the same field-session JTI. Field-session codes do not become GreenHaven accounts or admin credentials.
+- The central administrator Evidence Review Centre lists Research and Field Desk evidence and records review decisions. Admin access is checked against `GHC_FIELD_ADMIN_USER_ID`.
+- Upload completion streams the object through SHA-256 hashing and checks basic file magic bytes against the claimed MIME type. This is MIME-spoofing resistance, not malware detection.
+- All new evidence enters `scan_status=pending` and `verification_status=quarantined`. Content delivery is denied until a trusted scanner reports a matching SHA-256 digest as clean. Scanner queue and HMAC-authenticated callback endpoints are implemented; a separate trusted scanning worker/provider and `GHC_EVIDENCE_SCANNER_SECRET` configuration are still required. No file is claimed to have been malware-scanned in this source-only increment.
+- Database triggers append evidence creation, scan and review changes to a restricted append-only SHA-256 hash chain. Hashes are evidence-integrity indicators, not a guarantee of physical authenticity or legal certification.
+- Optional geographic-unit references are checked against active `gh_research_geo_units` records. For election-observation projects, supplied geographic IDs must resolve to `level_key='polling_unit'`. No national Nigeria geography dataset, international data package, GPS capture, EXIF verification or polling-unit roster is imported in this increment.
 
----
+## Migration status
 
-## Historical 0.330.43 — Phase 11.2.2 Notification Delivery Architecture (2026-11-08)
+The new evidence workflow depends on three additive migrations, all source-only and REVIEW_REQUIRED at packaging time:
 
-Phase 11.2.2 distinguishes the server-backed authenticated in-app inbox, local browser alerts, and remote Web Push. The unified `/api/notifications` route uses the canonical server inbox RPC and reports its durable status; device-local storage remains a compatibility mirror. Browser alerts are local display attempts gated by account preferences and browser permission. The service worker has a push-event receiver, but the repository has no PushManager subscription registration/persistence, provider sender, VAPID configuration, or durable remote delivery outbox. Remote Web Push is therefore NOT CONFIGURED and offline delivery must not be claimed. Legacy smart-notification queue terminology now says browser alerts, duplicate local alert scheduling from the smart mirror is removed, and service-worker click navigation is constrained to same-origin/same-protocol URLs. No migration, provider, API authority, or financial boundary changed. Focused architecture/runtime checks are included in prebuild and verify:static. Node 24 dependency-backed build, real provider, browser/mobile, screen-reader, real two-account and live Supabase acceptance remain open. Production remains NOT APPROVED.
+1. `20261116182000_gh_research_intelligence_platform_foundation.sql` — project roles, research evidence base, geographic hierarchy, election/exam/challenge/poll foundations and audit events. Its challenge participation function was reordered after the referenced tables to fix a forward type dependency.
+2. `20261116190000_gh_media_evidence_engine.sql` — media asset references and Field Desk evidence relation.
+3. `20261117010001_gh_evidence_scoped_upload_chain_of_custody.sql` — scoped upload sessions, scan/quarantine fields, field-session report binding, geographic metadata and append-only hash-chain events.
 
-**Version at this historical release:** `0.330.43`
+The existing Testnet migrations `20261116170409_gh_field_reports_public_intake` and `20261116171144_gh_research_studio_public_forms` remain applied and recorded. The three migrations above remain unapplied and held for review. RUN333 applied only the separate server-only SELECT-grant revocation migration on Testnet. Mainnet was not changed.
 
+## Verification limits
 
-## 0.330.40 — Priority 10.2 shared filter state and server parity (2026-11-08)
+The supported runtime requirement is Node.js `^24.15.0`. Full TypeScript, lint, and Next.js production build verification must run on that supported runtime with the locked dependencies installed. The current source-only workspace does not establish those dependency-backed checks.
 
-Phase 10.2 introduces a shared, validated filter query contract for date, numeric, category, location range, sort, pagination and search inputs. Non-sensitive filter preferences are persisted under account-scoped browser keys for Communities, Rewards history and Activity; account changes cannot write one account's old state into another account's key. Marketplace public listing filters (AND-token search, category, listing kind, currency-specific GHC/PI price range, date range and sort) are executed in Postgres/PostgREST before bounded offset pagination. Authenticated wallet history supports inclusive UTC calendar-day date bounds plus allow-listed status/kind and AND-token text search in the server query while preserving its keyset cursor and owner check; Rewards requests only earned rows. Public Community search is implemented through `gh_community_search_public`, a new service-role-only RPC with full-text/category filtering, deterministic ordering and bounded pagination; migration `20261108120001_gh_community_server_filter_search.sql` is REVIEW_REQUIRED and unapplied, so filtered RPC use must wait for independent Testnet/Mainnet history reconciliation and disposable PostgreSQL validation. Communities, Rewards and Activity now use consistent filter summaries and semantics; Activity explicitly labels itself as the latest locally available bounded snapshot, not a complete ledger. The legacy Discovery FilterPanel had no mounted consumers and was removed from its public barrel exports and source. Filter result-state component covers loading, error, empty and no-results. Runtime tests pass 28/28 and integration contracts 34/34; Node 24 dependency-backed typecheck/build, live database/RPC, browser/mobile/keyboard/screen-reader acceptance remain outstanding. Production remains NOT APPROVED.
+The source migration inventory is not evidence of applied migrations; it records repository SQL files and classifications only. RUN333 postflight verified the new Testnet grant migration and its privilege effects; all other source files still require exact target-history/catalog reconciliation before application.
 
-**Historical source version:** `0.330.39`
+The source includes static contract checks and pure file-signature tests. Full Node 24.15.0 dependency-backed TypeScript, lint, production build and browser/device end-to-end acceptance remain outstanding because the available workspace is Node 22.16.0 and dependencies are not installed. Scanner provider execution, signed upload against Testnet, evidence chain postflight and geographic lookup against populated data are not runtime-verified.
 
-## 0.330.39 — Priority 10 coordinated filters (2026-11-07)
+No GitHub push, Vercel deployment, Mainnet migration or financial state change was performed. Source presence does not establish database application, runtime success, scanner execution or test acceptance. Production remains NOT APPROVED.
 
-Priority 10 adds one shared accessible active-filter summary with per-filter removal and clear-all behavior across Feed, Discovery, Wallet, Messages, Marketplace and Notifications. Common bounded Unicode/diacritic-insensitive token matching is used by Feed, Discovery, Wallet transaction search and Messages inbox search. The legacy random-distance placeholder was removed; textual location matching does not claim geospatial radius. Focused utility tests pass 14/14 and source contracts pass 17/17. The shared filter foundation does not yet complete account-scoped persistence, server-side query parity, Communities/Rewards coverage or browser/device acceptance. No database migration or authorization change was made. Node 24.15.x build, accessibility/device and live acceptance remain open. Production remains NOT APPROVED.
 
-**Historical source version:** `0.330.39`
+## 0.338.96 full-project audit remediation candidate
 
-## 0.330.38 — Priority 9.4 seller fulfilment and buyer tracking (2026-11-07)
+- Added a safe `.env.example` containing blank server-only credential placeholders, explicit public/server-only sections, and disabled Pi payout execution defaults. It contains no real credentials.
+- Reconciled the essential-controls navigation list with the actual six visible shell destinations: Home, Discover, Messages, Communities, Cart and Profile. The wallet remains an overlay.
+- Updated stale regression assertions that still expected the older five-item navigation contract.
+- Updated package, lockfile and in-app release identity to 0.338.96.
+- No database schema, migration, RLS policy, payment, payout, wallet balance, Pi execution, production environment or deployment was changed.
 
-Phase 9.4 adds durable fulfilment method (shipping, pickup or digital), carrier/tracking details, HTTPS tracking links, estimated delivery and dispatch timestamps. Sellers must record shipping details before starting a shipment, explicitly dispatch before marking it delivered, and digital fulfilment activates a service rather than claiming parcel delivery. Buyer completion remains gated on verified payment and persisted delivery/service activation. A database-enforced append-only trigger journal captures order creation, payment status, order status and delivery status; Phase 9.4 fulfilment events carry the authenticated participant actor. The activity timeline is available only to the order's buyer and seller. Legacy orders already in fulfilment retain a clearly labelled compatibility path without guessing their delivery method. The migration `20261107190001_marketplace_fulfilment_tracking_timeline.sql` is REVIEW_REQUIRED and unapplied. Parser tests pass 15/15 and source contracts pass 28/28. No PostgreSQL execution, shipping-provider verification, live Supabase, Pi/GHC Testnet, browser/device or Node 24.15.x build evidence exists. Production remains NOT APPROVED.
+Focused source checks: release hygiene 17/17; Run #312 notification repair 28/28; Run #304 filter/search release 30/30; scoped evidence engine 25/25; media evidence engine 22/22; Phase 10 release closure 17/17. Full Node 24.15.0 dependency-backed verification remains outstanding because the available environment is Node 22.16.0 and npm installation did not complete.
 
-**Historical source version:** `0.330.38`
+## Canonical visible navigation
 
-## 0.330.37 — Priority 9.3 true SKU variants and atomic inventory (2026-11-07)
+The current visible shell navigation contains six destinations, in order: Home · Discover · Messages · Communities · Cart · Profile. Matches remains available as a secondary/deep-link tab; Wallet remains an overlay.
 
-Phase 9.3 adds dedicated durable SKU records with seller-scoped unique SKUs, per-variant price/currency/on-hand/reserved inventory, bounded seller authoring, buyer SKU selection, variant-aware cart line identity, variant-aware starting-price display, immutable order SKU/label snapshots, and variant-bound order creation. Listing publication and initial SKU rows share one database transaction to prevent a legacy-checkout race. Database transitions release reserved units on cancellation/expiry and commit units on verified payment; legacy order creation is blocked for active-variant listings to prevent inventory bypass. Seller variant replacement validates all rows before writes, preserves reserved units, refuses to deactivate variants with active reservations, and uses a consistent listing-before-variant lock order. The migration `20261107180001_marketplace_sku_variants_atomic_inventory.sql` is REVIEW_REQUIRED and unapplied. Static contract and parser tests pass 25/25 and 16/16 respectively; no disposable PostgreSQL concurrency, migration application, live Supabase, Pi/GHC Testnet, browser/device or Node 24.15 build evidence is available. Production remains NOT APPROVED.
 
-**Historical source version:** `0.330.37`
+## 0.338.96 transaction and interaction hardening (Run 313)
 
-## 0.330.36 — Priority 9.2 Seller Centre and product option foundations (2026-11-07)
+- Replaced the misleading in-memory transaction operation flags with explicit ordered operation executors and reverse-order compensation handlers. Failed operations now trigger compensations for completed operations; incomplete compensation is recorded as `failed`. Completed transaction records are retrievable from bounded history.
+- Explicitly documented that this in-memory coordinator is not a database transaction and is never authoritative for wallets, payments, rewards, orders, or entitlements. Financial state remains server/RPC/ledger-owned.
+- Backup restore now validates the complete snapshot arrays before applying one consolidated state update, preventing subscribers from observing partial profile/settings/posts/conversations restoration.
+- Added Run 313 source and runtime regression gates to prebuild and static verification.
+- No live database, wallet, Pi, A2U, Mainnet, GitHub, or Vercel operations were performed. Full Node 24.15.0 build and device acceptance remain required; production remains NOT APPROVED.
 
-Marketplace checkout now selects GHC versus Pi from the server-created durable order currency, never from a potentially stale listing/cart snapshot. Single-item purchase attempts use unique stable idempotency keys rather than a minute-based collision-prone key; keys remain available across uncertain payment retries and pending Pi handoff. If the order response omits or returns an unsupported currency, payment is not started and the buyer is directed to inspect Orders. Listing record hydration now treats missing inventory as zero instead of inventing one unit. Seller Centre exposes an explicit bounded stock quantity; zero remains zero, edits submit the seller's selected quantity, and an omitted stock field on server-side edits preserves the existing authoritative quantity. Listing delivery instructions now round-trip through the existing JSON metadata column and are returned by the listing API, so delivery mode/details survive refresh and device changes. No schema migration, financial authority, payment rail, order lifecycle or inventory reservation RPC was changed. Dedicated Phase 9 source/runtime contracts are registered in prebuild and static verification. Node 24.15.x dependency-backed typecheck/lint/build, browser/device acceptance, disposable PostgreSQL concurrency tests, live Supabase/Pi provider and Testnet operator acceptance remain outstanding. Production is NOT APPROVED.
 
-**Historical source version:** `0.330.36`
+## 0.338.96 Run 314 — 30 screen-level experience upgrades
+- Added a 30-rule adaptive UI layer for Wallet, payment recovery and sheets, Messages, Communities, Marketplace, Feed, Profile, Rewards, Membership and Settings.
+- Added explicit component hooks for the responsive community directory grid, marketplace listing grid, conversation rows/bubbles/composer, wallet scroll region, profile timeline and rewards balance panel.
+- No payment, wallet, ledger, reward, membership entitlement, order lifecycle, Pi consent, A2U, migration, or Mainnet authority changed.
+- Full Node 24.15.0 dependency-backed checks and visual browser/device acceptance remain required.
+## 0.338.92 implementation
 
-Phase 9.2 adds seller-facing listing health indicators (low stock, drafts, incomplete catalog content), bounded product option authoring (up to four option groups and twelve values per group), durable option metadata, and buyer-visible option information with a clear message-to-confirm journey. Product options intentionally share the listing's authoritative price and stock in this increment; they are not independent SKUs or separate inventory pools. Independent variant prices/stock and variant-bound atomic reservation remain gated until the dedicated database/order contract is implemented and concurrency-tested.
+- Public respondents can upload images, video, audio and PDF files to a published project using short-lived signed Storage URLs and a one-hour project/submission-key scoped upload session. Up to five files per submission key are accepted. Files attach to the response only when that exact submission key is submitted.
+- Field agents can upload evidence only to a durable report created by the same field-session JTI. Field-session codes do not become GreenHaven accounts or admin credentials.
+- The central administrator Evidence Review Centre lists Research and Field Desk evidence and records review decisions. Admin access is checked against `GHC_FIELD_ADMIN_USER_ID`.
+- Upload completion streams the object through SHA-256 hashing and checks basic file magic bytes against the claimed MIME type. This is MIME-spoofing resistance, not malware detection.
+- All new evidence enters `scan_status=pending` and `verification_status=quarantined`. Content delivery is denied until a trusted scanner reports a matching SHA-256 digest as clean. Scanner queue and HMAC-authenticated callback endpoints are implemented; a separate trusted scanning worker/provider and `GHC_EVIDENCE_SCANNER_SECRET` configuration are still required. No file is claimed to have been malware-scanned in this source-only increment.
+- Database triggers append evidence creation, scan and review changes to a restricted append-only SHA-256 hash chain. Hashes are evidence-integrity indicators, not a guarantee of physical authenticity or legal certification.
+- Optional geographic-unit references are checked against active `gh_research_geo_units` records. For election-observation projects, supplied geographic IDs must resolve to `level_key='polling_unit'`. No national Nigeria geography dataset, international data package, GPS capture, EXIF verification or polling-unit roster is imported in this increment.
 
+## Migration status
 
-## 0.330.34 — Priority 8 Messages security hardening (2026-11-07)
+The new evidence workflow depends on three additive migrations, all source-only and REVIEW_REQUIRED at packaging time:
 
-Completed the remaining source-level messaging abuse-control consistency work. Every messaging API rate-limit bucket now uses the shared Supabase-backed durable rate-limit control plane with fail-closed behavior when the RPC is unavailable: direct-conversation creation, inbox preference writes, conversation presence reads/writes, global presence heartbeats, messaging privacy preference reads/writes, community membership provisioning and read receipts. Existing quota values are preserved. No schema migration, financial authority or messaging data model was changed. The Priority 8 contract gate passes 49/49; messaging route scan finds no process-local `checkRateLimit` calls. Legacy messaging, inbox, media hydration, bounded JSON, private-surface durable-control and repository consistency checks pass. Node 24.15.x dependency-backed typecheck/lint/build, browser/device/screen-reader and live Supabase/Testnet acceptance remain outstanding. Production is NOT APPROVED.
+1. `20261116182000_gh_research_intelligence_platform_foundation.sql` — project roles, research evidence base, geographic hierarchy, election/exam/challenge/poll foundations and audit events. Its challenge participation function was reordered after the referenced tables to fix a forward type dependency.
+2. `20261116190000_gh_media_evidence_engine.sql` — media asset references and Field Desk evidence relation.
+3. `20261117010001_gh_evidence_scoped_upload_chain_of_custody.sql` — scoped upload sessions, scan/quarantine fields, field-session report binding, geographic metadata and append-only hash-chain events.
 
-**Current source version:** `0.330.34`
+The existing Testnet migrations `20261116170409_gh_field_reports_public_intake` and `20261116171144_gh_research_studio_public_forms` remain applied and recorded. The three migrations above were not applied by this source upgrade. Mainnet was not changed.
 
-## 0.330.33 — Priority 8 Messages transformation (2026-11-07)
+## Verification limits
 
-The Messages inbox now has a dedicated Archived lane while active inbox filters exclude archived conversations. Pin/archive/restore/mute/unmute actions use the authenticated server-side per-member preferences API, and the inbox hydrates those preferences across sessions/devices. Conversation-specific drafts survive thread close, app navigation, thread switching and network reconciliation; the previous thread draft is not deleted when opening another conversation. Conversation pin/archive/mute actions are available on touch layouts and keyboard focus, message actions are touch-visible and keyboard-reachable, message bubbles use group rather than false button semantics, and the composer enforces and displays the server's 8,000-character limit. Existing authenticated durable conversation/message storage, active membership checks, idempotent sends, owned-media validation, privacy, read receipts, presence and durable fail-closed message send/read controls remain canonical. Dedicated Priority 8 source contract passes 43/43; existing messaging, media, bounded JSON, private-surface, accessibility and repository checks pass. No migration or financial authority changed. Node 24.15.x dependency-backed typecheck/lint/build, browser/Android/Pi Browser/screen-reader and live Supabase/Testnet acceptance remain outstanding. Production is NOT APPROVED.
+The supported runtime requirement is Node.js `^24.15.0`. Full TypeScript, lint, and Next.js production build verification must run on that supported runtime with the locked dependencies installed. The current source-only workspace does not establish those dependency-backed checks.
 
-**Current source version:** `0.330.33`
+The source migration inventory is not evidence of applied migrations; it records repository SQL files and classifications only. RUN333 postflight verified the new Testnet grant migration and its privilege effects; all other source files still require exact target-history/catalog reconciliation before application.
 
-## 0.330.32 — Priority 7 Communities governance and accessibility closeout (2026-11-07)
+The source includes static contract checks and pure file-signature tests. Full Node 24.15.0 dependency-backed TypeScript, lint, production build and browser/device end-to-end acceptance remain outstanding because the available workspace is Node 22.16.0 and dependencies are not installed. Scanner provider execution, signed upload against Testnet, evidence chain postflight and geographic lookup against populated data are not runtime-verified.
 
-Community moderation history and safety reports now have authenticated server endpoints, moderator-only reads, server-derived actor identity, transactional moderator-role revalidation for audit appends, and durable report create/resolve RPC paths. Moderator UI hydrates durable history and report queues, retaining session fallback only when server data is unavailable. Key community controls use 44px touch targets, the community content region is keyboard-focusable and named, and reduced-motion preferences are respected. The migration `20261107170001_phase7_durable_community_governance.sql` is REVIEW_REQUIRED and unapplied; the server path requires server-only Supabase credentials and `GHC_GOVERNANCE_SERVER=1`. Phase 7 source closeout checks pass, but live DB/RLS, Node 24.15.x production build, browser/screen-reader/mobile-device and Testnet acceptance remain open. Production is NOT APPROVED.
+No GitHub push, Vercel deployment, Mainnet migration or financial state change was performed. Source presence does not establish database application, runtime success, scanner execution or test acceptance. Production remains NOT APPROVED.
 
-**Current source version:** `0.330.32`
 
-## 0.330.31 — Priority 7 Communities discovery and participation correctness (2026-11-07)
+## 0.338.96 full-project audit remediation candidate
 
-Community directory “Most members” sorting now uses the server aggregate member count instead of a partial member-ID projection. “Needs attention” and the Community pulse share a non-negative unread-count policy so legacy `unreadCount` is used only as a chat fallback and is not double-counted. Community event dates accept ISO strings, Unix seconds and millisecond timestamps; malformed dates remain unknown. External resource links reject embedded credentials while retaining the HTTPS/same-origin-relative allowlist. Community cards distinguish pending requests from new joins and expose canonical invitation acceptance/decline actions; approval-required and invite-only privacy modes remain distinct in the hub. No migration, membership/governance authority, chat policy or financial behavior changed. Priority 7 source/runtime contracts and consolidated `verify:static` pass (57/57); Node 24.15.x prebuild/typecheck/lint/build and browser/device/live infrastructure acceptance remain outstanding. Production is NOT APPROVED.
+- Added a safe `.env.example` containing blank server-only credential placeholders, explicit public/server-only sections, and disabled Pi payout execution defaults. It contains no real credentials.
+- Reconciled the essential-controls navigation list with the actual six visible shell destinations: Home, Discover, Messages, Communities, Cart and Profile. The wallet remains an overlay.
+- Updated stale regression assertions that still expected the older five-item navigation contract.
+- Updated package, lockfile and in-app release identity to 0.338.96.
+- No database schema, migration, RLS policy, payment, payout, wallet balance, Pi execution, production environment or deployment was changed.
 
-**Current source version:** `0.330.32`
+Focused source checks: release hygiene 17/17; Run #312 notification repair 28/28; Run #304 filter/search release 30/30; scoped evidence engine 25/25; media evidence engine 22/22; Phase 10 release closure 17/17. Full Node 24.15.0 dependency-backed verification remains outstanding because the available environment is Node 22.16.0 and npm installation did not complete.
 
-## 0.330.30 — Priority 7 Communities transformation (2026-11-07)
+## Canonical visible navigation
 
-Community participation pulse controls now open distinct Board, Chat and moderator-request focus filters instead of sending every action to the same generic unread sort. Legacy event rows without canonical IDs receive deterministic render keys; community event/resource URLs are restricted to HTTPS or safe same-origin relative paths in both normalization and rendering; malformed resource rows and ordering values are handled safely. Governance durability is now reported as session-only until a real server persistence path confirms a durable write, even when the optional mirror flag is enabled. No database migration, membership authority, chat policy, moderation decision authority, GHC/Pi financial behavior or entitlement behavior changed. Priority 7 source checks pass; Node 24.15.x dependency-backed typecheck/lint/build and browser/device/Testnet/operator acceptance remain outstanding. Production is NOT APPROVED.
+The current visible shell navigation contains six destinations, in order: Home · Discover · Messages · Communities · Cart · Profile. Matches remains available as a secondary/deep-link tab; Wallet remains an overlay.
 
-**Current source version:** `0.330.30`
 
-## 0.330.29 — Priority 6 Settings transformation (2026-11-07)
+## 0.338.96 transaction and interaction hardening (Run 313)
 
-Settings now opens with a coordinated control-centre overview showing privacy posture, enabled notification categories, locale and appearance, with direct navigation to the corresponding subsections. Individual preference changes now submit narrow partial patches instead of spreading a stale render-time settings snapshot, preventing rapid toggles from overwriting unrelated values. Discovery radius and age ranges are bounded. Existing server-backed messaging privacy and delayed SDK persistence remain unchanged. No migration, financial action, permission grant or notification-delivery guarantee was added. Node 24.15.x build and external acceptance remain open. Production is NOT APPROVED.
+- Replaced the misleading in-memory transaction operation flags with explicit ordered operation executors and reverse-order compensation handlers. Failed operations now trigger compensations for completed operations; incomplete compensation is recorded as `failed`. Completed transaction records are retrievable from bounded history.
+- Explicitly documented that this in-memory coordinator is not a database transaction and is never authoritative for wallets, payments, rewards, orders, or entitlements. Financial state remains server/RPC/ledger-owned.
+- Backup restore now validates the complete snapshot arrays before applying one consolidated state update, preventing subscribers from observing partial profile/settings/posts/conversations restoration.
+- Added Run 313 source and runtime regression gates to prebuild and static verification.
+- No live database, wallet, Pi, A2U, Mainnet, GitHub, or Vercel operations were performed. Full Node 24.15.0 build and device acceptance remain required; production remains NOT APPROVED.
 
-**Current source version:** `0.330.29`
 
-## 0.330.28 — Priority 5 Profile transformation (2026-11-07)
+## 0.338.96 Run 314 — 30 screen-level experience upgrades
+- Added a 30-rule adaptive UI layer for Wallet, payment recovery and sheets, Messages, Communities, Marketplace, Feed, Profile, Rewards, Membership and Settings.
+- Added explicit component hooks for the responsive community directory grid, marketplace listing grid, conversation rows/bubbles/composer, wallet scroll region, profile timeline and rewards balance panel.
+- No payment, wallet, ledger, reward, membership entitlement, order lifecycle, Pi consent, A2U, migration, or Mainnet authority changed.
+- Full Node 24.15.0 dependency-backed checks and visual browser/device acceptance remain required.
 
-Public peer profiles retain server privacy-projected professional/business identity and portfolio data; cached discovery profiles are enriched from the canonical profile API with stale-request fencing; share links resolve to the exact profile; owner About presents professional/business work and durable achievements; authoritative follower/following counts remain unknown until loaded; and profile tabs expose improved ARIA relationships. No database migration, financial action or privacy-policy expansion occurred. Node 24.15.x build and external acceptance remain open. Production is NOT APPROVED.
+## 0.338.98 Run 315 — CI lint and build remediation
 
+- Replaced internal raw anchors in the public research form with Next.js `Link` components for `/` and `/privacy`.
+- Removed inline suppressions for `@typescript-eslint/no-require-imports`, a rule absent from the configured ESLint plugin set; retained the existing cryptographic Web Crypto-first implementation and fail-closed fallback behavior.
+- Added `state.posts` to the `deleteComment` callback dependency list because the callback reads the current posts snapshot when reconciling comment counts.
+- Restored the shared `gh-section-title` class on the reusable section heading, satisfying the actual design-system contract.
+- Updated the Pass 14 product-design gate to validate dynamic package/app release synchronization rather than a stale 0.236.0 label.
+- Added a CI failure-context artifact file before upload so early prebuild failures do not cause a missing-artifact warning.
+- Added a nine-assertion Run 315 source regression gate to prelint, prebuild checks and static verification.
+- No Supabase changes, migration application, GitHub push, Vercel deployment, wallet/payment changes, payout enablement or Mainnet operations.
+- Local workspace has no installed dependencies and runs Node 22.16.0; the required Node 24.15.0 dependency-backed lint and production build remain unverified. Production remains NOT APPROVED.
 
-## 0.330.27 — Priority 4 Membership completion increment (2026-11-07)
 
-Membership now includes accessible category-filtered plan comparison, explicit term/savings disclosure for each separate GHC/Pi catalog price, server-derived remaining-term information, fail-closed purchase actions until membership status is authoritative, and accurate attribution of Pi/GHC/external/admin/trial membership sources. VVIP-to-VIP downgrades are blocked in the plan chooser, activation API and verified Pi grant path. An additive entitlement-row trigger migration provides database-level protection against direct-RPC/concurrent downgrades; it is REVIEW_REQUIRED and unapplied pending remote history reconciliation and disposable PostgreSQL validation. No migration was applied and no payment, ledger or provider transaction was run. Static contracts pass; Node 24.15.x build and external acceptance remain open. Production is NOT APPROVED.
+## 0.338.99 Run 324 — Phase 2 / Phase 3 local source derivative (2026-11-17)
 
-**Historical release version:** `0.330.27`
-**Current status at that historical release:** **NOT APPROVED** for production release.
+The current local working candidate adds timed examination delivery/review and election-observation administration to the RUN323 derivative. Exam answer keys are excluded from public projections; respondents use a server-HMAC-hashed session key; deadlines, attempt limits, autosave, server scoring and owner-controlled result release are implemented in source. Election contest/candidate/agent administration is owner-scoped. The Phase 3 increment hardens marketplace search/quantity validation, poll vote presentation and feed/profile/community post engagement counts.
 
-## 0.330.26 — Priority 4 Membership product transformation (2026-11-07)
+Verification: `npm run verify:static` passed. New exam/election source contract 22/22; membership API 13/13; field intake 7/7; research integrity 12/12; marketplace search 6/6; community poll accessibility 10/10; post count contract 6/6 and runtime 9/9; active-module runtime 58/58; changed TS/TSX syntax transpilation 10/10. The full prebuild/typecheck/lint/build remain unverified because this workspace has Node 22.16.0 and lacks installed project dependencies (including `typescript`); the repository requires Node 24.15.0.
 
-Membership plan comparison now derives from canonical tier/entitlement data and selected-duration GHC/Pi pricing. The active-plan journey no longer advertises a broken same-tier Renew action; it routes Free/VIP/VVIP members to meaningful next steps while preserving the server's active-same-tier no-charge behavior. Purchase review presents separate exact GHC and Pi catalog prices and accurately describes one-time prepaid terms. Current-plan benefits are generated from the canonical catalog, the false paid-plan boost statement and universal Free-account recovery prompt are removed, and membership activity can expand to the existing 20-event response, the current plan view shows the server-confirmed start date, and the comparison table has an accessible caption. The consolidated static verification suite passes 57/57. No payment/entitlement authority, price catalog, API, migration, ledger, provider or recurring billing behavior changed. Targeted Membership source contracts pass. Node 24.15.x dependency-backed typecheck/lint/build, browser/device, database and Testnet/operator acceptance remain outstanding. Production is NOT APPROVED.
+Phase 2 is not operationally closed: the Research Intelligence migration remains REVIEW_REQUIRED and unapplied; election tally submission still requires an atomic database RPC and reconciliation tests; authoritative geographic datasets and the trusted malware-scanning provider remain external prerequisites; real Testnet/device acceptance is outstanding. Phase 3 remains an ongoing product-quality programme, not a completed global-launch certification. No GitHub push, Vercel deployment, Supabase migration, live DB mutation, wallet/payment operation or Mainnet action occurred. Production remains NOT APPROVED. See `docs/RUN324-PHASE2-EXAM-ELECTION-AND-PHASE3-QUALITY-2026-11-17.md`.
 
-**Release version:** `0.330.26`
-**Current status at that historical release:** **NOT APPROVED** for production release.
 
-## 0.330.25 — Priority 3 Rewards and Wallet trust UX (2026-11-07)
+## RUN338 Pi authentication diagnosis (2026-11-18)
 
-Priority 3 Rewards transformation increment: the Rewards overview separates locally tracked claim-ready records from records under review/maturity, explicitly describes the current non-financial mission achievement policy, preserves separate GHC and Pi cashback journeys, and now supports stable keyset-paged ledger history with account-switch isolation and deterministic timestamp-plus-ID keyset pagination. Claim feedback distinguishes server acceptance from confirmed ledger refresh, and mission progress is labelled as guidance rather than durable proof. All seven existing server-verifiable mission codes have explicit Rewards cards; unsupported mission types are gated rather than shown as finishable. Wallet adds a discoverable **Security & PIN** destination with a dedicated withdrawal-PIN manager. The manager reads authenticated server status, enables first-time setup only when the server confirms no PIN exists, requires matching six-digit values, uses the existing insert-only server action, and exposes the existing recovery flow after setup. Pi balance copy now distinguishes available balance, eligible-to-withdraw amount and reservations, and explains that only unstarted payout requests can be released. No balance, ledger, payout, issuance or settlement authority changed; no migration was added or applied.
+- Added token-free, stable diagnostic codes around Pi SDK script/init, `Pi.authenticate`, Pi Platform `/v2/me` verification, durable Pi identity mapping, GH session creation, and the `/api/auth/session` cookie round-trip.
+- The client now confirms the HttpOnly session cookie returns, the session is durable, and the verified GH identity matches before treating the authenticated server session as ready.
+- Supabase Testnet read-only review found 6 Pi identity rows and 264 GH session rows (176 revoked, 72 expired-unrevoked, 16 active); no blank identity keys, malformed SHA-256 hash lengths, or invalid expiry ordering. Both tables have RLS and deny-all policies, while `anon` and `authenticated` still hold unnecessary table-level SELECT grants; no grant was changed.
+- `gh_security_events` contained 44 successful `auth.pi.success` events in the preceding 7 days, last at 2026-11-17 15:17:33 UTC, with no matching rejection/stage failure events. This proves historical server-bridge success, not that the latest mobile browser attempt reached the route.
+- A read-only SQL diagnostic script is provided at `docs/RUN338-PI-AUTH-SUPABASE-DIAGNOSTICS.sql`.
+- Dependency remediation and lockfile regeneration remain incomplete: npm registry requests timed out in this environment. `package.json` dependency versions and `package-lock.json` were not altered, and the 29-finding security audit remains a blocker. The `pi-backend` → `stellar-sdk` chain is used by A2U/withdrawal flows and must not be overridden without Pi Testnet payment/receipt tests.
+- No GitHub push, Vercel deployment, Supabase write, migration, grant change, financial mutation or Mainnet operation was performed.
 
-The user-reported Pi available-to-reserved movements are **not reconciled** by this UI increment. Each affected account still requires authoritative ledger, payout-request and provider-state investigation. Node 24.15.x typecheck/lint/build and browser/device/Testnet acceptance remain outstanding.
+## RUN377 identity/session finding
 
-**Historical release version:** `0.330.25`
-**Current status:** **NOT APPROVED** for production release.
-
-## 0.330.23 — Feed source closure and roadmap realignment (2026-11-07)
-
-The coordinated Feed source scope is closed for this product increment. The existing 0.330.19–0.330.22 implementation has passing targeted source contracts for Feed transformation, discovery, composer journey, ranking transparency, pagination, reduced-data behavior, reconciliation and accessibility. The approved product roadmap is restored to the user's 11 priorities; Rewards is Priority 3 and the next coordinated product transformation. This release aligns source truth and roadmap documentation; it does not claim browser/device or production acceptance.
-
-Critical Wallet follow-up remains open: investigate Pi available-to-reserved balance movements from authoritative records, and expose the existing six-digit withdrawal PIN setup through a discoverable Wallet security entry. The device-unlock PIN is separate. No reserved funds were reclassified or released, and no financial authority or migration changed.
-
-**Release version:** `0.330.23`
-
-
-## 0.330.22 — Feed relevance transparency and durable local feedback (2026-11-07)
-
-The Feed post-card relevance label now opens a real accessible, focus-managed explanation dialog. Users can see the current ranking reason, understand that relevance ordering does not change post visibility permissions, and choose “See fewer like this.” The action reuses the existing client-side Feed exclusion behavior and persists a unique bounded set of up to 200 post IDs on the current device. No new backend ranking preference, migration, visibility rule, social mutation authority, wallet or payment behavior was introduced. Targeted Feed regression checks pass. Node 24.15.x dependency-backed typecheck/lint/build and physical browser/device acceptance remain outstanding; production remains NOT APPROVED.
-
-## 0.330.21 — Phase 2 Wallet completion increment (2026-11-07)
-
-GHC transaction receipts now surface additional allowlisted durable correlation references from existing row metadata (order, reward, request, payment-intent, correlation and provider-payment identifiers), while retaining the explicit in-app-ledger receipt disclaimer. Wallet history provides one shared search field across independently selected GHC and Pi rails; switching to Pi history initiates its existing authenticated, read-only history load, and records remain separately rendered and selectable. GHC month-to-date insights now count only posted settled movement, exclude request-only rows and terminal failed/reversed/cancelled/expired entries, and report pending amounts separately. Send/Receive/Request and Pi Withdraw remain on their existing canonical flows. No database migration, financial mutation authority, payout, transfer, payment or entitlement contract changed. Responsive layout checks are source-level only; actual low-end Android, WebView and Pi Browser acceptance remains pending. Node 24.15.x typecheck, lint and production build remain required; production remains NOT APPROVED.
-
-
-**Release version:** `0.330.21`
-
-## 0.330.9 — Build-gate continuity (curation language + version truth)
-
-Source continues the Phase 4–5 wallet withdrawal form stability work and synchronizes release metadata so prebuild gates (Phase 9 membership, Phase 16 post interactions, Pass 43 domain bridges) accept the active package version. Post engagement toolbar uses concise **Community curation** product language. No new database migration, ledger mutation, or Mainnet A2U enablement. Production remains NOT APPROVED pending external acceptance gates.
-
-
-## 0.330.19 — Cross-surface interaction reliability (2026-11-07)
-
-Notification hydration is now session-identity scoped: an account switch clears prior-account rows and unread counts, aborts in-flight requests, and fences late responses so they cannot overwrite the new account's notification state. Feed, inbox, community and marketplace filter controls now expose their selected state with appropriate accessible semantics. This increment does not change wallet balances, GHC/Pi ledgers, reward issuance, membership entitlement, messaging persistence, marketplace order/payment authority or database migrations. Source-level verification is registered in prebuild and static verification; Node 24.15.x runtime/build and browser/device acceptance remain required. Production remains NOT APPROVED.
-
-## 0.330.2 — Phase 26 cache-safe CI and release hygiene
-
-TypeScript incremental metadata now writes to `.cache/tsconfig.tsbuildinfo`, and `.cache/` is ignored alongside all `*.tsbuildinfo` files. The Phase 26 wallet-ledger resilience check recursively discovers build-info artifacts and, in a Git checkout, confirms each is ignored and not tracked. It rejects the legacy root `tsconfig.tsbuildinfo` path and fails closed if a cache is present outside a Git-verifiable workspace. This prevents CI from failing merely because a correctly ignored incremental cache was generated before the gate. Existing wallet timeout/cancellation and Pi/GHC separation contracts remain unchanged. No migration, ledger, payment, entitlement or production authority changed. Production remains NOT APPROVED pending all external acceptance gates.
-
-## 0.330.1 — Phase 10 CI regression-contract repair
-
-The release retains the 0.330.0 Settings/media/navigation work and corrects stale regression contracts: PI wallet action validation matches the implemented dedicated Withdraw action, Stories own-story ring validation matches the actual emerald treatment, and the legacy Phase 5 release-readiness check dynamically validates the current package/manifest versions rather than hardcoding 0.312.0. Generic image URL mutation is removed to preserve signed storage/CDN URLs and private media facade identifiers. Infinite-scroll locks now span asynchronous page loads, preventing duplicate pagination requests; older embedded WebViews without IntersectionObserver receive visible content. The 0.329.0 public-static service-worker policy and reduced-data prefetch controls remain in force. This is a source-level UX/performance increment only; no database migration, Pi payment, GHC ledger, entitlement, or production authority is changed. Phase 9 Membership acceptance remains open, and the release remains NOT APPROVED until supported-runtime, database, Testnet, browser/device and operator gates pass.
-
-## Current authoritative metadata
-
-- Package and lockfile version: `0.338.20` (verified against `package.json` and the lockfile root).
-- Runtime: Node `24.15.0` / package engine `^24.15.0`; this audit environment only supplied Node 22.16.0, so dependency-backed typecheck/build remain unverified.
-- Canonical Supabase migrations: **200** SQL files.
-- Duplicate migration numeric prefixes: **0** (source-level manifest check required for release).
-- Migration source manifest: 200 entries, synchronized with the canonical migration directory.
-- No local secret `.env` file is included; `.env.example` is the only env template.
-
-
-## 0.338.9 — Responsive experience and navigation refinement (2026-11-09)
-
-The shared application headers now use a slimmer 36px control rhythm; hidden duplicate header actions are inert, and the compact header no longer repeats its subtitle. Marketplace browse/detail headers have a unified compact treatment. Marketplace and Community content surfaces have more responsive horizontal breathing room and safe-area-aware scroll endings. Active-tab scroll reset now uses stable panel identity and actual computed scroll containers. Global `/` and `c` shortcuts avoid editable controls, modal workflows and IME composition. A 31-assertion UI/navigation/responsive gate runs during prebuild and static verification. Existing 42-control Marketplace/Community security audit and financial regression boundaries remain in place. No migration or financial authority changed. Node 24.15.0 typecheck/build and external database/provider/browser acceptance remain unverified; production remains NOT APPROVED.
-
-## 0.338.8 — Independent marketplace, community and financial controls (2026-11-09)
-
-Marketplace checkout and saved-listing endpoints now use durable fail-closed mutation throttling; saved-listing RPC calls are time-bounded. Community creation, membership, moderation, governance, platform and chat mutations now use durable fail-closed throttling. Community IDs and moderation target IDs are bounded/sanitized, and join-request decisions require an explicit boolean. The independent source-contract gate covers 22 marketplace and 20 community controls. Existing Pi/GHC ledger, checkout, inventory, payout and reconciliation authority is unchanged; no SQL migration was added or applied. Node 24.15.0 typecheck/build and live PostgreSQL/Supabase/Testnet acceptance remain blocked/pending; production remains NOT APPROVED. See `docs/INDEPENDENT-MARKETPLACE-COMMUNITY-FINANCIAL-AUDIT-2026-11-09.md`.
-
-## Current source/audit status
-
-The 0.319.0 increment adds editable professional/creator/business identity, a public portfolio and experience showcase, account-scoped server achievements, explainable discovery relevance from professional interests, and privacy-filtered public identity projections. The 0.320.0 Phase 7 Wallet source implementation is closed: its Pi withdrawable snapshot read is abortable, time-bounded and strictly validated. External Node 24.15.x typecheck/lint/build, browser/device acceptance and live Pi Testnet reconciliation remain production release blockers. Phase 8 Rewards source implementation is closed in 0.323.0: premium account-scoped Rewards hydration, server-authoritative daily claims, authenticated cross-device GHC ledger history/search/filtering, and seven durable server-verified idempotent mission achievement unlocks. Mission achievements are non-financial; GHC activity issuance remains disabled by the current policy. The new additive mission-verification migration is REVIEW_REQUIRED and not applied. Node 24 build, disposable PostgreSQL/Testnet, browser/device and operator acceptance remain outstanding. No GHC/Pi financial execution authority changed.
-
-
-The 0.289.0 internationalisation engine builds on the 0.288.0 Global Language Foundation. Locale preferences are saved locally and reflected in document language/direction and regional API headers; formatters use Intl APIs. At v0.289.0, English was the only complete UI translation catalog; the v0.292.0 preview packs are separately identified as partial and are not represented as complete translations. No automatic content translation or database migration was added.
-
-The 0.290.0 Phase 3 language pack adds preview translations for persistent navigation and essential language-status copy in Hausa, Igbo, Yoruba and Nigerian Pidgin. Navigation labels and accessible names follow the selected locale. Translation coverage is intentionally reported as partial: the wider application remains English until each feature area is translated and native reviewers approve terminology. English remains the safe fallback for unsupported locales. User-generated content is not machine-translated, and no database migration or financial/authentication change was introduced.
-
-
-The 0.292.0 Phase 5 experience-localisation increment extends the preview catalogs into feed filters, feed search and personalisation controls, discovery categories and accessibility/offline states, and time-of-day home greetings. Hausa, Igbo, Yoruba and Nigerian Pidgin remain partial preview packs; missing strings fall back to English. No user-authored content, private messages, legal text, identity/security instructions, wallet balances, payment states or transaction rules are translated. No database, authentication or financial logic was changed.
-
-The 0.288.0 Global Language Foundation retains all 36 previously catalogued countries and adds 24 approved country records, resulting in ten countries per continent. It introduces 240 country-language recommendations (four per country), standardized locale tags, native display names where confidently available, script direction metadata and a fail-closed validation gate. All recommendations remain pending human review; no translations are claimed complete. The location picker supports manual region and locality entry where verified subdivision seeds are not yet available. No database migration or existing user-location rewrite was required.
-
-
-The 2026-11-01 Phase 1 foundation pass reconciled release metadata and documentation hygiene, repaired the marketplace shared-mapper regression contract, and restored the missing source-only verification fixture. Pass 44 then moved 10 high-impact financial/payment routes to the existing Supabase-backed durable rate-limit control plane with fail-closed behavior when that service is unavailable. The complete network/database-independent static suite passed **57/57** after these changes. See `docs/PHASE-1-FOUNDATION-UPGRADE-0.265.0.md` and `docs/PASS-44-DURABLE-ABUSE-CONTROL-HARDENING-2026-11-01.md` for scope, evidence, and remaining runtime/operator gates. Pass 45 adds bounded, opportunistic cleanup for expired durable rate-limit buckets and explicitly expired security events, defaults new security events to a 90-day expiry, and validates limiter inputs and RPC result shapes before accepting decisions. Its new migration is `REVIEW_REQUIRED`; it must be reconciled and tested before application. See `docs/PASS-45-SECURITY-CONTROL-PLANE-RETENTION-2026-11-01.md`. Pass 46 distinguishes exhausted quotas (HTTP 429) from unavailable durable protection (HTTP 503), extends fail-closed handling to social mute/block writes, and adds a keyboard, reduced-motion and mobile interaction quality baseline. Pass 47 adds global offline/reconnect feedback, consistent feed/tab loading surfaces, and safer root error diagnostics. No Cloudflare/R2 integration was performed. See `docs/PASS-46-APP-EXPERIENCE-AND-SECURITY-RESILIENCE-2026-11-01.md` and `docs/PASS-47-APP-EXPERIENCE-COHESION-2026-11-01.md`. Pass 48 makes inactive primary-tab panels and hidden bottom navigation inert so keyboard focus cannot enter hidden surfaces. See `docs/PASS-48-ACCESSIBLE-NAVIGATION-2026-11-01.md`.
-
-
-The current source tree has passed the repository-level contracts covering release hygiene, migration manifest synchronization, regional context, section refresh, shell/realtime/scroll behavior, post/curation production behavior, wallet/notification wiring, community governance, and residual technical-debt hardening. Pass 40 additionally centralizes feed replacement and pagination reconciliation in a shared, runtime-tested social-domain helper. Pass 41 hardens saved-listing, seller-listing, and durable-order hydration against stale responses and transient data loss, and adds latest-request-wins cancellation to feed refreshes. Pass 42 moves marketplace API record normalization out of the UI into shared, runtime-tested domain-boundary mappers for saved listings, seller/public listings, and durable orders, preserving explicit zero values and server-authoritative order/payment lifecycle fields. Pass 43 activates the Feed, Connections, and Discovery read seams against the current block/mute-filtered GHC session, excludes drafts and scheduled posts from the feed bridge, computes incoming request counts, and fails closed for production discovery candidates unless they are explicitly marked server-hydrated.
-
-The corrected release archive must keep the Next.js application at repository root (`app/` directly under the repository root). Do not add an extra wrapper directory around the project.
-
-## Navigation contract
-
-- Canonical navigation: **Home · Discover · Messages · Communities · Cart · Profile** (visible bottom bar). Historical five-item baseline remains documented as Home · Messages · Communities · Cart · Profile. Wallet remains an overlay.
-
-## Release boundary
-
-Static/source verification **does not establish** a supported-runtime production build, live Vercel behavior, applied Supabase migrations, live Pi authentication/payment/provider behavior, realtime deployment configuration, or operator approval.
-
-Before release:
-1. Use Node `24.15.x` or another supported Node 24 release.
-2. Run the locked dependency install and the project's typecheck/lint/build gates.
-3. Reconcile Testnet/Mainnet migration history before applying SQL.
-4. Complete live/disposable Testnet and provider evidence for the relevant payment, identity, messaging, media, realtime and financial workflows.
-5. Keep Mainnet changes separately approved; never infer approval from source-only checks.
-
-## Documentation authority
-
-Use `docs/SOURCE_OF_TRUTH.md` for prompt execution and document precedence. Old worklogs and historical phase documents are not current product authority. If a legacy verification fixture conflicts with executable source or current release documentation, the source/current release documentation wins and the fixture should be repaired rather than the product being regressed.
-
-## Source-only evidence language
-
-The **source migration inventory is not evidence of applied migrations**. It does NOT prove migrations are applied to any Supabase project.
-
-The supported runtime is `^24.15.0`. **TypeScript, lint, and Next.js production build** must be executed with the supported Node 24 runtime and installed locked dependencies before production acceptance.
-
-The 0.292.0 Phase 4 product-surface localisation extends preview strings to messaging inbox headings/filters, community discovery labels/search, marketplace navigation/search and settings discovery. The four Nigerian locale packs remain partial and require native-speaker review. English remains the fallback for untranslated keys and unsupported locales. No user-authored content translation, database migration, authentication change, wallet change or financial logic change was introduced.
-
-
-## 0.293.0 Phase 6 — workflow localisation and review governance
-The phase adds typed preview translations to the post composer, profile editor, community-board explanation, marketplace listing form and wallet transaction-history heading. It introduces a native-speaker review gate requiring reviewer identity, review timestamp, exact catalog version and product-owner approval. All Hausa, Igbo, Yoruba and Nigerian Pidgin packs remain partial and pending review. User-generated content, private messages, profile-authored text, listing descriptions, financial amounts, currency codes, fees, payment states and transaction identifiers are not automatically translated or recalculated. No database, authentication, wallet-ledger or payment logic changes are included.
-
-
-## 0.294.0 Phase 7 — social-surface localisation
-The notification centre and GH Pulse short-video experience now consume a typed social-message catalog for Hausa, Igbo, Yoruba and Nigerian Pidgin preview packs. Core notification controls, accessibility names, offline/unavailable feedback, empty states, video modes and playback controls follow the selected regional language. Locale changes update short-video labels without remounting the experience. Server-authored notification content, user posts, captions and author names remain untouched. The catalog version is 4 and the native-review gate is version-bound; all four packs remain partial and pending review. No database, authentication, wallet, payment or financial logic changed. The social translation regression gate passes 13/13.
-
-
-## 0.295.0 Phase 8 — locale presentation and formatting
-
-Added a shared formatting toolkit for compact numeric display, percentages, measurement units, relative time, plural forms, and locale-aware text comparison. Regional context exposes locale presentation metadata including text direction, numbering system, calendar and hour cycle. These functions are display-only and do not mutate canonical identifiers, amounts, currency codes, ledger records or payment state. Catalog version 5 is pending native-speaker/product-owner review; no preview locale is promoted to complete.
-
-
-## 0.296.0 Phase 9 — RTL and accessibility foundation
-
-The app already applies canonical locale direction to the document root. This phase strengthens that foundation with logical-property styling primitives, a locale-aware keyboard skip link, bidi-isolated notification count values, high-contrast and forced-colors support, and readable-copy/reflow utilities. Directional icon flipping is opt-in through `.gh-directional-icon`; non-directional icons are never globally mirrored. Numeric notification counts use isolated LTR rendering while their surrounding labels inherit the selected locale direction. Translation catalog version 6 must be reviewed before any preview language can be approved. No database, auth, wallet, payment or financial logic was changed.
-
-
-## 0.297.0 Phase 10 — accessible interaction system
-
-Shared status semantics now cover lazy-screen loading, navigation announcements and localized main landmark naming. Interactive controls receive a 44px minimum target baseline, focus-visible indicators are consistent, reduced-motion preferences suppress nonessential animation, and forced-colors mode retains focus/error affordances. Catalog version 7 is pending renewed review. Source checks do not replace browser/screen-reader validation.
-
-
-## 0.298.0 Phase 12 — global locale integration
-
-Explicit locale choices now survive localStorage failures for the active session, including later visibility/language refreshes. Cross-tab preference changes and reset behavior synchronize the in-memory fallback. Unit and plural formatters have defensive fallback behavior. The Phase 12 source gate covers locale lifecycle, document metadata, regional headers, preview translation governance and financial-display boundaries. This does not promote preview packs or replace browser/native-speaker acceptance.
-
-
-## 0.300.0 Phase 13 — social Stories and profile media
-
-The Stories rail is now a restrained horizontal strip of compact vertical cards. Existing profile and cover photos open in the shared full-screen media viewer; editing is a separate action. Story image/video viewing resolves private-media facade references through the viewer-authorized URL path. Existing story audience, publishing, reply, reaction, and viewer contracts remain in place. The Phase 13 source UX gate passes 13/13; device and production acceptance remain pending.
-
-
-## 0.300.0 Phase 14 — creator media preview
-
-The post composer now provides full-screen previews for selected image attachments and inline playback for attached videos. Story images can be opened in the shared full-screen media viewer; Story videos use the private-media-aware DurableVideo component. Preview and removal are distinct actions. Uploading and publishing remain owned by the existing compose pipeline. The Phase 14 source gate validates these boundaries; browser/device acceptance remains pending. No database, authentication, wallet, Pi, GHC or financial contracts changed.
-
-
-## 0.302.0 Phase 16 — post interaction experience
-
-Comment image attachments open in a full-size proportion-preserving viewer; video attachments open in a dedicated playback preview, with download actions kept separate. The comments dialog now provides an announced loading skeleton, traps keyboard focus, locks background scrolling and restores focus on close. Post curation language is simplified without changing curation weights, vote persistence, server authorization, comments, reactions, sharing or moderation. The Phase 16 source gate validates these UI and accessibility contracts; browser/device acceptance remains pending. No database, authentication, wallet, Pi, GHC or financial logic changed.
-
-## 0.301.0 Phase 15 — feed experience refinement
-
-The shared feed/profile composer has been simplified into one clear text-entry action with two focused media shortcuts (photo and video). Decorative gradients and the redundant feeling shortcut were removed. Feed discovery prompts now appear at a lower cadence (once per twelve displayed posts), use a compact inline presentation for people discovery, and are suppressed in focus mode and non-personalized feed filters. The canonical create hub, feed ranking, server hydration, post actions, media authorization and domain contracts are unchanged. Phase 15 source checks cover the presentation and boundary contracts; device/browser acceptance remains outstanding. No database, authentication, wallet, Pi, GHC or financial logic changed.
-
-
-## 0.304.0 Phase 18 — private-media session isolation and account privacy controls
-
-The browser-side signed-media cache is scoped to the active GreenHaven identity/authentication epoch. Identity changes clear cached/in-flight resolutions and notify mounted image/video surfaces to discard prior playback URLs and resolve again under the new session. Settings → Privacy & Safety now exposes a downloadable JSON account export and a typed-confirmation deletion request. Both actions require the existing server-side recent step-up contract. Export remains an explicit allowlist of supported GreenHaven records and fails closed rather than returning a partial export. Deletion intake records a request only; no destructive deletion, wallet forfeiture, payment, or settlement is performed by the request endpoint. No migration was added or applied.
-
-Verification: Phase 18 source contract 18/18; the consolidated static suite is rerun and tracked in the current release worklog. Supported-runtime Node 24.15.x typecheck, lint, production build, browser/device verification and live provider/database checks remain separate release gates.
-
-
-## 0.305.0 Phase 19 — creator economy and engagement integrity
-
-Creator tip idempotency now follows a user-action key when supplied through `Idempotency-Key` or the bounded request body. Reusing a key is retry-safe; a fresh key enables a distinct later tip to the same creator at the same amount. Legacy clients retain the prior deterministic fallback. Creator economy summaries now require all four contributing data sources (PI tips, GHC tips, post rewards and creator ledger) to return valid collection payloads before publishing combined totals. Creator post reads reject malformed upstream shapes, the creator endpoint exposes per-source health, and Creator Studio suppresses unknown totals rather than rendering fabricated zeros.
-
-Verification: Phase 19 creator commerce integrity source contract 17/17; tip idempotency runtime checks cover stable retries, distinct repeat tips, legacy fallback and invalid-key rejection. No migration was added; the canonical migration count remains 175. This source-only evidence does not establish live provider, database, payout, TypeScript, lint, browser or production-build acceptance.
-
-
-## 0.306.0 Phase 20 — durable seller payout abuse controls
-
-All twelve seller payout and banking API routes now use the shared database-backed rate limiter with an explicit deny-on-unavailable policy. This removes process-local limiter dependence from payout request intake/history, bank directory/account resolution, beneficiary create/disable, bank transfer execution, PI/GHC/bank reconciliation, operator transitions and exception resolution. Rate-limit storage outages now return the control-plane unavailable response rather than silently falling back to per-instance counters. Existing recent-step-up checks, operator secrets, payout idempotency, provider amount/recipient/reference verification, treasury funding checks and atomic settlement RPCs remain authoritative. No migration was added; the canonical migration inventory remains 175.
-
-Verification: `check:phase20-payout-durable-limits` validates all 12 route contracts, fail-closed behavior, durable status/error mapping, and migration inventory uniqueness. This is source-level verification only; it does not prove live Supabase RPC availability or provider settlement.
-
-
-## 0.307.0 Phase 21 — private-surface durable abuse controls
-
-Private messaging reads, sends, edits and deletes; private-media signed URL issuance, media resolution, direct-upload intent and buffered upload; and account export/deletion-request intake now use the shared database-backed rate-limit control plane. Each boundary awaits the limiter and denies the request with the explicit 503 unavailable contract if durable enforcement cannot be reached; exhausted quotas remain 429. This replaces process-local counters for these high-sensitivity surfaces without changing conversation membership, media viewer authorization, owned-attachment validation, recent-step-up requirements, account export completeness or deletion-request semantics.
-
-A Phase 21 repository-integrity gate is registered in both `prebuild` and `verify:static`. It validates the ten durable boundaries, pipeline registration, package/lockfile version parity, migration-prefix uniqueness, and exact synchronization of the 175-file migration source manifest including byte counts. No database migration was added or applied. Verification remains source-level; supported-runtime typecheck, lint, production build, browser/device checks, live Supabase and provider acceptance are outstanding.
-
-
-## 0.308.0 Phase 22 — atomic marketplace order transitions
-
-Durable order-state changes now use `gh_marketplace_order_transition`, a service-role-only PostgreSQL function that locks the target order row with `FOR UPDATE`, validates the existing state transition matrix, records an audit event and returns the refreshed canonical order. The application no longer performs a database-backed read/modify/upsert for these transitions. If the RPC is unavailable or returns an invalid payload, the request fails closed; it does not fall back to process memory. The canonical order-read RPC now includes the commerce/delivery fields already present in the schema. Payment verification remains downstream of authoritative payment settlement; this RPC does not create GHC/Pi payments, refunds, escrow releases, wallet entries, ledger entries or payouts.
-
-Verification: Phase 22 source gate checks row locking, service-role ACLs, fail-closed transport, canonical response use, pipeline registration, package/lockfile parity and migration uniqueness. The new migration is classified `REVIEW_REQUIRED`; it has not been applied. PostgreSQL execution/concurrency tests, migration-history reconciliation, Node 24 typecheck/lint/build, live Supabase/provider checks and browser/device acceptance remain outstanding. Production remains **NOT APPROVED**.
-
-
-## 0.309.0 Phase 23 — migration and order-read integrity
-- Added a source migration that makes the canonical marketplace order snapshot read side-effect free.
-- Application order reads explicitly run reservation expiry cleanup before snapshot retrieval and fail closed if cleanup cannot be confirmed.
-- Atomic transition and commerce RPCs can return order snapshots without running a global expiry sweep while holding an order-row lock, reducing cross-order lock contention/deadlock risk.
-- Static migration audit checks canonical filenames, unique versions, non-empty files, and fixed search_path on every SECURITY DEFINER function definition.
-- Migration remains REVIEW_REQUIRED; no database was connected or modified.
-
-
-## 0.310.0 Phase 24 — final source and migration-operator review
-
-The migration classification source is now synchronized across `MIGRATION-SOURCE-MANIFEST.csv`, `docs/MIGRATION_CHECKLIST.md`, `VERIFIED_MANIFEST.txt`, and the generated `supabase/TESTNET_APPLY_ORDER.md`. The previous hand-maintained Testnet apply sequence is replaced with a complete 177-entry review inventory, sorted by canonical migration identifier and explicitly distinguishing review, approval, validation hold, and proposal/no-apply states. A regression gate checks the classifications, guide rows, generated inventory, release version and critical phase-gate registration.
-
-This is a source/documentation integrity completion only. It does not prove that any migration has been applied, that the target schema is compatible, or that PostgreSQL concurrency, Pi/Paystack providers, Testnet, Mainnet, browser/device journeys, or production build have passed. The 58 `REVIEW_REQUIRED`, 1 `REQUIRES_APPROVAL`, and 2 `PROPOSAL` classifications remain held. Production remains **NOT APPROVED**.
-
-
-## 0.313.1 Final polish
-
-Toast clearance, capped toast stack, version/docs sync. No financial authority changes.
-
-## 0.313.0 Product UX track Phases 1–5 (trust → release)
-
-Media facade story publish, Discover CTA/presence honesty, Communities My membership enrichment, feed soft-refresh + composer/stories polish, aggregated release gate. **SOURCE VERIFIED only** — Testnet migration `20261104180001` and A2U funding remain operator-owned.
-
-## 0.312.0 Phase 26 — wallet ledger resilience and premium wallet experience
-
-Wallet summary and Pi earnings reads are bounded, superseded requests are cancelled, timeout resources are cleaned up, and the PI dashboard uses latest-request-wins refresh sequencing. The wallet hero presents the selected asset rail and separates available, pending, locked, withdrawable and reserved figures. GHC is described as server-confirmed only when the validated snapshot is ready and server-sourced. `docs/CURRENT_BUILD_CONTEXT.md` is now the canonical concise brief for future build prompts; older worklogs and visual references are historical only. No SQL migration or financial mutation authority changed. Typecheck, lint, production build, live database/provider and device acceptance remain outstanding. Production remains **NOT APPROVED**.
-
-## 0.312.0 Phase 27 — scroll immersion and creator analytics
-
-- Bottom navigation now hides on upward content movement and returns on downward content movement, resolving the actual nested scroll owner rather than the tab wrapper. The hidden in-flow bar collapses fully and releases its reserved content inset.
-- Curation and post insights are presented in an accessible modal sheet, not an inline expanding accordion. Analytics load only when opened, with a 10-second abort boundary and stale-response fencing.
-- No SQL migration, GHC minting, vote economics, Pi settlement or wallet authority changed.
-
-
-## 0.315.4 — Curation intelligence refresh recovery (source-only)
-
-The curation intelligence refresh function in the prior source attempted to return a nonexistent `id` column from `gh_reputation_intelligence`; it also allowed missing reputation/calibration rows to overwrite initialized defaults with NULL. The additive correction removes the invalid return target and uses aggregate reads that always return a row with safe defaults. It preserves service-role-only execution, stored server-authoritative curation power, existing risk controls, atomic vote/reward/GHPV boundaries, and does not mutate GHC or wallet balances. The migration is `REVIEW_REQUIRED` and has not been applied. Testnet history reconciliation and disposable PostgreSQL validation are mandatory before application.
-
-The full source-only verification suite passes on Node 22.16.0, but the project requires Node `^24.15.0`; TypeScript, lint, and production build remain unverified here. Live Supabase RPC behavior, snapshot creation, voting, curation rosters, and Testnet two-account behavior remain operator gates.
-
-
-## 0.315.5 — Phase 1 social foundation (source-only)
-
-Phase 1 revisits the social posting, voting, curation and community-board foundation. It adds a member-authorized, viewer-aware `gh_community_post_list` RPC and authenticated `/api/communities/[id]/posts` read endpoint. The RPC scopes records to the requested community, excludes deleted/archived posts, reuses canonical post-visibility enforcement, returns server-owned vote aggregates, reaction counts, saved state and the viewer's own curation/reaction choices, supports stable keyset pagination, and is executable only by `service_role`. The matching community client helper hydrates the hub from canonical social posts. Canonical community cards now reuse `EnhancedPostCard`, the same interaction component used by Feed/Profile, so voting, reactions, saving, comments and sharing use existing durable social endpoints. Legacy local-only `bpost_` / `local_` rows are explicitly read-only; they no longer display controls that imply durable voting. They must be republished by their authors to enter the canonical social ledger; the system does not impersonate authors or silently convert local data.
-
-The existing curation intelligence refresh correction remains additive and `REVIEW_REQUIRED`. The new community-feed migration `20261106090001_gh_community_post_feed_canonical.sql` is also `REVIEW_REQUIRED`; it depends on the previously defined community role and canonical post visibility functions. Neither migration has been applied to Testnet or Mainnet. Reconcile each remote migration history, validate both migrations and query plans on disposable PostgreSQL, then run member/non-member, block, deleted-post, cursor, curation and two-account Testnet checks before application.
-
-Verification completed for the 0.315.5 source baseline: full `npm run verify:static` passed, including the Phase 1 community/social contract (12/12), curation-intelligence recovery contract (10/10), existing post/curation production contract (12/12), and community global-standard contract (14/14). Migration inventory was 183 files at that release. TypeScript, ESLint, production build, live Supabase RPC behavior, and Testnet two-account/device acceptance were not certified.
-
-
-## 0.315.6 — Phase 1 deep completion and reconciliation (source-only)
-
-The Phase 1 deep pass aligns curation preflight with the canonical post-visibility function, so block, follower, mutual-follow, and active community-membership policy is consistent between reads and writes. It consistently denies self-curation, serializes the per-user daily curation cap across concurrent post votes, and makes activity-audit persistence mandatory in the same transaction as the vote and GHPV state update. The community-feed cursor now sorts on the same millisecond/id key it filters on. The community board preserves its last known-good canonical posts when a refresh fails, fences stale requests, and only clears a new-post draft after the parent confirms success.
-
-The additive migration `20261106110001_phase1_curation_community_guard_reconciliation.sql` is `REVIEW_REQUIRED`. Together with `20261106080001_gh_reputation_intelligence_refresh_recovery.sql` and `20261106090001_gh_community_post_feed_canonical.sql`, it must be reconciled against Testnet and Mainnet migration histories independently and validated on disposable PostgreSQL before any application. No GHC issuance, Pi payment, wallet balance, payout, or financial settlement authority is changed.
-
-Source verification: full `npm run verify:static` passed on the available Node 22.16.0 runtime; the consolidated static suite reported 57/57 and all registered targeted checks passed, including Phase 1 deep completion (16/16). Migration inventory is synchronized at 184 files with duplicate numeric prefixes 0. TypeScript, ESLint and production build remain unverified because Node 24.15.0 and installed dependencies are unavailable in this environment. Live PostgreSQL, Supabase RPC, Testnet concurrency, two-account access and device acceptance remain open. Production remains **NOT APPROVED**.
-
-
-## 0.315.7 — Phase 2 Stories premium rebuild (source-only)
-
-Stories now group multiple active stories by creator and play each creator's sequence chronologically. Story-seen state is account-scoped locally and hydrated from the durable server view ledger; successful durable empty-list responses clear stale cached stories. The viewer adds pause/resume, reduced-motion-aware progression, and video end progression. The story creator duplicate close control was removed. Story hydration now preserves server reaction counts and viewer reaction state.
-
-The additive migration `20261106130001_gh_story_view_privacy_and_read_performance.sql` hardens direct story-view writes with the same audience and bidirectional-block policy as story reads, excludes author self-views, adds a viewer lookup index, returns server-confirmed seen state, and removes expiry mutation from the active-story read RPC. It is classified REVIEW_REQUIRED. Validate on disposable PostgreSQL, reconcile Testnet and Mainnet histories independently, and apply only after explicit operator approval. No live database operation was performed.
-
-Source regression gate: `scripts/check-phase2-stories-premium-upgrade.mjs` (23/23), existing story rail gate (9/9), story/profile media gate (13/13), Phase 4 story shell gate (12/12). Full static verification still requires the remaining release-truth fixtures and supported-runtime checks to pass; TypeScript, lint, production build and live browser/database acceptance are not claimed here.
-
-
-## 0.315.9 — Phase 4 Cart and Checkout premium upgrade (source-only)
-
-The local marketplace cart now validates and bounds cached rows, consolidates duplicate listing IDs, synchronizes across tabs, and locks cart editing during checkout. Successful checkout removes only lines whose orders were durably reserved, preserving unrelated cart entries. Server-side order reservation and GHC/Pi payment authority remain unchanged. No SQL migration was added or applied. Static cart contract: 10/10; runtime cart assertions: 8/8. Supported-runtime build, live payment, Testnet and operator acceptance remain open.
-
-## 0.315.8 — Phase 3 Marketplace premium upgrade (source-only)
-
-Marketplace browse now supports product/service/opportunity and delivery-mode filters with a one-action reset. Price sorting keeps GHC and PI in separate currency groups rather than comparing nominal amounts across assets. Listing cards improve condition, availability and keyboard/reduced-motion feedback. Marketplace listing reports now submit through an authenticated, bounded, fail-closed server route using the durable rate-limit control plane and a service-role-only idempotent SQL RPC; the client confirms success only when the API reports a durable record. The additive migration `20261106150001_marketplace_listing_report_intake.sql` is REVIEW_REQUIRED and must be tested on disposable PostgreSQL and reconciled against Testnet/Mainnet histories independently before application. No order, inventory, payment, wallet, GHC, Pi, payout or settlement authority is changed.
-
-Source regression gate: `scripts/check-phase3-marketplace-premium.mjs` plus currency-aware sorting runtime tests. Node 24.15.0 TypeScript, ESLint and production build gates, disposable PostgreSQL execution, Testnet moderation-queue review, and browser/device acceptance remain required; source checks do not establish production readiness.
-
-## 0.319.0 Phase 6 completion and Phase 7 premium profile experience
-
-Profile relationship state uses per-domain derived indexes over canonical social graph arrays; indexes are independently invalidated and batch-hydrated. Discovery cards consume prepared relationship states. Account switches abort stale profile pagination and identity hydration, clear previous-account counters, and reject late responses. Block-first safety and private financial-data boundaries remain intact. Phase 7 adds accessible reputation progress, localized number formatting, announced loading states and last-known-good recovery. No migration, identity authority, wallet, Pi, GHC or financial-authority change. Dedicated Phase 6/7 runtime and source checks pass; supported Node 24.15.x typecheck, lint, production build and browser/device acceptance remain pending.
-
-
-## 0.322.0 Phase 8 — Rewards premium experience and ledger history
-
-Rewards Centre snapshot reads are now bounded, abortable, authenticated and account-scoped. Invalid/null amounts remain unknown rather than becoming false zeroes, optional returned user identity is checked, and the UI exposes confirmed/loading/refreshing/unavailable states. Daily claim amount messaging accepts only a finite non-negative server-reported amount; it does not substitute local streak estimates. A failed daily claim cannot show a success flash. Reward issuance, idempotency, maturity and ledger authority remain server-side. No migration or financial authority changed.
-
-
-## 0.323.0 Phase 8 Rewards source completion
-
-The mission completion endpoint now derives the actor from verified server authentication, applies durable fail-closed rate limiting, parses a bounded request and ignores client metadata. Its service-role-only SQL verifier checks the seven supported mission proofs against durable membership, post, comment, profile and connection-request rows; advisory locking plus the existing unique achievement key make unlocks idempotent. It unlocks non-financial achievements only and always reports zero GHC. Migration `20261106170001_phase8_verified_mission_achievements.sql` is REVIEW_REQUIRED and unapplied. Phase 8 source work is closed; production approval remains pending Node 24.15.x build, disposable PostgreSQL/Testnet, browser/device and operator acceptance.
-
-
-## 0.325.0 Phase 9 Membership foundation
-
-Phase 9 begins with strict parsing of privileged membership entitlement rows, authenticated row identity checks, tier/source/period/active/timestamp validation, paid-expiry fail-closed rules (except explicit comp entitlements), expired/inactive paid normalization, bounded server/client status reads and rejection of conflicting purchase-duration inputs. GHC and Pi pricing/settlement authorities remain separate and server-owned. No migration or financial execution authority changed. Phase 9 remains active; Node 24.15.x, dependency-backed typecheck/lint/build, browser/device, disposable database/Testnet and operator acceptance remain outstanding.
-
-
-## 0.326.0 Phase 9 Membership lifecycle and access control
-
-Server-authoritative membership tier checks now protect catalog features before GHC debit. Premium membership presentation is based only on server status and includes authenticated read-only lifecycle history. The operator renewal workflow verifies the durable completed/fulfilled PI intent owner, provider, currency, purpose, canonical product and catalog amount; SQL derives the calendar access period including the bonus month, serializes renewal and enforces idempotency. A 72-hour continuity-only window preserves term alignment without granting access after expiry. Prepaid plans do not auto-renew; no recurring billing or refund authority was added. The lifecycle migration is REVIEW_REQUIRED and unapplied. Node 24.15.x typecheck/lint/build, disposable PostgreSQL/Testnet, browser/device and operator acceptance remain outstanding.
-
-
-## Phase 9 current increment (0.327.0)
-
-Strict Pi intent discrimination now protects activation, payment completion, fulfillment, recovery and payment-history reconciliation. Exact provider/currency/purpose/non-empty provider payment ID/completed state are required. Production Pi grants use the row-locked idempotent RPC with post-write confirmation; payment/fulfillment returns retryable pending status if entitlement is not confirmed. The generic GHC ledger-spend route also blocks premium boost/tool purposes until durable effects exist. The follow-up SQL renewal guard is REVIEW_REQUIRED and unapplied. Phase 9 source implementation is complete; external acceptance remains pending and no production approval is implied.
-
-
-
-## 0.330.1 — Phase 10 navigation and media reliability
-- Settings security/compliance/Pi capability/passkey/account-data panels are lazy-loaded with section-specific accessible fallbacks.
-- Generic image URL mutation is removed so signed storage/CDN URLs and private media facade identifiers are preserved exactly.
-- Infinite-scroll locks span the asynchronous page load; older WebViews without IntersectionObserver show content rather than leaving it deferred indefinitely.
-- Focused navigation/media source gate: 9/9; runtime media/pagination tests: 7/7.
-- No migration, Pi transaction, GHC debit, entitlement issuance or financial-authority change. Node 24.15.x build and browser/device acceptance remain outstanding. Production remains NOT APPROVED.
-
-## 0.329.0 — Phase 10 resilience and media efficiency
-- Service worker caches only explicitly allowlisted public static assets; navigations, API, media facades and personalized responses are network-only.
-- Feed and Story prefetch respects reduced-data/Data Saver and constrained network conditions, rechecks at execution time and caps speculative work.
-- Reconnect status timer is cleaned up on unmount.
-- Added 17 static resilience assertions and 11 executable service-worker policy tests.
-- No production migration, Pi transaction, GHC debit or entitlement issuance. Phase 9 external acceptance remains open.
-
-
-## 0.330.29 — Priority 6 Settings transformation
-
-Settings now has a coordinated control-centre landing overview with live summaries for privacy posture, enabled notification categories, appearance and locale, plus direct navigation to the corresponding subsections. Mutations use narrow partial patches to avoid stale render-time settings snapshots overwriting unrelated changes. Discovery radius and age-range inputs are bounded before state updates. Existing server-backed messaging privacy writes and delayed SDK user-state persistence remain unchanged. No migrations, financial operations, permission grants or notification-delivery guarantees were added. Source regression checks are registered in prebuild and static verification. Node 24.15.x dependency-backed typecheck/lint/build and browser/device/live-account acceptance remain outstanding. Production remains NOT APPROVED.
-
-## User programme Phase 3 — Rewards & Membership (2026-11-08)
-
-The 0.330.48 Phase 3 increment reuses the existing unified earnings ledger, server-authoritative GHC reward claim/maturity, mission evidence, separate PI cashback, keyset-paginated reward history, canonical VIP/VVIP catalog, verified payment-intent grants and entitlement lifecycle. It adds durable fail-closed per-account request limits to membership status, lifecycle history, payment-history reconciliation and activation before privileged work. The new source gate is registered in `prebuild` and `verify:static`. Targeted Rewards/Membership source and pure-policy suites pass; see `docs/PHASE-3-REWARDS-MEMBERSHIP-2026-11-08.md`. This is source implementation only: Node 24.15.0 build/typecheck/lint, remote migration reconciliation, disposable PostgreSQL concurrency, authenticated Testnet provider journeys and browser/device acceptance remain outstanding. No migration was added or applied, no financial state was modified, and production remains NOT APPROVED.
-
-
-## 0.338.10 — Messaging and Community transformation (2026-11-09)
-
-- Responsive message composer with measured multi-line growth capped at 120px and internal overflow for long drafts.
-- Accessible recent-message search within the active conversation, explicitly limited to the loaded recent message window.
-- Search focus management and Escape behavior close search before closing the thread.
-- Community join, invitation accept/decline, and leave actions return stable failure outcomes under offline/transport failure; local membership remains server-success-gated.
-- Three new regression gates are registered in `prebuild` and `verify:static`.
-- No SQL migrations, payment authority changes, or authorization relaxations.
-- Static regression checks passed; TypeScript/lint/build and live E2E remain unverified because the available runtime is Node 22.16.0 while the repository requires Node 24.15.0, and dependency installation timed out.
-- See `docs/PRIORITY_9_MESSAGING_COMMUNITY_TRANSFORMATION.md` for the full implementation record.
+Both identity/session tables and their base migration-history rows exist in the currently connected Supabase project. The `service_role` SELECT/INSERT/UPDATE privilege gap is confirmed there. RUN377 contains a source-only least-privilege grant migration and readiness evidence correction. The Preview database target mapping is unconfirmed, so no live database change or sign-in acceptance is claimed.

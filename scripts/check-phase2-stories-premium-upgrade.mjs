@@ -23,7 +23,7 @@ const checks = [
   ['server-confirmed seen state is persisted before local seen state', component.includes('if (!result.ok || !result.durable) return') && component.includes('window.localStorage.setItem(seenStorageKey')],
   ['story autoplay supports pause and resume', component.includes('viewerPaused') && component.includes('setViewerPaused((paused) => !paused)')],
   ['story autoplay respects reduced motion', component.includes('prefersReducedMotion()')],
-  ['video story advances on media completion', component.includes('onEnded={() => navigateStory(1)}')],
+  ['video story advances on media completion', component.includes('onEnded={() => { if (!viewerPaused) navigateStory(1) }}')],
   ['story creator has one close control', (component.match(/aria-label="Close story creator"/g) || []).length === 1],
   ['story view state is included in the canonical type and sanitizer', types.includes('viewerHasViewed?: boolean') && sanitize.includes('viewerHasViewed: raw.viewerHasViewed === true')],
   ['durable story hydration preserves seen and reaction state', context.includes('viewerHasViewed: st.viewerHasViewed === true') && context.includes('viewerReactions: Array.isArray(st.viewerReactions)')],

@@ -19,6 +19,7 @@ import {
   softDeleteMessage,
   editMessage,
   pinMessage,
+  toggleMessageReaction,
   isMessagingStoreDurable,
 } from "@/lib/server/messaging/message-store"
 
@@ -178,6 +179,8 @@ export async function POST(request: Request, ctx: Ctx) {
           ? 403
           : result.error === "PRIVACY_SETTINGS_UNCONFIGURED"
             ? 409
+          : result.error === "IDEMPOTENCY_CONFLICT"
+            ? 409
           : result.error === "EMPTY_BODY" || result.error === "INVALID_ATTACHMENTS" || result.error === "INVALID_REPLY_TARGET"
             ? 400
             : result.error === "REPLY_TARGET_NOT_FOUND" || result.error === "INVALID_SHARED_POST"
@@ -249,6 +252,27 @@ export async function PATCH(request: Request, ctx: Ctx) {
         { ok: false, error: "MESSAGE_ID_REQUIRED" },
         { status: 400, headers: { "Cache-Control": "no-store" } }
       )
+    }
+
+    // Durable reaction toggle. Only the authenticated session can identify the actor.
+    if (typeof body?.reaction === "string") {
+      const reaction = await toggleMessageReaction({
+        conversationId,
+        messageId,
+        actorId: auth.userId,
+        emoji: body.reaction,
+      })
+      if (!reaction.ok) {
+        const status = reaction.error === "FORBIDDEN" ? 403 : reaction.error === "INVALID_REACTION" ? 400 : reaction.error === "NOT_FOUND" ? 404 : 503
+        return NextResponse.json({ ok: false, error: reaction.error }, { status, headers: { "Cache-Control": "no-store" } })
+      }
+      return NextResponse.json({
+        ok: true,
+        durable: reaction.durable,
+        active: reaction.active,
+        reactionCounts: reaction.reactionCounts,
+        viewerReactions: reaction.viewerReactions,
+      }, { headers: { "Cache-Control": "no-store" } })
     }
 
     // Pin / unpin

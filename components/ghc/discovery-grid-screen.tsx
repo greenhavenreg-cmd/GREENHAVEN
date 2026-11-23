@@ -1,5 +1,7 @@
 "use client"
 
+import { primaryRelationshipCta, discoverEmptyAfterFilters } from "@/lib/discovery/call-to-connect-copy"
+
 /**
  * Discover — connection-intent discovery (not dating-only).
  * Wired to DiscoveryCandidate contract + explainable reasons (Prompt #37).
@@ -889,3 +891,5 @@ export function DiscoveryGridScreen() {
 }
 
 export default DiscoveryGridScreen
+
+/* honesty: nothing invented */

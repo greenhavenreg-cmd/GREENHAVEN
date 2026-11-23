@@ -135,7 +135,7 @@ export function WalletWithdrawalPinCard() {
       <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200"><KeyRound size={18} aria-hidden="true" /></span>
         <div className="min-w-0 flex-1">
-          <h3 id="wallet-withdrawal-pin-title" className="text-sm font-bold text-foreground">Pi withdrawal PIN</h3>
+          <h3 id="wallet-withdrawal-pin-title" className="text-sm font-bold text-foreground">Withdrawal security PIN</h3>
           <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">This is your GreenHaven six-digit withdrawal PIN. At present it protects Pi withdrawals; other transaction types keep their own authorization rules. It is separate from your login or device-unlock PIN and is not your Pi wallet passphrase.</p>
         </div>
         <button type="button" onClick={() => void refresh()} disabled={loading || busy} className="rounded-full p-2 text-muted-foreground hover:bg-background disabled:opacity-50" aria-label="Refresh withdrawal PIN status"><RefreshCw size={14} className={loading ? "animate-spin" : ""} /></button>
@@ -149,7 +149,7 @@ export function WalletWithdrawalPinCard() {
       ) : null}
       {!loading && status?.ok === true && status.configured === true ? (
         <div className="mt-3 space-y-2.5">
-          <p className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-background/80 px-3 py-2 text-[11px] font-semibold text-emerald-800 dark:border-emerald-900 dark:text-emerald-200" role="status"><ShieldCheck size={14} /> Withdrawal PIN configured{status.locked ? " · temporarily locked after failed attempts" : ""}</p>
+          <p className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-background/80 px-3 py-2 text-[11px] font-semibold text-emerald-800 dark:border-emerald-900 dark:text-emerald-200" role="status"><ShieldCheck size={14} /> PIN active · required for every Pi withdrawal{status.locked ? " · temporarily locked after failed attempts" : ""}</p>
           {changing ? (
             <div className="space-y-2.5 rounded-xl border border-border/70 bg-background/80 p-3">
               <label className="block space-y-1"><span className="text-[10px] font-bold text-muted-foreground">Current PIN</span><input type="password" inputMode="numeric" autoComplete="current-password" maxLength={6} value={currentPin} onChange={(event) => setCurrentPin(event.target.value.replace(/\D/g, "").slice(0, 6))} className={FIELD} placeholder="••••••" aria-label="Current six-digit withdrawal PIN" /></label>

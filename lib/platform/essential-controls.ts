@@ -29,4 +29,4 @@ export function isDemoOrPlaceholderUserId(id: string): boolean {
   return /^(demo|sample|placeholder)[-_]/i.test(t)
 }
 
-export const BOTTOM_NAV_ITEMS = ["home", "discover", "messages", "communities", "profile"] as const
+export const BOTTOM_NAV_ITEMS = ["home", "discover", "messages", "communities", "cart", "profile"] as const

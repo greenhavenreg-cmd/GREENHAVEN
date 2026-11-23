@@ -5,6 +5,7 @@
  */
 
 import { readGhcServerEnv, hasPrivilegedDatabase } from "@/lib/server/economy/env"
+import { supabaseRest } from "@/lib/server/supabase/rest-client"
 
 export type ServerAchievementUnlock = {
   ghUserId: string
@@ -47,15 +48,8 @@ export async function listAchievementsForUser(
     const env = readGhcServerEnv()
     if (env.supabaseUrl && env.supabaseServiceRoleKey) {
       try {
-        const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_user_achievements?gh_user_id=eq.${encodeURIComponent(uid)}&select=gh_user_id,achievement_id,unlocked_at,source_event&order=unlocked_at.asc&limit=200`
-        const res = await fetch(url, {
-          headers: {
-            apikey: env.supabaseServiceRoleKey,
-            Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-            Accept: "application/json",
-          },
-          cache: "no-store",
-        })
+        const restResult = await supabaseRest(`gh_user_achievements?gh_user_id=eq.${encodeURIComponent(uid)}&select=gh_user_id,achievement_id,unlocked_at,source_event&order=unlocked_at.asc&limit=200`, { method: "GET", timeoutMs: 10000 })
+    const res = { ok: restResult.ok, status: restResult.status, json: async () => restResult.ok ? restResult.data : restResult.body, text: async () => JSON.stringify(restResult.ok ? restResult.data : restResult.body) }
         if (res.ok) {
           const rows = (await res.json()) as Array<Record<string, unknown>>
           const list = (Array.isArray(rows) ? rows : []).map((r) => ({
@@ -105,26 +99,19 @@ export async function unlockAchievement(input: {
     const env = readGhcServerEnv()
     if (env.supabaseUrl && env.supabaseServiceRoleKey) {
       try {
-        const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_user_achievements`
-        const res = await fetch(url, {
+        const result = await supabaseRest<Array<Record<string, unknown>>>("gh_user_achievements", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: env.supabaseServiceRoleKey,
-            Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-            Prefer: "resolution=ignore-duplicates,return=representation",
-            Accept: "application/json",
-          },
+          headers: { Prefer: "resolution=ignore-duplicates,return=representation" },
           body: JSON.stringify({
             gh_user_id: uid,
             achievement_id: aid,
-            source_event: row.sourceEvent,
             unlocked_at: new Date(row.unlockedAt).toISOString(),
+            source_event: row.sourceEvent,
           }),
-          cache: "no-store",
+          timeoutMs: 10_000,
         })
-        if (res.ok) {
-          const rows = (await res.json()) as Array<Record<string, unknown>>
+        if (result.ok) {
+          const rows = result.data
           if (Array.isArray(rows) && rows[0]) {
             const r = rows[0]
             const saved: ServerAchievementUnlock = {
@@ -143,7 +130,7 @@ export async function unlockAchievement(input: {
           return (await listAchievementsForUser(uid)).find((e) => e.achievementId === aid) || row
         }
         if (isProd()) {
-          console.error("[achievement-store] unlock failed", res.status)
+          console.error("[achievement-store] unlock failed", result.status)
           return null
         }
       } catch (err) {
@@ -172,15 +159,8 @@ export async function getProgress(ghUserId: string): Promise<ServerProgress> {
     const env = readGhcServerEnv()
     if (env.supabaseUrl && env.supabaseServiceRoleKey) {
       try {
-        const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_user_progress?gh_user_id=eq.${encodeURIComponent(uid)}&select=*&limit=1`
-        const res = await fetch(url, {
-          headers: {
-            apikey: env.supabaseServiceRoleKey,
-            Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-            Accept: "application/json",
-          },
-          cache: "no-store",
-        })
+        const restResult = await supabaseRest(`gh_user_progress?gh_user_id=eq.${encodeURIComponent(uid)}&select=*&limit=1`, { method: "GET", timeoutMs: 10000 })
+    const res = { ok: restResult.ok, status: restResult.status, json: async () => restResult.ok ? restResult.data : restResult.body, text: async () => JSON.stringify(restResult.ok ? restResult.data : restResult.body) }
         if (res.ok) {
           const rows = (await res.json()) as Array<Record<string, unknown>>
           if (rows[0]) {

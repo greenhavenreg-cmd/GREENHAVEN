@@ -87,7 +87,7 @@ add(5, 'P05', 'Settings export forbids secret-bearing keys', /vapid|jwt|webhook|
 add(5, 'P06', 'Platform export helper mirrors forbidden keys', /FORBIDDEN_SETTINGS_EXPORT_RE/.test(platEss))
 add(5, 'P07', 'Discovery radius clamp 1–100 km', /clampDiscoveryRadiusKm/.test(platEss) && /Math\.min\(100/.test(platEss))
 add(5, 'P08', 'Demo user IDs rejected by platform helper', /isDemoOrPlaceholderUserId/.test(platEss))
-add(5, 'P09', 'Five-item bottom navigation contract documented', /BOTTOM_NAV_ITEMS/.test(platEss) && /home/.test(platEss) && /discover/.test(platEss))
+add(5, 'P09', 'Six-item bottom navigation contract documented', platEss.includes('BOTTOM_NAV_ITEMS = ["home", "discover", "messages", "communities", "cart", "profile"]'))
 add(5, 'P10', 'CI does not auto-apply migrations', !/supabase\s+db\s+push/.test(ci))
 
 // Release hygiene (counted inside section totals above; soft check)

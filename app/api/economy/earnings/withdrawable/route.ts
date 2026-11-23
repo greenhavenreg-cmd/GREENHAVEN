@@ -38,6 +38,11 @@ export async function GET(request: Request) {
         error: walletAuth.error || null,
         authorizedPiAppUid: walletAuth.authorizedPiAppUid || null,
         mappedPiAppUid: walletAuth.mappedPiAppUid || null,
+        piWalletAddress: walletAuth.piWalletAddress || null,
+        walletAddressSource: walletAuth.walletAddressSource || null,
+        walletAddressVerifiedAt: walletAuth.walletAddressVerifiedAt || null,
+        walletScopeVerifiedAt: walletAuth.walletScopeVerifiedAt || null,
+        walletAddressPending: walletAuth.walletAddressPending === true,
         consentedAt: walletAuth.consentedAt || null,
       },
       policy: {

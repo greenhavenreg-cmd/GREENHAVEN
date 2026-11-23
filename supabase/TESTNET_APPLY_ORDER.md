@@ -1,9 +1,9 @@
 # GreenHaven Testnet migration review order
 
 **Generated from:** `supabase/migrations/*.sql` and the canonical classification policy in `scripts/generate-migration-inventory.mjs`.
-**Current source inventory:** 201 migrations.
+**Current source inventory:** 232 migrations.
 
-> **This is a review order, not permission to apply.** It does not prove remote migration history, database compatibility, or Testnet/Mainnet readiness. Never run `supabase db push` while any pending migration is held for review, approval, validation, or marked proposal. Supabase CLI does not enforce these classifications.
+> **This is a review order, not permission to apply.** It does not prove remote migration history, database compatibility, or Testnet/Mainnet readiness. See docs/RUN278-SUPABASE-SOURCE-DRIFT-2026-11-11.md and docs/TESTNET-RECONCILIATION-2026-11-10.md for the latest source-drift and Testnet snapshots. Never run `supabase db push` while any pending migration is held for review, approval, validation, or marked proposal. Supabase CLI does not enforce these classifications.
 
 ## Required operator procedure
 
@@ -216,11 +216,42 @@ The rows are sorted by the canonical migration identifier for review. Dependenci
 | 194 | `20261107180001_marketplace_sku_variants_atomic_inventory.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
 | 195 | `20261107190001_marketplace_fulfilment_tracking_timeline.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
 | 196 | `20261108110001_phase3_wallet_rewards_membership_concurrency_recovery.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
-| 197 | `20261108120001_gh_community_server_filter_search.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 197 | `20261108120001_gh_community_server_filter_search.sql` | REVIEW_REQUIRED | SUPERSEDED_BY_COMMUNITY_SEARCH_TESTNET_PATCH_HOLD_OTHER_TARGETS |
 | 198 | `20261108150001_repair_pin_storage_and_payout_release.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
 | 199 | `20261109100001_gh_messaging_phase1_controls_search.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
 | 200 | `20261110100001_withdrawal_rpc_acl_and_recovery_atomicity.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
 | 201 | `20261110110001_wallet_recovery_reset_lock_race_guard.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 202 | `20261110110002_marketplace_orders_list_rpc_alias_fix.sql` | REQUIRED | REVIEW_THEN_APPLY |
+| 203 | `20261110125500_pi_wallet_address_binding_and_verified_a2u_diagnostics.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 204 | `20261110160001_security_definer_rpc_server_only_acl_hardening.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 205 | `20261110170001_function_search_path_hardening.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 206 | `20261110174922_revoke_client_table_write_and_sequence_privileges.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 207 | `20261110180001_remove_verified_duplicate_indexes.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 208 | `20261110182120_community_chat_membership_revocation_and_reconciliation.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 209 | `20261110183004_community_server_filter_search_reconciliation.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 210 | `20261110185525_story_idempotent_create_and_owned_media_guard.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 211 | `20261110185528_story_read_path_and_viewer_roster_indexes.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 212 | `20261110190001_rls_policy_dedup_and_initplan_optimization.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 213 | `20261110190531_post_create_idempotent_owner_and_payload_guard.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 214 | `20261110193134_social_feed_profile_rpc_search_path_hardening.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 215 | `20261110200001_supporting_foreign_key_indexes.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 216 | `20261110210001_pi_a2u_ecosystem_qualification.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 217 | `20261111064321_call_pair_lock_order_and_retry_safety.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 218 | `20261111064446_call_expiry_sweeper_before_start.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 219 | `20261111064542_call_expiry_sweeper_pair_lock_order.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 220 | `20261111120001_pi_earnings_release_stale_incomplete.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 221 | `20261111131500_run285_durable_message_reactions.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 222 | `20261112100001_financial_stale_hold_reaper.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 223 | `20261114100001_gh_feed_preferences_durable.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 224 | `20261116045934_pi_wallet_scope_consent_provider_address_discovery.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 225 | `20261116170409_gh_field_reports_public_intake.sql` | REQUIRED | REVIEW_THEN_APPLY |
+| 226 | `20261116171144_gh_research_studio_public_forms.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 227 | `20261116182000_gh_research_intelligence_platform_foundation.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 228 | `20261116190000_gh_media_evidence_engine.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 229 | `20261117010001_gh_evidence_scoped_upload_chain_of_custody.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 230 | `20261118033839_revoke_client_select_on_server_only_tables.sql` | REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 231 | `20261118194252_testnet_a2u_network_fence.sql` | REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 232 | `20261123145603_gh_identity_session_service_role_grants.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
 
 ## Classification meanings
 

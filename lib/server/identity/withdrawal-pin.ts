@@ -5,6 +5,7 @@
  */
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto"
 import { readGhcServerEnv } from "@/lib/server/economy/env"
+import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
 const MAX_ATTEMPTS = 5
 const LOCK_MS = 15 * 60_000
@@ -15,15 +16,6 @@ export type PinStatus = {
   locked: boolean
   lockedUntil?: string | null
   error?: string
-}
-
-function restHeaders(key: string) {
-  return {
-    apikey: key,
-    Authorization: `Bearer ${key}`,
-    "Content-Type": "application/json",
-    Prefer: "return=representation",
-  }
 }
 
 function hashPin(pin: string, saltHex: string): string {
@@ -50,12 +42,8 @@ export async function getWithdrawalPinStatus(userId: string): Promise<PinStatus>
     return { ok: false, configured: false, locked: false, error: "PIN_SERVICE_UNAVAILABLE" }
   }
   try {
-    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_withdrawal_pins?user_id=eq.${encodeURIComponent(userId)}&select=failed_attempts,locked_until`
-    const res = await fetch(url, {
-      headers: restHeaders(env.supabaseServiceRoleKey),
-      cache: "no-store",
-      signal: AbortSignal.timeout(10_000),
-    })
+    const restResult = await supabaseRest(`gh_withdrawal_pins?user_id=eq.${encodeURIComponent(userId)}&select=failed_attempts,locked_until`, { method: "GET", timeoutMs: 10000 })
+    const res = { ok: restResult.ok, status: restResult.status, json: async () => restResult.ok ? restResult.data : restResult.body, text: async () => JSON.stringify(restResult.ok ? restResult.data : restResult.body) }
     if (!res.ok) {
       // A missing table/schema is not the same as an unconfigured PIN. Fail closed
       // so the UI never invites setup against unavailable persistence.
@@ -92,34 +80,28 @@ export async function setWithdrawalPin(input: {
   const salt = randomBytes(16).toString("hex")
   const pinHash = hashPin(input.pin, salt)
   try {
-    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_withdrawal_pins`
-    const res = await fetch(url, {
+    const result = await supabaseRest<Array<Record<string, unknown>>>("gh_withdrawal_pins", {
       method: "POST",
-      headers: {
-        ...restHeaders(env.supabaseServiceRoleKey),
-        // First PIN setup is insert-only. Never let a repeated setup request replace
-        // an existing credential; PIN changes need a separate verified flow.
-        Prefer: "resolution=ignore-duplicates,return=representation",
-      },
+      headers: { Prefer: "resolution=ignore-duplicates,return=representation" },
       body: JSON.stringify({
         user_id: input.userId,
         pin_hash: pinHash,
         pin_salt: salt,
         failed_attempts: 0,
         locked_until: null,
+        created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(10_000),
+      timeoutMs: 10_000,
     })
-    if (!res.ok) {
-      const detail = (await res.json().catch(() => null)) as { code?: string; message?: string } | null
-      console.error("[withdrawal-pin] persist failed", { status: res.status, code: detail?.code, message: String(detail?.message || "").slice(0, 200) })
+    if (!result.ok) {
+      const detail = (result.body || null) as { code?: string; message?: string } | null
+      console.error("[withdrawal-pin] persist failed", { status: result.status, code: detail?.code, message: String(detail?.message || "").slice(0, 200) })
       // 23503 = FK to auth.users, 22P02 = uuid column given a non-uuid id: storage predates the text-id repair migration.
       if (detail?.code === "23503" || detail?.code === "22P02") return { ok: false, error: "PIN_STORAGE_MIGRATION_PENDING" }
       return { ok: false, error: "PIN_PERSIST_FAILED" }
     }
-    const inserted = (await res.json().catch(() => [])) as unknown
+    const inserted = result.data as unknown
     if (!Array.isArray(inserted) || inserted.length === 0) {
       return { ok: false, error: "PIN_ALREADY_CONFIGURED" }
     }
@@ -136,14 +118,10 @@ export async function verifyWithdrawalPin(input: {
   if (!isValidPinFormat(input.pin)) return { ok: false, error: "PIN_FORMAT_INVALID" }
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return { ok: false, error: "PIN_SERVICE_UNAVAILABLE" }
-  const base = env.supabaseUrl.replace(/\/$/, "")
   const call = async (fn: string, body: Record<string, unknown>) => {
-    const res = await fetch(`${base}/rest/v1/rpc/${fn}`, {
-      method: "POST", headers: restHeaders(env.supabaseServiceRoleKey!), body: JSON.stringify(body),
-      cache: "no-store", signal: AbortSignal.timeout(10_000),
-    })
-    if (!res.ok) throw new Error(`RPC_${res.status}`)
-    return res.json().catch(() => null)
+    const result = await supabaseRpc(fn, body, { timeoutMs: 10_000 })
+    if (!result.ok) throw new Error(`RPC_${result.status}`)
+    return result.data ?? null
   }
   try {
     // The attempt is counted atomically (row lock) BEFORE comparing, so parallel guesses cannot exceed the limit.
@@ -181,10 +159,9 @@ export async function changeWithdrawalPin(input: {
   if (!verified.ok) return verified
   const salt = randomBytes(16).toString("hex")
   try {
-    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_withdrawal_pins?user_id=eq.${encodeURIComponent(input.userId)}`
-    const res = await fetch(url, {
+    const result = await supabaseRest<Array<Record<string, unknown>>>(`gh_withdrawal_pins?user_id=eq.${encodeURIComponent(input.userId)}`, {
       method: "PATCH",
-      headers: restHeaders(env.supabaseServiceRoleKey),
+      headers: { Prefer: "return=representation" },
       body: JSON.stringify({
         pin_hash: hashPin(input.newPin, salt),
         pin_salt: salt,
@@ -192,14 +169,13 @@ export async function changeWithdrawalPin(input: {
         locked_until: null,
         updated_at: new Date().toISOString(),
       }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(10_000),
+      timeoutMs: 10_000,
     })
-    if (!res.ok) {
-      console.error("[withdrawal-pin] change persist failed", { status: res.status })
+    if (!result.ok) {
+      console.error("[withdrawal-pin] change persist failed", { status: result.status })
       return { ok: false, error: "PIN_PERSIST_FAILED" }
     }
-    const rows = (await res.json().catch(() => [])) as unknown
+    const rows = result.data as unknown
     if (!Array.isArray(rows) || rows.length !== 1) return { ok: false, error: "PIN_PERSIST_FAILED" }
     return { ok: true }
   } catch {

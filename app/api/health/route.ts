@@ -12,7 +12,7 @@
 
 import { NextResponse } from "next/server"
 import {
-  evaluateReadiness,
+  evaluateLiveReadiness,
   readinessHttpStatus,
 } from "@/lib/server/readiness"
 
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     /* */
   }
 
-  const report = evaluateReadiness({ hostname })
+  const report = await evaluateLiveReadiness({ hostname })
   const status = readinessHttpStatus(report)
 
   return NextResponse.json(report, {

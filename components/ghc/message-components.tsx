@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useRef, useCallback, useEffect, memo, type KeyboardEvent } from "react"
-import { Send, Smile, Paperclip, X, Search, MessageCircle, Pin, Archive, VolumeX, AudioLines, FileText, Play, Phone, Video, Images, Info } from "lucide-react"
+import { Send, Smile, Paperclip, X, Search, MessageCircle, Pin, Archive, VolumeX, AudioLines, FileText, Play, Phone, Video, Images, Info , Mic } from "lucide-react"
 import type { Conversation } from "@/lib/ghc-types"
 import { timeAgo } from "@/lib/ghc-data"
 import { LazyImage } from "./lazy-image"
@@ -113,7 +113,7 @@ export function ConversationSearchBar({ searchQuery, onSearchChange }: { searchQ
           className="min-h-10 w-full rounded-xl border border-border bg-background py-2 pl-9 pr-9 text-sm text-foreground placeholder:text-muted-foreground transition focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20"
         />
         {searchQuery && (
-          <button type="button" onClick={() => onSearchChange("")} className="absolute right-3 text-muted-foreground hover:text-foreground active:scale-90 transition" aria-label="Clear search">
+          <button type="button" onClick={() => onSearchChange("")} className="absolute right-1 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Clear search">
             <X size={16} aria-hidden />
           </button>
         )}
@@ -160,7 +160,7 @@ function ConversationItemBase({
 
   return (
     <div
-      className={`group border-b border-border/25 transition-colors ${isSelected ? "bg-emerald-50/80 dark:bg-emerald-950/40" : "bg-card hover:bg-muted/40"}`}
+      className={`gh-conversation-row group border-b border-border/25 transition-colors ${isSelected ? "bg-emerald-50/80 dark:bg-emerald-950/40" : "bg-card hover:bg-muted/40"}`}
       style={{ contentVisibility: "auto", containIntrinsicSize: "0 72px" }}
     >
       <div className="flex min-h-[76px] w-full items-center px-3.5 py-3.5 text-left transition active:bg-emerald-50/50 sm:px-4">
@@ -303,6 +303,7 @@ export function MessageInput({
   onSendMessage,
   onEmojiClick,
   onAttachmentClick,
+  onVoiceNote,
   disabled,
 }: {
   messageText: string
@@ -310,6 +311,7 @@ export function MessageInput({
   onSendMessage: () => void
   onEmojiClick: () => void
   onAttachmentClick: () => void
+  onVoiceNote?: () => void
   disabled: boolean
 }) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
@@ -374,7 +376,7 @@ export function MessageInput({
 
   return (
     <div
-      className="relative z-40 min-w-0 shrink-0 border-t border-border/70 bg-card p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
+      className="gh-message-composer relative z-40 min-w-0 shrink-0 border-t border-border/70 bg-card p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
       onKeyDown={(event) => {
         if (event.key === "Escape" && showEmojiPicker) {
           event.preventDefault()
@@ -417,6 +419,20 @@ export function MessageInput({
           rows={1}
           style={{ minHeight: "44px", maxHeight: "120px", overflowY: "hidden" }}
         />
+
+        {/* Voice note */}
+        {onVoiceNote && (
+          <button
+            type="button"
+            onClick={onVoiceNote}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted text-muted-foreground transition hover:bg-muted/80 active:scale-90"
+            title="Voice note"
+            aria-label="Record voice note"
+            disabled={disabled}
+          >
+            <Mic size={20} aria-hidden />
+          </button>
+        )}
 
         {/* Attachment button */}
         <button
@@ -469,6 +485,9 @@ function MessageBubbleBase({
     senderId: string
     createdAt: number
     replyTo?: string
+    sharedType?: string
+    sharedId?: string
+    sharedPostId?: string
     replyToPreview?: { senderName: string; text: string }
     reactions?: Record<string, string[]>
     isEdited?: boolean
@@ -525,7 +544,7 @@ function MessageBubbleBase({
   }
 
   return (
-    <div className={`mb-3 flex ${isSentByCurrentUser ? "justify-end" : "justify-start"}`}>
+    <div className={`gh-message-row mb-3 flex ${isSentByCurrentUser ? "justify-end" : "justify-start"}`}>
       <div className="group relative">
         {/* Pinned indicator */}
         {message.isPinned && (
@@ -561,7 +580,7 @@ function MessageBubbleBase({
             e.preventDefault()
             setMenuOpen(true)
           }}
-          className={`group max-w-[min(82vw,24rem)] select-text rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
+          className={`gh-message-bubble group max-w-[min(82vw,24rem)] select-text rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
             isSentByCurrentUser ? "rounded-br-none border border-emerald-600/30 bg-emerald-600/15 text-emerald-950 dark:bg-emerald-600/25 dark:text-emerald-50" : "rounded-bl-none bg-muted text-foreground"
           }`}
         >
@@ -634,6 +653,12 @@ function MessageBubbleBase({
               <p className="opacity-80">View original in feed · ref {(message as any).sharedPostId.slice(0, 8)}…</p>
             </div>
           )}
+          {message.sharedType === "profile" && message.sharedId ? (
+            <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("ghc:open-profile", { detail: { userId: message.sharedId } }))} className={`mt-2 flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs ${isSentByCurrentUser ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-50" : "border-border/80 bg-card text-foreground/90"}`}>
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" aria-hidden="true">GH</span>
+              <span className="min-w-0"><strong className="block">Shared GreenHaven profile</strong><span className="opacity-75">Open public profile</span></span>
+            </button>
+          ) : null}
           <p className={`mt-1 flex items-center gap-1 text-xs opacity-70 ${isSentByCurrentUser ? "justify-end text-emerald-900 dark:text-emerald-100" : "text-muted-foreground"}`}>
             <span>{timestamp}</span>
             {message.isEdited ? <span>(edited)</span> : null}

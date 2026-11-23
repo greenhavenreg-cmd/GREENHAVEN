@@ -1,5 +1,9 @@
 "use client"
 
+import { buildWithdrawalAuthorizationChecklist, withdrawalNotReadyMessage } from "@/lib/wallet/withdrawal-authorization-checklist"
+
+import { releaseReservedPi, emitWalletBalanceRefresh } from "@/lib/wallet/release-reserved-pi"
+
 /**
  * Exchange-style Pi withdrawal sheet.
  * Flow: wallet authorization check → (if missing) genuine Pi consent → quote → review → PIN → submit.
@@ -28,8 +32,26 @@ type LimitHints = { availableAtomic?: number; minPayoutAtomic?: number; maxSingl
 function humanizeApiError(code?: string | null, message?: string | null, hints?: LimitHints): string {
   if (message && !/^[A-Z][A-Z0-9_]{3,}$/.test(message.trim())) return message
   const c = (code || "").toUpperCase()
-  if (c === "WALLET_AUTHORIZATION_REQUIRED") {
-    return "Authorize your Pi wallet in this sheet to continue."
+  if (c === "PAYOUT_ALREADY_IN_PROGRESS") {
+    return "You already have a Pi withdrawal awaiting confirmation. No new request was created and no additional Pi was reserved. Check the existing request status before trying again."
+  }
+  if (c === "WALLET_AUTHORIZATION_REQUIRED" || c === "PI_WALLET_ADDRESS_VERIFICATION_REQUIRED") {
+    return "Reconnect your Pi wallet and approve the wallet-address permission before withdrawing. GreenHaven will check the actual provider destination before submitting any transfer."
+  }
+  if (c === "PI_WALLET_ADDRESS_REQUIRED" || c === "PI_WALLET_SCOPE_NOT_GRANTED") {
+    return "Pi did not confirm wallet-address permission. Open this app in Pi Browser, tap Allow on the wallet-address prompt, and ensure wallet_address is enabled for GreenHaven in the Pi Developer Portal."
+  }
+  if (c === "WALLET_SCOPE_MIGRATION_REQUIRED") {
+    return "Pi confirmed your wallet permission, but GreenHaven's payout database has not been updated for it yet. Nothing was reserved. This needs an operator update; retrying will not help."
+  }
+  if (c === "PI_WALLET_ADDRESS_INVALID" || c === "PI_WALLET_ADDRESS_MISMATCH") {
+    return "Pi returned conflicting wallet details. No payout was submitted; reconnect your Pi wallet and try again."
+  }
+  if (c === "PI_WALLET_ADDRESS_CHANGED_SINCE_REQUEST") {
+    return "Your Pi wallet address changed after this withdrawal was reserved. The existing request is held safely; reconcile or cancel it before creating a new withdrawal."
+  }
+  if (c === "PI_PAYOUT_WALLET_ADDRESS_MISMATCH" || c === "PI_PROVIDER_WALLET_ADDRESS_UNAVAILABLE") {
+    return "Pi's payment destination could not be confirmed against your connected wallet. The payout was not submitted; operator review is required."
   }
   if (c === "WALLET_AUTHORIZATION_UNAVAILABLE") {
     return "Wallet authorization is temporarily unavailable. Withdrawals remain blocked; please try again shortly."
@@ -80,6 +102,9 @@ type AuthSnap = {
   hasMapping: boolean
   /** Linked Pi app UID when the server reports one (never shown in full when sensitive). */
   piAppUid?: string | null
+  piWalletAddress?: string | null
+  walletAddressSource?: "platform_api" | "pi_sdk_scope" | "provider_payment" | null
+  walletAddressVerifiedAt?: string | null
   uidMatches?: boolean
 }
 
@@ -108,6 +133,8 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
   const [authorizing, setAuthorizing] = useState(false)
   const [quoting, setQuoting] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [releasingReserved, setReleasingReserved] = useState(false)
+  const [releaseNote, setReleaseNote] = useState<string | null>(null)
   const [quote, setQuote] = useState<{
     amountAtomic: number
     gross: number
@@ -169,6 +196,9 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
           mappedUsername: res.status.mappedUsername || linkedUsername || null,
           hasMapping: res.status.hasMapping === true,
           piAppUid: res.status.authorizedPiAppUid || null,
+          piWalletAddress: res.status.piWalletAddress || null,
+          walletAddressSource: res.status.walletAddressSource || null,
+          walletAddressVerifiedAt: res.status.walletAddressVerifiedAt || null,
           uidMatches: res.status.uidMatchesAuthorization === true,
         })
         return active
@@ -178,6 +208,9 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
         mappedUsername: linkedUsername || null,
         hasMapping: false,
         piAppUid: null,
+        piWalletAddress: null,
+        walletAddressSource: null,
+        walletAddressVerifiedAt: null,
         uidMatches: false,
       })
       if (!res.ok && "code" in res && res.code === "AUTH_STATUS_TIMEOUT") {
@@ -193,6 +226,9 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
         mappedUsername: linkedUsername || null,
         hasMapping: false,
         piAppUid: null,
+        piWalletAddress: null,
+        walletAddressSource: null,
+        walletAddressVerifiedAt: null,
         uidMatches: false,
       })
       return false
@@ -403,6 +439,9 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
         mappedUsername: result.status.mappedUsername || destination,
         hasMapping: true,
         piAppUid: result.status.authorizedPiAppUid || null,
+        piWalletAddress: result.status.piWalletAddress || null,
+        walletAddressSource: result.status.walletAddressSource || null,
+        walletAddressVerifiedAt: result.status.walletAddressVerifiedAt || null,
         uidMatches: result.status.uidMatchesAuthorization === true,
       })
       setConsentDone(true)
@@ -554,7 +593,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
         "Withdrawal request accepted. Your Pi is reserved while the payout is processed."
       if (body.requestId) {
         setMsg("Request accepted. Sending your Pi…")
-        const run = await apiRequest<{ ok?: boolean; status?: string; error?: string; retryable?: boolean }>(
+        const run = await apiRequest<{ ok?: boolean; status?: string; error?: string; retryable?: boolean; diagnosticCode?: string; requestId?: string }>(
           "/api/economy/earnings/withdrawals/process",
           { method: "POST", body: { requestId: body.requestId }, timeoutMs: 90_000 },
         )
@@ -566,9 +605,15 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
         } else if (r?.error === "PI_EARNINGS_AUTO_EXECUTE_DISABLED") {
           finalMsg = "Request accepted. Automatic payout is not switched on for this deployment yet, so your Pi stays reserved."
         } else if (r?.error === "PI_SERVER_CREDENTIALS_MISSING") {
-          finalMsg = "Request accepted, but the payout wallet is not configured yet. Your Pi stays reserved; use \"Check for releasable requests\" to return it."
+          finalMsg = "Request accepted, but the payout wallet is not configured yet. Your Pi stays reserved; use 'Check for releasable requests' to return it."
+        } else if (r?.error === "UNRELATED_INCOMPLETE_A2U_REQUIRES_OPERATOR_REVIEW") {
+          finalMsg = "A previous Pi app-wallet payout is still incomplete and must be reconciled before another transfer can start. Your request remains safely reserved; no duplicate transfer was created."
+        } else if (r?.error === "PI_UNCERTAIN_REQUEST_REQUIRES_OPERATOR_RECONCILIATION") {
+          finalMsg = "This withdrawal already had an ambiguous Pi provider attempt. It is locked for operator reconciliation; GreenHaven will not create a replacement transfer or release the reservation without authoritative Pi evidence."
+        } else if (r?.error === "PI_EARNINGS_EXECUTION_UNCERTAIN") {
+          finalMsg = `Pi has not confirmed this payout yet. Your reserved Pi remains protected; do not create another withdrawal while this request is unresolved.${r.diagnosticCode ? ` Reference: ${r.diagnosticCode}` : r.requestId ? ` Reference: ${r.requestId.slice(0, 8)}` : ""}`
         } else {
-          finalMsg = "Request accepted. The payout is still being confirmed; your Pi stays reserved until Pi confirms the result."
+          finalMsg = "Request accepted. The payout is still being confirmed; your Pi stays reserved until Pi confirms the result. Do not submit another withdrawal while it is unresolved."
         }
       }
       setMsg(finalMsg)
@@ -577,7 +622,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
         window.dispatchEvent(new CustomEvent("ghc:wallet-refresh"))
         window.dispatchEvent(
           new CustomEvent("ghc:toast", {
-            detail: { message: "Pi withdrawal request submitted", type: "success" },
+            detail: { message: finalMsg, type: finalMsg.startsWith("Withdrawal complete") ? "success" : "info" },
           }),
         )
       } catch { /* */ }
@@ -590,6 +635,28 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
   }
 
   if (!open) return null
+
+  const onReturnReserved = async () => {
+    if (releasingReserved) return
+    setReleasingReserved(true)
+    setReleaseNote(null)
+    try {
+      const result = await releaseReservedPi()
+      if (result.ok && result.released > 0) {
+        setReleaseNote(`${result.released} incomplete withdrawal(s) returned to Available.`)
+        emitWalletBalanceRefresh()
+        // Parent should re-seed available; soft nudge via event is enough.
+      } else if (result.ok) {
+        setReleaseNote(result.message || "No incomplete reservation was eligible to release yet.")
+      } else {
+        setReleaseNote(result.message)
+      }
+    } catch {
+      setReleaseNote("Could not reach the server to return reserved π. Try again.")
+    } finally {
+      setReleasingReserved(false)
+    }
+  }
 
   return (
     <div
@@ -612,7 +679,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
         tabIndex={-1}
       />
       <div
-        className="relative z-[1] flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-card shadow-2xl sm:rounded-3xl"
+        className="relative z-[1] flex max-h-[min(100dvh,92vh)] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-card shadow-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
       >
@@ -688,6 +755,22 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
           {(feePreview || quote) && (
             <div className="rounded-2xl border border-border/60 bg-muted/30 px-3 py-3 text-[12px]">
               <p className="font-semibold text-foreground" title="Fee estimate only. Funds are reserved only after you confirm with your PIN.">Review</p>
+            {(releaseNote || true) ? (
+              <div className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-[12px] leading-relaxed text-amber-950 dark:text-amber-50">
+                <p className="font-semibold">Incomplete withdrawal held as reserved?</p>
+                <p className="mt-1 opacity-90">If a previous attempt never completed on Pi, you can ask the server to return that reserved π to Available. Requests that already have a Pi payment id stay protected until reconcile.</p>
+                <button
+                  type="button"
+                  onClick={() => void onReturnReserved()}
+                  disabled={releasingReserved}
+                  className="mt-2 min-h-11 w-full rounded-full bg-amber-600 px-4 text-[12px] font-bold text-white disabled:opacity-60"
+                >
+                  {releasingReserved ? "Returning reserved π…" : "Return reserved π to available"}
+                </button>
+                {releaseNote ? <p className="mt-2 text-[11px] opacity-90" role="status">{releaseNote}</p> : null}
+              </div>
+            ) : null}
+
               <div className="mt-2 space-y-1 text-muted-foreground">
                 <p className="flex justify-between">
                   <span>Gross</span>
@@ -735,6 +818,15 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
                 Pi app UID (linked): {String(auth.piAppUid).slice(0, 8)}…{String(auth.piAppUid).slice(-4)}
               </p>
             ) : null}
+            {auth?.piWalletAddress ? (
+              <p className="font-mono text-[10px] text-violet-800/80 break-all">
+                Pi wallet address ({auth.walletAddressSource === "provider_payment" ? "provider-confirmed" : auth.walletAddressSource === "platform_api" ? "Pi API verified" : "Pi SDK-reported"}): {String(auth.piWalletAddress).slice(0, 7)}…{String(auth.piWalletAddress).slice(-6)}
+              </p>
+            ) : auth?.authorizationActive ? (
+              <p className="text-[10px] text-violet-800/80">
+                Wallet permission verified. Pi confirms your payout address when the transfer is created; nothing is sent to an unconfirmed address.
+              </p>
+            ) : null}
             <p>
               Authorization:{" "}
               {authLoading
@@ -744,7 +836,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
                   : "not active — complete consent below"}
             </p>
             <p className="text-violet-800/90">
-              Payouts only go to the KYC-approved Pi wallet bound to this linked identity. GreenHaven never asks for a raw wallet address in this sheet.
+              GreenHaven binds the Pi SDK wallet-address scope to your server-verified app-specific identity. Before signing or submitting an A2U transfer, GreenHaven compares Pi's actual payment `to_address` with this address. A2U itself is routed by Pi UID; the public address is never typed or changed here.
             </p>
           </div>
 
@@ -753,21 +845,22 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
                 <ShieldCheck className="h-4 w-4" /> Authorize your Pi wallet for withdrawals
               </p>
               <p className="mt-1 text-[11px] leading-relaxed text-violet-900/90 dark:text-violet-100/85">
-                GreenHaven needs your explicit Pi authentication and consent to send Pi earnings to the wallet linked to your account
+                GreenHaven needs your explicit Pi authentication, wallet-address permission and consent to bind the Pi wallet returned by Pi to your linked account
                 {destination ? ` (@${destination})` : ""}. You will be asked to confirm with Pi. Only your linked Pi identity can be authorized.
               </p>
               <p className="mt-1.5 text-[11px] leading-relaxed text-violet-900/90 dark:text-violet-100/85">
                 A 3% platform fee applies to each withdrawal; you receive the remaining 97%.
               </p>
-              <label className="mt-2.5 flex items-start gap-2 text-[12px] text-violet-950 dark:text-violet-100">
+              <label className="mt-3 flex min-h-12 w-full cursor-pointer items-start gap-3 rounded-xl border border-violet-300/80 bg-white/70 px-3 py-3 text-[13px] leading-relaxed text-violet-950 transition-colors hover:bg-white focus-within:outline-none focus-within:ring-2 focus-within:ring-violet-500 focus-within:ring-offset-2 dark:border-violet-700 dark:bg-violet-950/50 dark:text-violet-100">
                 <input
                   type="checkbox"
-                  className="mt-0.5 h-4 w-4 rounded border-violet-400"
+                  className="mt-0.5 h-6 w-6 min-h-6 min-w-6 shrink-0 cursor-pointer rounded-md border-2 border-violet-500 accent-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2"
                   checked={consentChecked}
                   onChange={(e) => setConsentChecked(e.target.checked)}
+                  aria-label="I authorize GreenHaven to send eligible Pi earnings to my linked Pi account"
                 />
-                <span>
-                  I authorize GreenHaven to send eligible Pi earnings to my linked Pi wallet
+                <span className="flex-1">
+                  I authorize GreenHaven to send eligible Pi earnings to my linked Pi account; GreenHaven will verify the provider payment destination against the wallet address returned by Pi before submission
                   {destination ? ` (@${destination})` : ""}.
                 </span>
               </label>
@@ -909,7 +1002,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
             )}
           </button>
           <p className="text-center text-[10px] text-muted-foreground" aria-live="polite">
-            Your Pi is reserved first, then sent by the secure payout service. Success is shown only after Pi confirms it.
+            Funds are reserved only after you confirm a withdrawal request; success shows after Pi confirms payment. Success is shown only after Pi confirms it.
           </p>
         </div>
       </div>

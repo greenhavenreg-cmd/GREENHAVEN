@@ -1,9 +1,11 @@
 "use client";
 
+import { debugLog, debugWarn, debugError } from "@/lib/client/debug-log";
+
 import React, {
   createContext,
   useContext,
-  useState,
+  useState, useRef,
   useEffect,
   useCallback,
   type ReactNode,
@@ -16,6 +18,9 @@ import { createLocalSdkLite, isLikelyAppStudioPreview } from "@/lib/local-pi-sdk
 import {
   ensurePiInitialized,
   piAuthenticateOfficial,
+  reportPiAuthDiagnostic,
+  getPiSandboxLaunchHint,
+  isPiDirectAuthFrame,
 } from "@/lib/pi-runtime";
 import {
   INITIAL_AUTH_LIFECYCLE,
@@ -192,11 +197,17 @@ function detectPiEnvironment(): {
     return { hasWindowPi: false, uaLooksLikePi: false, userAgent: "" }
   }
   const ua = String(window.navigator?.userAgent || "")
+  const w = window as unknown as Record<string, unknown>
+  const bridgeHint = Boolean(w.Pi || w.PiApp || w.PiNetwork || w.__PI_BROWSER__ || w.piNetwork)
+  let referrerHint = false
+  try {
+    referrerHint = /minepi\.com|pi\.app|pinet\.com/i.test(String(document.referrer || ""))
+  } catch { /* */ }
   const uaLooksLikePi =
-    /PiBrowser/i.test(ua) ||
-    /Pi Network/i.test(ua) ||
-    /minepi/i.test(ua) ||
-    /Pi/i.test(ua)
+    bridgeHint ||
+    referrerHint ||
+    /PiBrowser|Pi\s*Browser|Pi\s*Network|minepi|PiWebView|Pi\/|\bPiOS\b/i.test(ua) ||
+    (/wv\)/i.test(ua) && /pi\.network|minepi/i.test(ua))
   return {
     hasWindowPi: typeof (window as any).Pi !== "undefined",
     uaLooksLikePi,
@@ -204,66 +215,23 @@ function detectPiEnvironment(): {
   }
 }
 
-/**
- * Pi Browser often injects window.Pi slightly after first paint.
- * Poll briefly before treating the bridge as missing.
- */
-async function waitForWindowPi(timeoutMs = 10000, intervalMs = 250): Promise<boolean> {
-  if (typeof window === "undefined") return false
-  if (typeof (window as any).Pi !== "undefined") return true
-  const start = Date.now()
-  while (Date.now() - start < timeoutMs) {
-    await new Promise((r) => setTimeout(r, intervalMs))
-    if (typeof (window as any).Pi !== "undefined") return true
-  }
-  return typeof (window as any).Pi !== "undefined"
-}
-
-const loadPiSDK = async (): Promise<void> => {
-
-  if (typeof window === "undefined") {
-    throw new Error("Pi Browser required (no window)")
-  }
-  // Prefer native bridge (injected by Pi Browser)
-  if (typeof (window as any).Pi !== "undefined") return
-
-  const env = detectPiEnvironment()
-  console.info("[PiAuth] waiting for window.Pi", env)
-
-  const appeared = await waitForWindowPi(10000, 250)
-  if (appeared) {
-    console.info("[PiAuth] window.Pi appeared after wait")
-    return
-  }
-
-  // Optional CDN load — only helps when host already provides Pi host APIs
-  try {
-    const timeout = PI_NETWORK_CONFIG.SCRIPT_LOAD_TIMEOUT_MS || 12000
-    await loadScript(PI_NETWORK_CONFIG.SDK_URL, timeout)
-  } catch (e) {
-    console.warn("[PiAuth] CDN Pi SDK load issue:", e)
-  }
-
-  if (await waitForWindowPi(3000, 250)) return
-
-  const after = detectPiEnvironment()
-  console.warn("[PiAuth] window.Pi still missing", after)
-  throw new Error(
-    after.uaLooksLikePi
-      ? "Pi Browser detected but window.Pi is still missing. Wait a few seconds and Retry, or re-open the app from Pi → Develop using the exact URL registered in the Developer Portal. Check NEXT_PUBLIC_PI_SANDBOX matches sandbox/testnet."
-      : "Pi bridge (window.Pi) not found. Open GreenHaven from inside the Pi app (Develop → your app). Pasting the Vercel URL into Chrome/WhatsApp will not work."
-  )
-}
-
 /** Map raw SDK ReferenceErrors to a clear operator message */
 function humanizePiAuthError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err || "Authentication failed")
-  if (/Pi is not defined/i.test(raw) || /window\.Pi/i.test(raw) || /bridge not found/i.test(raw) || /still missing/i.test(raw)) {
-    const env = typeof window !== "undefined" ? detectPiEnvironment() : null
-    if (env?.uaLooksLikePi) {
-      return "Almost there: Pi Browser is open, but the Pi bridge has not loaded yet. Tap Retry authentication. If it keeps failing, re-open from Pi → Develop with the registered app URL and confirm NEXT_PUBLIC_PI_SANDBOX=true for sandbox."
+  const env = typeof window !== "undefined" ? detectPiEnvironment() : null
+  const inPi = Boolean(env?.uaLooksLikePi || env?.hasWindowPi)
+  if (/Pi is not defined/i.test(raw) || /window\.Pi/i.test(raw) || /bridge not found/i.test(raw) || /still missing/i.test(raw) || /not available on this host/i.test(raw) || /SDK \(window\.Pi\) is not available/i.test(raw)) {
+    if (inPi) {
+      return "Pi Browser is open, but the authentication bridge is still loading. Tap Retry Pi authentication. If this continues, fully close Pi and reopen GreenHaven from Develop with the registered Testnet URL."
     }
-    return "Pi Browser bridge not available. Open the Pi app → Develop → GreenHaven (do not use Chrome or WhatsApp). If you are already in Pi Browser, tap Retry."
+    return "Open GreenHaven from inside the Pi app (Develop → your app, or the production link). External browsers cannot complete Pi sign-in."
+  }
+  if (/timed out|timeout/i.test(raw) && inPi) {
+    return "Pi took too long to respond. Stay in Pi Browser and tap Retry Pi authentication."
+  }
+  // Never tell an in-Pi user that Pi Browser is "required" — they are already there.
+  if (inPi && /Pi Browser is required|need the Pi Browser|Open this GreenHaven link inside the Pi app/i.test(raw)) {
+    return "Pi Browser is open, but sign-in did not finish. Tap Retry Pi authentication. If it fails again, reopen the app from Pi → Develop."
   }
   return raw
 }
@@ -271,8 +239,9 @@ function humanizePiAuthError(err: unknown): string {
 
 
 /**
- * Official Pi auth path via unified pi-runtime:
- * ensurePiInitialized (once) → Pi.authenticate
+ * Official Pi auth path via unified pi-runtime.
+ * Sandbox bootstrap pre-initializes the SDK; a direct sign-in tap then invokes
+ * Pi.authenticate without waiting on the App Studio bridge or SDK loader.
  * Backend must still verify accessToken via Platform API GET /me.
  */
 async function officialPiAuthenticate(): Promise<{
@@ -283,14 +252,11 @@ async function officialPiAuthenticate(): Promise<{
   if (typeof window === "undefined") {
     throw new Error("No window")
   }
-  try {
-    await ensurePiInitialized()
-  } catch {
-    // Fallback wait if script race
-    await waitForWindowPi(8000, 200)
-    await ensurePiInitialized()
-  }
-  return piAuthenticateOfficial(["username", "payments"])
+  // Sign-in needs identity only. Payment and wallet permissions are requested
+  // later, inside the specific payment/authorization flow that needs them.
+  // Keeping the payments scope out of bootstrap avoids making ordinary login
+  // depend on optional commerce permissions or payment capability.
+  return piAuthenticateOfficial(["username"])
 }
 
 
@@ -308,13 +274,13 @@ const loadSDKLite = async (): Promise<void> => {
     try {
       await loadScript(url, timeout)
       if (typeof (window as any).SDKLite !== "undefined") {
-        console.log("[PiAuth] SDKLite loaded from", url)
+        debugLog("PiAuth", "SDKLite loaded from", url)
         return
       }
       lastError = new Error(`Script loaded but SDKLite global missing: ${url}`)
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e))
-      console.warn("[PiAuth] SDKLite candidate failed:", url, lastError.message)
+      debugWarn("PiAuth", "SDKLite candidate failed:", url, lastError.message)
     }
   }
   throw lastError || new Error("Failed to load SDKLite script")
@@ -346,6 +312,14 @@ function writeSignedOutFlag(value: boolean): void {
 export function PiAuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authMessage, setAuthMessage] = useState("Initializing Pi Network...");
+  const softRetryRef = useRef(0);
+  // The initial bootstrap and a user's Retry tap can overlap in a slow Pi
+  // WebView. Pi.authenticate must be single-flight or competing prompts can
+  // invalidate each other's bridge state.
+  const authAttemptRef = useRef(false);
+  // Preserve an explicit user Retry tap even when automatic bootstrap is still
+  // in flight. The request is drained after the active attempt settles.
+  const retryRequestedRef = useRef(false);
   const [hasError, setHasError] = useState(false);
   const [sdk, setSdk] = useState<SDKLiteInstance | null>(null);
   const [products, setProducts] = useState<Product[] | null>(null);
@@ -365,6 +339,9 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const initialize = useCallback(async () => {
+    if (authAttemptRef.current) return;
+    let diagnosticStage = "PI_BOOTSTRAP_START";
+    authAttemptRef.current = true;
     setHasError(false);
     setRestoredPurchases(null);
     setAuthLifecycle(INITIAL_AUTH_LIFECYCLE);
@@ -372,12 +349,19 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       // 1) App Studio parent credentials (iframe)
       setAuthMessage("Connecting to Pi Network...");
       setAuthLifecycle((s) => transitionAuth(s, "PI_AUTHENTICATING"));
-      const parentCredentials = await requestParentCredentials();
+      // Pi Developer Sandbox is not the legacy App Studio parent bridge. Skip
+      // the 4-second postMessage probe there so a user's Retry tap can reach the
+      // already-initialized Pi.authenticate call without an intervening await.
+      // RUN374: the Pi app CDN frame (app-cdn.minepi.com) is not the Sandbox but
+      // never answered the parent-credentials probe in field diagnostics, so it
+      // also authenticates directly. Server verification stays mandatory.
+      const sandboxFrame = isPiDirectAuthFrame()
+      const parentCredentials = sandboxFrame ? null : await requestParentCredentials();
       if (parentCredentials?.accessToken) {
         setAuthMessage("Authenticated via App Studio...");
         // Establish a GH server session so uploads / profile saves are authorized.
         // Best effort: on failure we keep the previous local-only behaviour.
-        let bridged: { ghUserId: string; needsOnboarding: boolean } | null = null;
+        let bridged: { piAppUid: string; ghUserId: string; needsOnboarding: boolean } | null = null;
         try {
           const r = await fetch("/api/auth/pi", {
             method: "POST",
@@ -388,29 +372,55 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
           });
           const b = (await r.json().catch(() => ({}))) as {
             ok?: boolean;
+            durable?: boolean;
+            sessionDurable?: boolean;
             needsOnboarding?: boolean;
-            identity?: { piAppUid?: string; ghUserId?: string; onboardingCompleted?: boolean };
+            identity?: { piAppUid?: string; ghUserId?: string; onboardingCompleted?: boolean; serverVerified?: boolean };
           };
-          if (r.ok && b.ok === true && b.identity?.piAppUid) {
-            const completed = b.identity.onboardingCompleted === true;
-            bridged = {
-              ghUserId: String(b.identity.ghUserId || b.identity.piAppUid),
-              needsOnboarding: completed ? false : Boolean(b.needsOnboarding),
+          if (
+            r.ok && b.ok === true && b.durable === true && b.sessionDurable === true &&
+            b.identity?.serverVerified === true && b.identity.piAppUid && b.identity.ghUserId
+          ) {
+            const sessionResponse = await fetch("/api/auth/session", {
+              method: "GET", credentials: "include", cache: "no-store",
+            });
+            const session = await sessionResponse.json().catch(() => ({})) as {
+              authenticated?: boolean; durable?: boolean;
+              session?: { ghUserId?: string };
+              identity?: { serverVerified?: boolean };
             };
+            const ghUserId = String(b.identity.ghUserId);
+            if (
+              sessionResponse.ok && session.authenticated === true && session.durable === true &&
+              session.identity?.serverVerified === true && session.session?.ghUserId === ghUserId
+            ) {
+              const completed = b.identity.onboardingCompleted === true;
+              bridged = {
+                piAppUid: String(b.identity.piAppUid),
+                ghUserId,
+                needsOnboarding: completed ? false : Boolean(b.needsOnboarding),
+              };
+            }
           }
         } catch {
           /* offline or API unavailable */
         }
-        // Provide local state SDK so profile/onboarding can persist
+        // Production/App Studio must never become locally authenticated when the
+        // durable Pi→GH identity mapping and HttpOnly session could not be issued.
+        if (!bridged && !allowLocalAuthFallback()) {
+          throw new Error("PI_SERVER_VERIFY_FAILED")
+        }
+        // Provide local state SDK only for an explicitly permitted local preview.
         const localSdk = createLocalSdkLite(
-          parentCredentials.appId || "app-studio-user"
+          bridged?.ghUserId || parentCredentials.appId || "app-studio-user"
         );
         setSdk(localSdk);
         setIsAuthenticated(true);
         setProducts([]);
         setRestoredPurchases([]);
         IdentityService.setFromPi({
-          uid: bridged?.ghUserId ?? (parentCredentials.appId || null),
+          uid: bridged?.piAppUid ?? null,
+          canonicalUserId: bridged?.ghUserId ?? null,
           accessToken: parentCredentials.accessToken,
           username: null,
           ...(bridged
@@ -427,16 +437,22 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
             serverVerified: Boolean(bridged),
             sessionReady: Boolean(bridged),
             ghUserId: bridged?.ghUserId ?? null,
-            piUid: parentCredentials.appId || undefined,
+            piUid: bridged?.piAppUid || undefined,
           })
         );
         return;
       }
 
       // 2) Official Pi SDK + SDKLite
+      diagnosticStage = "PI_SDK_INIT";
       setAuthMessage("Loading Pi SDK...");
       try {
-        await loadPiSDK();
+        // Sandbox iframe bootstrap has already initialized the SDK before the
+        // sign-in button is shown. Other hosts initialize here as before.
+        // Crucially, Sandbox skips this await so a user's tap reaches
+        // Pi.authenticate in the same task.
+        if (!sandboxFrame) await ensurePiInitialized();
+        diagnosticStage = "PI_AUTHENTICATE";
         setAuthMessage("Authenticating with Pi...");
         setAuthLifecycle((s) => transitionAuth(s, "PI_AUTHENTICATING"));
         const identity = await officialPiAuthenticate();
@@ -455,9 +471,15 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
         let ghUserId = identity.uid
         let verifiedUsername = identity.username
         let onboardingStatus: OnboardingStatus = "unknown"
+        // Keep a safe diagnostic available to the later server-verification failure path.
+        let serverDiagnosticCode = identity.accessToken
+          ? "PI_SERVER_VERIFY_FAILED"
+          : "PI_ACCESS_TOKEN_MISSING"
 
         if (identity.accessToken) {
           try {
+            diagnosticStage = "PI_SERVER_VERIFY";
+            reportPiAuthDiagnostic("PI_SERVER_VERIFY_REQUEST", { stage: diagnosticStage, hasAccessToken: true });
             setAuthMessage("Verifying Pi identity with server...");
             setAuthLifecycle((s) => transitionAuth(s, "SERVER_VERIFYING"));
             const bridgeRes = await fetch("/api/auth/pi", {
@@ -467,6 +489,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
               body: JSON.stringify({ accessToken: identity.accessToken }),
             })
             const bridgeText = await bridgeRes.text().catch(() => "")
+            reportPiAuthDiagnostic(bridgeRes.ok ? "PI_SERVER_VERIFY_HTTP_OK" : "PI_SERVER_VERIFY_HTTP_FAILED", { stage: diagnosticStage, status: bridgeRes.status, hasAccessToken: true })
             type PiAuthBridgeIdentity = {
               piAppUid?: string
               ghUserId?: string
@@ -482,6 +505,8 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
               identityExisted?: boolean
               durable?: boolean
               sessionDurable?: boolean
+              diagnosticCode?: string
+              correlationId?: string
               durabilityWarning?: string
               identity?: PiAuthBridgeIdentity
             }
@@ -498,35 +523,57 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
               bridgeRes.status === 404 ||
               bridgeRes.status === 502 ||
               bridgeRes.status === 500 ||
-              bridgeRes.status >= 500 ||
+              (bridgeRes.status >= 500 && bridgeRes.status !== 503) ||
               /FUNCTION_RUNTIME_DEPRECATED|FUNCTION_INVOCATION_FAILED|DEPLOYMENT_NOT_FOUND|Internal Server Error/i.test(
                 bridgeText
               )
             ) {
-              console.error(
-                "[PiAuth] server functions unavailable:",
-                bridgeRes.status,
-                bridgeText.slice(0, 200)
-              )
+              reportPiAuthDiagnostic("PI_SERVER_ROUTE_UNAVAILABLE", { stage: diagnosticStage, status: bridgeRes.status })
+              console.error("[PiAuth] server route unavailable", { status: bridgeRes.status })
               setAuthLifecycle((s) =>
                 transitionAuth(s, "ERROR", {
                   error:
-                    "App server is temporarily unavailable (API offline). Redeploy on a supported Node.js runtime and confirm /api/health responds. You were not registered as a new user.",
+                    (typeof bridge?.detail === "string" && bridge.detail) ||
+                    "App server is temporarily unavailable. Please retry shortly; your account was not changed.",
                   onboardingStatus: "unavailable",
                   serverVerified: false,
                 })
               )
-              setAuthMessage("Server unavailable — try again after redeploy")
+              setAuthMessage(`Server unavailable (${bridge?.diagnosticCode || "PI_SERVER_ROUTE_UNAVAILABLE"}) — try again shortly`)
               setHasError(true)
               setIsAuthenticated(false)
               return
             }
             if (
+              bridgeRes.status === 429
+            ) {
+              const retryAfter = Number(bridgeRes.headers.get("Retry-After") || 30);
+              setAuthLifecycle((s) =>
+                transitionAuth(s, "ERROR", {
+                  error: "Too many sign-in attempts. Please wait briefly and try again.",
+                  onboardingStatus: "unavailable",
+                  serverVerified: false,
+                })
+              );
+              setAuthMessage(`Please wait ${Number.isFinite(retryAfter) ? Math.max(1, retryAfter) : 30}s before retrying.`);
+              setHasError(true);
+              setIsAuthenticated(false);
+              return;
+            }
+            if (
               bridgeRes.status === 503 ||
               bridge?.error === "IDENTITY_STORE_UNAVAILABLE" ||
-              bridge?.error === "SESSION_STORE_UNAVAILABLE"
+              bridge?.error === "SESSION_STORE_UNAVAILABLE" ||
+              bridge?.error === "PI_VERIFICATION_UNAVAILABLE" ||
+              bridge?.error === "PI_VERIFICATION_INVALID_RESPONSE"
             ) {
-              console.error("[PiAuth] identity store unavailable:", bridge?.error || bridgeRes.status)
+              serverDiagnosticCode = bridge?.diagnosticCode || (
+                bridge?.error === "PI_VERIFICATION_UNAVAILABLE" ? "PI_PLATFORM_UNAVAILABLE" :
+                bridge?.error === "PI_VERIFICATION_INVALID_RESPONSE" ? "PI_PLATFORM_INVALID_RESPONSE" :
+                bridge?.error === "SESSION_STORE_UNAVAILABLE" ? "PI_SESSION_STORE_FAILED" : "PI_IDENTITY_STORE_FAILED"
+              )
+              reportPiAuthDiagnostic(serverDiagnosticCode, { stage: diagnosticStage, status: bridgeRes.status })
+              console.error("[PiAuth] server verification/storage rejected", { status: bridgeRes.status, code: serverDiagnosticCode, correlationId: bridge?.correlationId || null })
               setAuthLifecycle((s) =>
                 transitionAuth(s, "ERROR", {
                   error:
@@ -536,7 +583,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
                   serverVerified: false,
                 })
               )
-              setAuthMessage("Identity service unavailable")
+              setAuthMessage(`Identity service unavailable (${serverDiagnosticCode})`)
               setHasError(true)
               setIsAuthenticated(false)
               return
@@ -550,6 +597,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
               bridgeIdentity.piAppUid.length > 0
             ) {
               serverVerified = true
+              reportPiAuthDiagnostic("PI_SERVER_VERIFY_OK", { stage: diagnosticStage, status: bridgeRes.status })
               ghUserId = String(
                 bridgeIdentity.ghUserId || bridgeIdentity.piAppUid
               )
@@ -576,10 +624,55 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
                 )
               }
             } else {
-              console.warn("[PiAuth] /api/auth/pi did not verify:", bridge)
+              const responseCode = bridge?.diagnosticCode || "PI_SERVER_VERIFY_RESPONSE_INVALID"
+              serverDiagnosticCode = responseCode
+              reportPiAuthDiagnostic(responseCode, { stage: diagnosticStage, status: bridgeRes.status })
+              debugWarn("PiAuth", "/api/auth/pi did not verify", { status: bridgeRes.status, code: responseCode, correlationId: bridge?.correlationId || null })
             }
           } catch (bridgeErr) {
-            console.warn("[PiAuth] identity bridge network error:", bridgeErr)
+            serverDiagnosticCode = "PI_SERVER_VERIFY_NETWORK_ERROR"
+            reportPiAuthDiagnostic("PI_SERVER_VERIFY_NETWORK_ERROR", { stage: diagnosticStage, errorName: bridgeErr instanceof Error ? bridgeErr.name : "UnknownError" })
+            debugWarn("PiAuth", "identity bridge network error", { errorName: bridgeErr instanceof Error ? bridgeErr.name : "UnknownError" })
+          }
+        } else {
+          diagnosticStage = "PI_AUTH_RESULT";
+          reportPiAuthDiagnostic("PI_AUTH_RESULT_NO_TOKEN", { stage: diagnosticStage, hasAccessToken: false });
+        }
+
+        // Verify the browser actually stored and returned the HttpOnly GH session cookie.
+        // A successful Pi /me response alone is not enough to mark the app session ready.
+        if (serverVerified) {
+          diagnosticStage = "PI_SESSION_COOKIE_VERIFY";
+          try {
+            const sessionRes = await fetch("/api/auth/session", {
+              method: "GET",
+              credentials: "include",
+              cache: "no-store",
+            });
+            const sessionBody = await sessionRes.json().catch(() => ({})) as {
+              authenticated?: boolean;
+              durable?: boolean;
+              session?: { ghUserId?: string };
+              identity?: { serverVerified?: boolean };
+              diagnosticCode?: string;
+              correlationId?: string;
+            };
+            const cookieSessionReady = sessionRes.ok && sessionBody.authenticated === true &&
+              sessionBody.durable === true && sessionBody.identity?.serverVerified === true &&
+              sessionBody.session?.ghUserId === ghUserId;
+            reportPiAuthDiagnostic(cookieSessionReady ? "PI_SESSION_COOKIE_VERIFY_OK" : (sessionBody.diagnosticCode || "PI_SESSION_COOKIE_VERIFY_FAILED"), {
+              stage: diagnosticStage, status: sessionRes.status, hasAccessToken: true,
+            });
+            if (!cookieSessionReady) {
+              serverVerified = false;
+              setAuthMessage(`Pi was verified, but the secure GreenHaven session cookie was not confirmed (${sessionBody.diagnosticCode || "PI_SESSION_COOKIE_VERIFY_FAILED"}). Retry sign-in.`);
+            }
+          } catch (sessionErr) {
+            serverVerified = false;
+            reportPiAuthDiagnostic("PI_SESSION_COOKIE_VERIFY_NETWORK_ERROR", {
+              stage: diagnosticStage, errorName: sessionErr instanceof Error ? sessionErr.name : "UnknownError",
+            });
+            setAuthMessage("Pi was verified, but the GreenHaven session could not be confirmed (PI_SESSION_COOKIE_VERIFY_NETWORK_ERROR). Retry sign-in.");
           }
         }
 
@@ -632,7 +725,8 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
         }
 
         IdentityService.setFromPi({
-          uid: ghUserId,
+          uid: identity.uid,
+          canonicalUserId: ghUserId,
           username: verifiedUsername,
           displayName: verifiedUsername,
           accessToken: identity.accessToken,
@@ -686,7 +780,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
                 piUid: identity.uid,
               })
             )
-            setAuthMessage("Verification unavailable")
+            setAuthMessage(`Identity service unavailable (${serverDiagnosticCode})`)
             setHasError(true)
             setIsAuthenticated(false)
             return
@@ -725,41 +819,56 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
           );
         } catch { /* */ }
 
-        // Official path success — try SDKLite for optional commerce features, non-blocking
-        try {
-          setAuthMessage("Loading optional commerce SDK...");
-          await loadSDKLite();
-          const sdkLite = await (window as any).SDKLite.init();
-          let sdkInstance: SDKLiteInstance;
-          try {
-            const pi = buildPiSdk();
-            await pi.auth.login();
-            await sdkLite.login();
-            sdkInstance = createSdk(sdkLite, pi);
-          } catch {
-            sdkInstance = sdkLite;
-          }
-          setSdk(sdkInstance);
-          await fetchProducts(sdkInstance);
-          try {
-            const { purchases } = await sdkInstance.state.restore();
-            setRestoredPurchases(purchases);
-          } catch {
-            setRestoredPurchases([]);
-          }
-        } catch (optionalErr) {
-          console.warn("[PiAuth] SDKLite optional path skipped:", optionalErr);
-          // Minimal sdk stub so consumers expecting sdk don't crash
-          setSdk(createLocalSdkLite(identity.uid));
-          setProducts([]);
-          setRestoredPurchases([]);
-        }
-
+        // The Pi identity and durable GH cookie have already been verified above.
+        // Authentication must not wait for optional commerce SDK initialization,
+        // product discovery, or purchase restoration.
         setIsAuthenticated(true);
         setAuthMessage("Signed in with Pi");
+        setProducts([]);
+        setRestoredPurchases([]);
+
+        // Optional commerce initialization is deliberately detached from the auth
+        // critical path. A slow or unavailable SDK must not leave a verified Pioneer
+        // looking logged out after the durable server session has been confirmed.
+        void (async () => {
+          reportPiAuthDiagnostic("PI_COMMERCE_SDK_INIT_START", { stage: "optional_commerce" });
+          try {
+            await loadSDKLite();
+            const sdkLite = await (window as any).SDKLite.init();
+            let sdkInstance: SDKLiteInstance;
+            try {
+              // The Pioneer has already authenticated through the official Pi
+              // SDK and the server session has been verified. Do not start a
+              // second Pi auth flow while bringing up optional commerce.
+              const pi = buildPiSdk();
+              sdkInstance = createSdk(sdkLite, pi);
+            } catch {
+              sdkInstance = sdkLite;
+            }
+            setSdk(sdkInstance);
+            await fetchProducts(sdkInstance);
+            try {
+              const { purchases } = await sdkInstance.state.restore();
+              setRestoredPurchases(purchases);
+            } catch {
+              setRestoredPurchases([]);
+            }
+            reportPiAuthDiagnostic("PI_COMMERCE_SDK_READY", { stage: "optional_commerce" });
+          } catch (optionalErr) {
+            reportPiAuthDiagnostic("PI_COMMERCE_SDK_FAILED", {
+              stage: "optional_commerce",
+              errorName: optionalErr instanceof Error ? optionalErr.name : "UnknownError",
+            });
+            debugWarn("PiAuth", "SDKLite optional path skipped:", optionalErr);
+            // Keep commerce unavailable rather than blocking or undoing verified auth.
+            setSdk(null);
+            setProducts([]);
+            setRestoredPurchases([]);
+          }
+        })();
         return;
       } catch (piErr) {
-        console.warn("[PiAuth] Official Pi auth failed:", piErr);
+        debugWarn("PiAuth", "Official Pi auth failed:", piErr);
         if (!allowLocalAuthFallback()) {
           throw piErr instanceof Error
             ? piErr
@@ -791,7 +900,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
             displayName: piUser?.username || null,
           });
         } catch (loginErr) {
-          console.warn("[PiAuth] Hybrid login failed, using SDKLite only:", loginErr);
+          debugWarn("PiAuth", "Hybrid login failed, using SDKLite only:", loginErr);
           const ok = await sdkLite.login();
           if (!ok) throw loginErr instanceof Error ? loginErr : new Error("Login failed");
           sdkInstance = sdkLite;
@@ -836,7 +945,9 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         setAuthMessage(
-          "Could not load Pi authentication. Open GreenHaven inside the Pi Browser and try again."
+          detectPiEnvironment().uaLooksLikePi
+            ? "Pi Browser is open, but authentication did not complete. Tap Retry Pi authentication."
+            : "Could not load Pi authentication. Open this URL from Pi → Develop → your app and try again."
         );
 
         throw sdkLiteErr instanceof Error
@@ -844,16 +955,36 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
           : new Error("Failed to load SDKLite script");
       }
     } catch (err) {
-      console.error("SDKLite initialization failed:", err);
+      const diagnosticCode = diagnosticStage === "PI_SDK_INIT" ? "PI_SDK_INIT_FAILED" : diagnosticStage === "PI_AUTHENTICATE" ? "PI_AUTHENTICATE_FAILED" : diagnosticStage === "PI_SERVER_VERIFY" ? "PI_SERVER_VERIFY_FAILED" : "PI_BOOTSTRAP_FAILED";
+      reportPiAuthDiagnostic(diagnosticCode, { stage: diagnosticStage, errorName: err instanceof Error ? err.name : "UnknownError" });
+      console.error("[PiAuth] initialization failed", { code: diagnosticCode, stage: diagnosticStage, errorName: err instanceof Error ? err.name : "UnknownError" });
+      const env = detectPiEnvironment();
+      if ((env.uaLooksLikePi || env.hasWindowPi) && softRetryRef.current < 1) {
+        softRetryRef.current += 1;
+        setHasError(false);
+        setAuthMessage("Pi Browser detected — retrying authentication…");
+        window.setTimeout(() => { void initialize(); }, 1200);
+        return;
+      }
       setHasError(true);
-      setAuthMessage(humanizePiAuthError(err));
+      const sandboxHint = diagnosticCode === "PI_AUTHENTICATE_FAILED" ? getPiSandboxLaunchHint() : null;
+      const failureMessage = `${humanizePiAuthError(err)} (${diagnosticCode})${sandboxHint ? ` ${sandboxHint}` : ""}`;
+      setAuthMessage(failureMessage);
       setAuthLifecycle((s) =>
         transitionAuth(s, "ERROR", {
-          error: humanizePiAuthError(err),
+          error: failureMessage,
           onboardingStatus: "unknown",
           serverVerified: false,
         })
       );
+    } finally {
+      authAttemptRef.current = false;
+      if (retryRequestedRef.current) {
+        retryRequestedRef.current = false;
+        // Start a fresh attempt after the active promise has unwound. Do not
+        // overlap Pi.authenticate calls or bypass server-side token verification.
+        window.setTimeout(() => { void initialize(); }, 0);
+      }
     }
   }, [fetchProducts]);
 
@@ -861,7 +992,9 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
     if (!allowLocalAuthFallback()) {
       setHasError(true);
       setAuthMessage(
-        "Local preview is disabled on this host. Open GreenHaven in the Pi Browser and sign in with your Pi account."
+        detectPiEnvironment().uaLooksLikePi
+          ? "Local preview is disabled here. Tap Retry Pi authentication to finish sign-in in Pi Browser."
+          : "Local preview is disabled on this host. Open GreenHaven from Pi → Develop and sign in with your Pi account."
       );
       return;
     }
@@ -890,21 +1023,62 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // User explicitly logged out: do not silently sign back in on reload.
     if (readSignedOutFlag()) {
-      setHasError(true);
-      setAuthMessage("You are signed out. Tap Sign in with Pi to continue.");
+      if (isPiDirectAuthFrame()) {
+        let cancelled = false
+        setHasError(false)
+        setAuthMessage("Preparing Pi Sandbox sign-in…")
+        void ensurePiInitialized().then(() => {
+          if (cancelled) return
+          setHasError(true)
+          setAuthMessage("You are signed out. Pi Sandbox is ready. Tap Sign in with Pi to continue.")
+        }).catch((error) => {
+          if (cancelled) return
+          setHasError(true)
+          setAuthMessage(humanizePiAuthError(error) + " (PI_SDK_INIT_FAILED)")
+          reportPiAuthDiagnostic("PI_SDK_INIT_FAILED", {
+            stage: "sdk_init",
+            sandbox: true,
+            errorName: error instanceof Error ? error.name : "UnknownError",
+          })
+        })
+        return () => { cancelled = true }
+      }
+      setHasError(true)
+      setAuthMessage("You are signed out. Tap Sign in with Pi to continue.")
       return undefined;
     }
     let cancelled = false;
+    if (isPiDirectAuthFrame()) {
+      setAuthMessage("Preparing Pi Sandbox sign-in…")
+      void ensurePiInitialized().then(() => {
+        if (cancelled) return
+        setHasError(true)
+        setAuthMessage("Pi Sandbox is ready. Tap Sign in with Pi to authorize your account.")
+      }).catch((error) => {
+        if (cancelled) return
+        setHasError(true)
+        setAuthMessage(humanizePiAuthError(error) + " (PI_SDK_INIT_FAILED)")
+      })
+      return () => { cancelled = true }
+    }
     const hardTimeout = window.setTimeout(() => {
       if (cancelled) return;
       setIsAuthenticated((prev) => {
         if (prev) return prev;
         // Production / Pi-required hosts: show error, do NOT fake a user
         if (!allowLocalAuthFallback()) {
-          setHasError(true);
-          setAuthMessage(
-            "Pi Browser is required. Open this GreenHaven link inside the Pi app (Develop → your app, or the production URL). Sign in with your Pi account to continue."
-          );
+          const env = detectPiEnvironment();
+          if (env.uaLooksLikePi) {
+            // Keep a slow Pi webview handshake in a connecting state instead of
+            // falsely telling a user already in Pi Browser that it is required.
+            setHasError(false);
+            setAuthMessage("Pi Browser detected. Still connecting to Pi… You can retry authentication if this takes too long.");
+          } else {
+            setHasError(true);
+            setAuthMessage(
+              "Pi sign-in is not connected yet. If you are in Pi Browser, tap Retry Pi authentication. Otherwise open this URL from Pi → Develop → your app."
+            );
+          }
           return false;
         }
         console.info("[PiAuth] Auth hard-timeout — activating local preview session");
@@ -941,6 +1115,12 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
 
   const reinitialize = async () => {
     writeSignedOutFlag(false);
+    if (authAttemptRef.current) {
+      retryRequestedRef.current = true;
+      setHasError(false);
+      setAuthMessage("Finishing the current Pi connection attempt before retrying…");
+      return;
+    }
     await initialize();
   };
 

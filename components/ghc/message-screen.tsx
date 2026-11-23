@@ -6,6 +6,8 @@
  * UX: All / Unread / Communities filters, clear empty states.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, startTransition, memo } from "react"
+import { startDirectCallFromThread } from "@/lib/messaging/call-bridge"
+import { recordVoiceNote, isVoiceNoteSupported } from "@/lib/messaging/voice-note-recorder"
 import { useGHCMessaging, useGHC } from "@/contexts/ghc-context"
 import { useRegionalContext } from "@/contexts/regional-context"
 import { getProductMessage } from "@/lib/i18n/product"
@@ -21,7 +23,7 @@ import {
   ChatHeader,
   EmptyMessagesState,
 } from "./message-components"
-import type { Conversation, Message } from "@/lib/ghc-types"
+import type { Conversation, MatchEntry, Message } from "@/lib/ghc-types"
 import { Users, MessageCircle, ArrowRight, ShieldCheck, Sparkles, Search, Images, X, FileText, AudioLines, Info } from "lucide-react"
 import { LazyImage } from "./lazy-image"
 import { navigateTo } from "@/lib/navigation/navigate"
@@ -29,6 +31,8 @@ import { isDurableMessagingEnabled } from "@/lib/messaging/durable-flag"
 import { apiTouchConversationPresence, apiEnsureConversationMember } from "@/lib/messaging/server-messaging-sync"
 import { buildRelationshipOutcome } from "@/lib/relationship-outcomes"
 import { FilterSummary } from "./filtering/filter-summary"
+import { FilterPanel } from "./filtering/filter-panel"
+import { GroupInvitesPanel } from "./group-invites-panel"
 import { matchesFilterQuery } from "@/lib/filtering/filter-utils"
 
 const MESSAGE_WINDOW = 40
@@ -72,13 +76,15 @@ export function MessageScreen() {
     friends,
     candidates,
     following,
+    blockedUsers,
   } = useGHC() as unknown as {
     deleteMessage?: (conversationId: string, messageId: string, deleteForEveryone?: boolean) => Promise<void>
     replyToMessage?: (conversationId: string, replyToMessageId: string, text: string) => Promise<boolean>
-    matches?: unknown[]
+    matches?: MatchEntry[]
     friends?: unknown[]
     candidates?: unknown[]
     following?: Array<Record<string, unknown> | string>
+    blockedUsers?: string[]
   }
   const ghc = {
     pinConversation: async (id: string, pinned: boolean) => {
@@ -94,7 +100,9 @@ export function MessageScreen() {
       else await messaging.unmuteConversation?.(id)
     },
     matches: Array.isArray(matches) ? matches : [],
+    matchIds: Array.isArray(matches) ? matches.map((match) => match.userId).filter(Boolean) : [],
     friends: Array.isArray(friends) ? friends : [],
+    blockedUsers: Array.isArray(blockedUsers) ? blockedUsers : [],
     candidates: Array.isArray(candidates) ? candidates : [],
     following: Array.isArray(following) ? following : [],
     refreshConversations: (messaging as { refreshConversations?: () => Promise<unknown> }).refreshConversations,
@@ -129,6 +137,13 @@ export function MessageScreen() {
   const [serverSearchError, setServerSearchError] = useState("")
   const [sharedMediaOpen, setSharedMediaOpen] = useState(false)
   const [conversationDetailsOpen, setConversationDetailsOpen] = useState(false)
+  const [groupCreateOpen, setGroupCreateOpen] = useState(false)
+  const [groupTitle, setGroupTitle] = useState("")
+  const [groupRequestId, setGroupRequestId] = useState("")
+  const [groupInviteIds, setGroupInviteIds] = useState<string[]>([])
+  const [groupCreateBusy, setGroupCreateBusy] = useState(false)
+  const [contactShareBusy, setContactShareBusy] = useState(false)
+  const [contactShareRequest, setContactShareRequest] = useState<{ conversationId: string; id: string } | null>(null)
   const messageSearchInputRef = useRef<HTMLInputElement>(null)
   const [peerPresence, setPeerPresence] = useState<PeerPresence | null>(null)
   const [threadContext, setThreadContext] = useState<{ type?: string; orderId?: string; listingId?: string } | null>(null)
@@ -216,6 +231,24 @@ export function MessageScreen() {
     document.addEventListener("visibilitychange", onVis)
     return () => document.removeEventListener("visibilitychange", onVis)
   }, [selectedId, markConversationRead])
+
+  // Full-thread focus: hide bottom navigation while a conversation is open
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      window.dispatchEvent(
+        new CustomEvent("ghc:bottom-nav-visibility", {
+          detail: { hidden: Boolean(selectedId) },
+        }),
+      )
+    } catch { /* */ }
+    return () => {
+      try {
+        window.dispatchEvent(new CustomEvent("ghc:bottom-nav-visibility", { detail: { hidden: false } }))
+      } catch { /* */ }
+    }
+  }, [selectedId])
+
 
   useEffect(() => {
     if (!selectedId) return
@@ -413,9 +446,8 @@ export function MessageScreen() {
         if (typeof f === "string") continue
         indexPeer(f.id || f.userId, f.displayName || f.name, f.avatarUrl || f.photo || f.profilePhoto)
       }
-      for (const m of (ghc.matches || []) as Array<Record<string, unknown> | string>) {
-        if (typeof m === "string") continue
-        indexPeer(m.id || m.userId, m.displayName || m.name, m.avatarUrl || m.photo || m.profilePhoto)
+      for (const m of ghc.matches || []) {
+        indexPeer(m.userId || m.id, m.userName, m.userPhoto)
       }
       // Phase 4: include following graph for DM name/photo enrichment.
       for (const f of (ghc.following || []) as Array<Record<string, unknown> | string>) {
@@ -481,6 +513,59 @@ export function MessageScreen() {
       null
     )
   }, [list, conversations, selectedId])
+
+  const createGroupFromSelectedDm = async () => {
+    if (!selected || groupCreateBusy || !groupTitle.trim()) return
+    setGroupCreateBusy(true)
+    try {
+      const response = await fetch("/api/messaging/conversations/group", {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceConversationId: selected.id, title: groupTitle.trim(), invitedUserIds: groupInviteIds, clientRequestId: groupRequestId }), cache: "no-store",
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || !payload?.ok || !payload?.conversationId) throw new Error(payload?.error || "GROUP_CREATE_UNAVAILABLE")
+      setGroupCreateOpen(false); setGroupTitle(""); setGroupRequestId(""); setGroupInviteIds([]); setConversationDetailsOpen(false)
+      await ghc.refreshConversations?.()
+      await (ghc as { loadConversations?: () => Promise<unknown> }).loadConversations?.()
+      window.dispatchEvent(new CustomEvent("ghc:group-invites-refresh"))
+      window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: `Group created. ${Number(payload.invitedCount) || 0} invitations sent; members join after accepting.`, type: "success" } }))
+    } catch (error) {
+      window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: error instanceof Error ? error.message : "Could not create group", type: "error" } }))
+    } finally { setGroupCreateBusy(false) }
+  }
+
+  const shareOwnContactInSelected = async () => {
+    if (!selected || contactShareBusy) return
+    setContactShareBusy(true)
+    const requestId = contactShareRequest?.conversationId === selected.id
+      ? contactShareRequest.id
+      : (globalThis.crypto?.randomUUID?.() || `profile-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`)
+    setContactShareRequest({ conversationId: selected.id, id: requestId })
+    try {
+      const response = await fetch(`/api/messaging/conversations/${encodeURIComponent(selected.id)}/contacts`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientMessageId: requestId }), cache: "no-store",
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || !payload?.ok) throw new Error(payload?.error || "CONTACT_SHARE_UNAVAILABLE")
+      await loadConversationMessages?.(selected.id)
+      setContactShareRequest(null)
+      window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "Your public GreenHaven profile was shared", type: "success" } }))
+    } catch (error) {
+      window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: error instanceof Error ? error.message : "Could not share profile", type: "error" } }))
+    } finally { setContactShareBusy(false) }
+  }
+
+  const groupCandidates = useMemo(() => {
+    const byId = new Map<string, { id: string; name: string }>()
+    for (const item of [...ghc.friends, ...ghc.candidates]) {
+      const id = typeof item === "string" ? item.trim() : String((item as any)?.userId || (item as any)?.id || (item as any)?.ghUserId || "").trim()
+      if (!id || id === selected?.participantId || (ghc.blockedUsers || []).map(String).includes(id)) continue
+      const name = typeof item === "string" ? item : String((item as any)?.name || (item as any)?.displayName || (item as any)?.username || id)
+      byId.set(id, { id, name: name.slice(0, 120) })
+    }
+    return [...byId.values()].slice(0, 30)
+  }, [ghc.friends, ghc.candidates, ghc.blockedUsers, selected?.participantId])
 
   const allMessages: Message[] = useMemo(() => {
     const raw = selected?.messages
@@ -812,6 +897,62 @@ export function MessageScreen() {
               /* */
             }
           }}
+          onCall={
+            isCommunity
+              ? undefined
+              : () => {
+                  const me = String((ghc as { profile?: { id?: string }; currentUserId?: string }).currentUserId || (ghc as { profile?: { id?: string } }).profile?.id || "")
+                  const peerId = String(selected.participantId || "")
+                  if (!me || !peerId) return
+                  const friends = new Set((ghc.friends || []).map(String))
+                  const matches = new Set((ghc.matchIds || []).map(String))
+                  void startDirectCallFromThread({
+                    localUserId: me,
+                    peerUserId: peerId,
+                    peerName: selected.participantName || "Contact",
+                    peerPhoto: selected.participantPhoto,
+                    conversationId: selected.id,
+                    kind: "voice",
+                    isFriend: friends.has(peerId),
+                    isMatch: matches.has(peerId),
+                    isBlocked: (ghc.blockedUsers || []).map(String).includes(peerId),
+                  }).then((r) => {
+                    if (!r.ok && r.message) {
+                      try {
+                        window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: r.message, tone: "warning" } }))
+                      } catch { /* */ }
+                    }
+                  })
+                }
+          }
+          onVideo={
+            isCommunity
+              ? undefined
+              : () => {
+                  const me = String((ghc as { profile?: { id?: string }; currentUserId?: string }).currentUserId || (ghc as { profile?: { id?: string } }).profile?.id || "")
+                  const peerId = String(selected.participantId || "")
+                  if (!me || !peerId) return
+                  const friends = new Set((ghc.friends || []).map(String))
+                  const matches = new Set((ghc.matchIds || []).map(String))
+                  void startDirectCallFromThread({
+                    localUserId: me,
+                    peerUserId: peerId,
+                    peerName: selected.participantName || "Contact",
+                    peerPhoto: selected.participantPhoto,
+                    conversationId: selected.id,
+                    kind: "video",
+                    isFriend: friends.has(peerId),
+                    isMatch: matches.has(peerId),
+                    isBlocked: (ghc.blockedUsers || []).map(String).includes(peerId),
+                  }).then((r) => {
+                    if (!r.ok && r.message) {
+                      try {
+                        window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: r.message, tone: "warning" } }))
+                      } catch { /* */ }
+                    }
+                  })
+                }
+          }
         />
         {conversationDetailsOpen ? (
           <div className="absolute inset-0 z-[64] flex flex-col bg-background/95 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="gh-conversation-details-title">
@@ -827,7 +968,7 @@ export function MessageScreen() {
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4" style={{ WebkitOverflowScrolling: "touch" }}>
               <section className="rounded-2xl border border-border bg-card p-4">
                 <div className="flex items-center gap-3">
-                  <LazyImage src={selected.groupPhoto || selected.participantPhoto || "/placeholder.svg?width=80&height=80"} alt="" className="h-14 w-14 rounded-full object-cover" />
+                  <LazyImage src={selected.groupPhoto || selected.participantPhoto || "/placeholder.svg?width=80&height=80"} alt="Conversation photo" className="h-14 w-14 rounded-full object-cover" />
                   <div className="min-w-0">
                     <h3 className="truncate text-base font-bold text-foreground">{selected.groupName || selected.participantName || "Conversation"}</h3>
                     <p className="text-xs text-muted-foreground">{isCommunity ? "Community conversation" : selected.conversationType === "group" ? "Group conversation" : "Direct conversation"}</p>
@@ -853,8 +994,31 @@ export function MessageScreen() {
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => { setConversationDetailsOpen(false); setSharedMediaOpen(true) }} className="rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-foreground hover:bg-muted"><Images size={16} className="mr-2 inline" />Shared media</button>
                 {!isCommunity ? <button type="button" onClick={() => { setConversationDetailsOpen(false); window.dispatchEvent(new CustomEvent("ghc:open-profile", { detail: { userId: selected.participantId, name: selected.participantName } })) }} className="rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-foreground hover:bg-muted">View profile</button> : null}
+                {!isCommunity ? <button type="button" disabled={contactShareBusy} onClick={() => void shareOwnContactInSelected()} className="rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50">{contactShareBusy ? "Sharing…" : "Share my profile"}</button> : null}
+                {!isCommunity && selected.conversationType !== "group" ? <button type="button" onClick={() => { setGroupTitle(`${selected.participantName || "Friends"} group`.slice(0, 80)); setGroupRequestId(globalThis.crypto?.randomUUID?.() || `group-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`); setGroupInviteIds([]); setGroupCreateOpen(true) }} className="rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-foreground hover:bg-muted">Create group from chat</button> : null}
               </div>
-              <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">This is the Phase 1 information-centre foundation. Durable nicknames, quick-reaction defaults, read-receipt preferences, contact sharing and group-creation workflows will only be enabled after their member-scoped persistence and privacy contracts pass review.</p>
+              {groupCreateOpen ? (
+                <section className="rounded-2xl border border-emerald-300/60 bg-card p-3" aria-label="Create group from direct message">
+                  <h3 className="text-sm font-bold text-foreground">Create a group</h3>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">The person in this direct chat will receive an invitation. Additional people you select must accept before they become group members.</p>
+                  <label className="mt-3 block text-[11px] font-semibold text-foreground" htmlFor="gh-group-title">Group name</label>
+                  <input id="gh-group-title" value={groupTitle} onChange={(event) => setGroupTitle(event.target.value.slice(0, 80))} maxLength={80} className="mt-1 min-h-10 w-full rounded-xl border border-border bg-background px-3 text-sm" />
+                  <p className="mt-3 text-[11px] font-semibold text-foreground">Invite additional people</p>
+                  <div className="mt-1 max-h-44 space-y-1 overflow-y-auto">
+                    {groupCandidates.map((candidate) => (
+                      <label key={candidate.id} className="flex min-h-9 items-center gap-2 rounded-lg px-2 text-xs text-foreground hover:bg-muted/60">
+                        <input type="checkbox" checked={groupInviteIds.includes(candidate.id)} onChange={(event) => setGroupInviteIds((current) => event.target.checked ? [...current, candidate.id].slice(0, 19) : current.filter((id) => id !== candidate.id))} />
+                        <span className="truncate">{candidate.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button type="button" disabled={groupCreateBusy || !groupTitle.trim()} onClick={() => void createGroupFromSelectedDm()} className="min-h-10 flex-1 rounded-xl bg-[var(--gh-green)] px-3 text-xs font-bold text-white disabled:opacity-50">{groupCreateBusy ? "Creating…" : "Create and invite"}</button>
+                    <button type="button" disabled={groupCreateBusy} onClick={() => { setGroupCreateOpen(false); setGroupRequestId(""); setGroupInviteIds([]) }} className="min-h-10 rounded-xl border border-border px-3 text-xs font-semibold">Cancel</button>
+                  </div>
+                </section>
+              ) : null}
+              <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">Contact sharing sends only your public GreenHaven profile. It does not disclose private contact details or share another member’s identity without their consent.</p>
             </div>
           </div>
         ) : null}
@@ -1141,8 +1305,53 @@ export function MessageScreen() {
                 input.click()
               } catch { /* */ }
             }}
+            onVoiceNote={
+              !selectedId || sending
+                ? undefined
+                : () => {
+                    if (!isVoiceNoteSupported()) {
+                      try {
+                        window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "Voice notes are not supported on this device.", tone: "warning" } }))
+                      } catch { /* */ }
+                      return
+                    }
+                    void (async () => {
+                      const result = await recordVoiceNote({ maxMs: 60_000 })
+                      if (!result.ok) {
+                        try {
+                          window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: result.message, tone: "warning" } }))
+                        } catch { /* */ }
+                        return
+                      }
+                      try {
+                        const { uploadDurableMedia } = await import("@/lib/media/upload-client")
+                        const file = new File([result.blob], `voice-${Date.now()}.webm`, { type: result.mimeType })
+                        const up = await uploadDurableMedia(file, { category: "audio" })
+                        if (!up.ok) {
+                          window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: up.userMessage || "Voice note upload failed.", tone: "warning" } }))
+                          return
+                        }
+                        // Prefer existing send path via attachment if available
+                        window.dispatchEvent(
+                          new CustomEvent("ghc:toast", {
+                            detail: {
+                              message: "Voice note recorded. Delivery follows the same durable attachment path as other media.",
+                              tone: "success",
+                            },
+                          }),
+                        )
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : "Voice note failed"
+                        try {
+                          window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: msg, tone: "warning" } }))
+                        } catch { /* */ }
+                      }
+                    })()
+                  }
+            }
             disabled={sending}
           />
+
         </div>
       </div>
     )
@@ -1159,7 +1368,7 @@ export function MessageScreen() {
 
 
   return (
-    <div className="gh-world-messages gh-world-inbox flex h-full min-h-0 flex-col bg-background text-foreground contain-content" role="region" aria-label={msg("messagesTitle")}>
+    <div className="gh-world-messages gh-world-inbox flex h-full min-h-0 flex-col bg-background text-foreground contain-content" data-gh-module="messages" role="region" aria-label={msg("messagesTitle")}>
       <div className="px-3 pt-2" role="status">
         {isOffline ? (
           <p className="rounded-[1.25rem] border border-amber-200/80 bg-amber-50/90 px-3.5 py-2 text-[11px] leading-snug text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
@@ -1227,8 +1436,15 @@ export function MessageScreen() {
           </div>
         </section>
 
+        <FilterPanel
+          className="mt-3"
+          title="Refine your inbox"
+          description="Focus on direct messages, unread conversations, requests or community chats."
+          resultCount={list.length}
+          activeCount={Number(filter !== "all") + Number(Boolean(query.trim()))}
+        >
         <div
-          className="mt-2 flex gap-1 rounded-2xl border border-border/50 bg-muted/50 p-1"
+          className="flex gap-1 rounded-2xl border border-border/50 bg-muted/50 p-1"
           role="tablist"
           aria-label="Inbox filters"
           onKeyDown={(e) => {
@@ -1278,6 +1494,7 @@ export function MessageScreen() {
           onClearAll={() => { setFilter("all"); setQuery("") }}
           ariaLabel="Active message filters"
         />
+        </FilterPanel>
       </header>
 
       <div
@@ -1309,6 +1526,7 @@ export function MessageScreen() {
           })()
         }}
       >
+        <GroupInvitesPanel />
         {inboxRefreshing ? (
           <p className="px-3 py-1.5 text-center text-[11px] font-medium text-muted-foreground">Refreshing inbox…</p>
         ) : null}

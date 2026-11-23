@@ -7,7 +7,7 @@
  */
 import { NextResponse } from "next/server"
 import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
-import { checkRateLimit } from "@/lib/server/economy/rate-limit"
+import { checkDurableRateLimit } from "@/lib/server/security/control-plane"
 import { socialDbConfigured, socialRpc } from "@/lib/server/social/rpc"
 import { emitSocialNotification } from "@/lib/server/social/notifications"
 import { nonDurableWriteResponse, nonDurableReadResponse } from "@/lib/server/production-guard"
@@ -94,10 +94,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "AUTH_REQUIRED" }, { status: 401 })
   }
 
-  const rl = checkRateLimit(`follow:${auth.userId}`, 40, 60_000)
-  if (!rl.ok) {
-    return NextResponse.json({ ok: false, error: "RATE_LIMITED" }, { status: 429 })
-  }
+  const rl = await checkDurableRateLimit(`follow:${auth.userId}`, 40, 60_000, { onUnavailable: "deny" })
+  if (!rl.ok) return NextResponse.json({ ok: false, error: rl.unavailable ? "RATE_LIMIT_UNAVAILABLE" : "RATE_LIMITED", retryAfterSec: rl.retryAfterSec }, { status: rl.unavailable ? 503 : 429, headers: { "Cache-Control": "no-store", "Retry-After": String(rl.retryAfterSec) } })
 
   const parsedBody = await readBoundedJson(request, 4096)
   if (!parsedBody.ok) return NextResponse.json({ ok: false, error: parsedBody.error }, { status: parsedBody.error === "REQUEST_TOO_LARGE" ? 413 : 400, headers: { "Cache-Control": "no-store" } })

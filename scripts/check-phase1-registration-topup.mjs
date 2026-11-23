@@ -3,6 +3,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { hasProjectDoc } from './lib/read-project-doc.mjs'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (f) => readFileSync(join(root, f), 'utf8')
 const checks = [
@@ -19,7 +20,7 @@ const checks = [
   ['legacy auto-reconcile on load', /legacyClaimed/.test(read('components/ghc/registration-bonus-card.tsx')) && /autoReconcileStarted/.test(read('components/ghc/registration-bonus-card.tsx'))],
   ['migration-pending UI when ledger unavailable', /20261030010001_registration_bonus_v2_reconciliation/.test(read('components/ghc/registration-bonus-card.tsx'))],
   ['Testnet backfill script present', existsSync(join(root, 'scripts/ops/phase2-registration-bonus-backfill-testnet.sql'))],
-  ['Phase 1 operator doc present', existsSync(join(root, 'docs/PHASE1_REGISTRATION_TOPUP.md'))],
+  ['Phase 1 operator doc present', hasProjectDoc('docs/PHASE1_REGISTRATION_TOPUP.md')],
   ['claim RPC service_role only', /GRANT EXECUTE ON FUNCTION public\.gh_earnings_registration_bonus_claim\(text\) TO service_role/.test(read('supabase/migrations/20261030010001_registration_bonus_v2_reconciliation.sql'))],
 ]
 let failed = 0

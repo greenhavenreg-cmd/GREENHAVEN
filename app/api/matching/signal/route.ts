@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
 import { readGhcServerEnv } from "@/lib/server/economy/env"
-import { checkRateLimit } from "@/lib/server/economy/rate-limit"
+import { checkDurableRateLimit } from "@/lib/server/security/control-plane"
 import { nonDurableWriteResponse } from "@/lib/server/production-guard"
 import { emitSocialNotification } from "@/lib/server/social/notifications"
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
@@ -22,13 +22,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 })
     }
 
-    const rl = checkRateLimit(`match-signal:${auth.userId}`, 60, 60_000)
-    if (!rl.ok) {
-      return NextResponse.json(
-        { ok: false, error: "RATE_LIMITED", retryAfterSec: rl.retryAfterSec },
-        { status: 429 }
-      )
-    }
+    const rl = await checkDurableRateLimit(`match-signal:${auth.userId}`, 60, 60_000, { onUnavailable: "deny" })
+    if (!rl.ok) return NextResponse.json({ ok: false, error: rl.unavailable ? "RATE_LIMIT_UNAVAILABLE" : "RATE_LIMITED", retryAfterSec: rl.retryAfterSec }, { status: rl.unavailable ? 503 : 429, headers: { "Cache-Control": "no-store", "Retry-After": String(rl.retryAfterSec) } })
 
     const parsedBody = await readBoundedJson(req, 4 * 1024)
     if (!parsedBody.ok) {

@@ -10,6 +10,7 @@ import { randomBytes } from "crypto"
 import { readGhcServerEnv, hasPrivilegedDatabase } from "@/lib/server/economy/env"
 import type { ServerAuthContext } from "@/lib/server/economy/auth"
 import { checkRateLimit } from "@/lib/server/economy/rate-limit"
+import { supabaseRest } from "@/lib/server/supabase/rest-client"
 
 /** High-risk operations: 5 minutes */
 export const STEP_UP_TTL_MS = 5 * 60 * 1000
@@ -75,30 +76,22 @@ async function dbInsert(rec: StepUpRecord): Promise<boolean> {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return false
   try {
-    const res = await fetch(
-      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_step_ups`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: env.supabaseServiceRoleKey,
-          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-          Prefer: "return=minimal",
-        },
-        body: JSON.stringify({
-          id: rec.id,
-          gh_user_id: rec.ghUserId,
-          session_id: rec.sessionId,
-          auth_method: rec.authMethod,
-          authenticated_at: new Date(rec.authenticatedAt).toISOString(),
-          expires_at: new Date(rec.expiresAt).toISOString(),
-          revoked_at: null,
-        }),
-        cache: "no-store",
-      }
-    )
-    if (!res.ok) {
-      console.error("[step-up] dbInsert failed", res.status)
+    const result = await supabaseRest("gh_step_ups", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        id: rec.id,
+        gh_user_id: rec.ghUserId,
+        session_id: rec.sessionId,
+        auth_method: rec.authMethod,
+        authenticated_at: new Date(rec.authenticatedAt).toISOString(),
+        expires_at: new Date(rec.expiresAt).toISOString(),
+        revoked_at: rec.revokedAt == null ? null : new Date(rec.revokedAt).toISOString(),
+      }),
+      timeoutMs: 15_000,
+    })
+    if (!result.ok) {
+      console.error("[step-up] dbInsert failed", result.status)
       return false
     }
     return true
@@ -115,25 +108,8 @@ async function dbFindValid(
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
   try {
-    const q = new URLSearchParams({
-      gh_user_id: `eq.${ghUserId}`,
-      session_id: `eq.${sessionId}`,
-      revoked_at: "is.null",
-      expires_at: `gt.${new Date().toISOString()}`,
-      order: "authenticated_at.desc",
-      limit: "1",
-      select: "*",
-    })
-    // PostgREST filter syntax
-    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_step_ups?gh_user_id=eq.${encodeURIComponent(ghUserId)}&session_id=eq.${encodeURIComponent(sessionId)}&revoked_at=is.null&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&order=authenticated_at.desc&limit=1&select=*`
-    const res = await fetch(url, {
-      headers: {
-        apikey: env.supabaseServiceRoleKey,
-        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    })
+    const restResult = await supabaseRest(`gh_step_ups?gh_user_id=eq.${encodeURIComponent(ghUserId)}&session_id=eq.${encodeURIComponent(sessionId)}&revoked_at=is.null&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&order=authenticated_at.desc&limit=1&select=*`, { method: "GET", timeoutMs: 10000 })
+    const res = { ok: restResult.ok, status: restResult.status, json: async () => restResult.ok ? restResult.data : restResult.body, text: async () => JSON.stringify(restResult.ok ? restResult.data : restResult.body) }
     if (!res.ok) return null
     const rows = (await res.json()) as DbRow[]
     if (!Array.isArray(rows) || !rows[0]) return null
@@ -148,19 +124,12 @@ async function dbRevokeForSession(sessionId: string): Promise<boolean> {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return false
   try {
-    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_step_ups?session_id=eq.${encodeURIComponent(sessionId)}&revoked_at=is.null`
-    const response = await fetch(url, {
+    const result = await supabaseRest(`gh_step_ups?session_id=eq.${encodeURIComponent(sessionId)}&revoked_at=is.null`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: env.supabaseServiceRoleKey,
-        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-        Prefer: "return=minimal",
-      },
       body: JSON.stringify({ revoked_at: new Date().toISOString() }),
-      cache: "no-store",
+      timeoutMs: 10_000,
     })
-    return response.ok
+    return result.ok
   } catch {
     return false
   }

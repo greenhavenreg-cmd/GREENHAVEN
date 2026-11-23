@@ -3,6 +3,7 @@
  * Settlement requires GHC_REFERRAL_SETTLEMENT_ENABLED=1 and issuance guard migration applied.
  */
 import { readGhcServerEnv } from "@/lib/server/economy/env"
+import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
 function env() {
   return readGhcServerEnv()
@@ -15,22 +16,11 @@ function settlementEnabled(): boolean {
 async function rpc(name: string, body: Record<string, unknown>): Promise<Record<string, unknown> | null> {
   const e = env()
   if (!e.supabaseUrl || !e.supabaseServiceRoleKey) return null
-  try {
-    const res = await fetch(`${e.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/${name}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: e.supabaseServiceRoleKey,
-        Authorization: `Bearer ${e.supabaseServiceRoleKey}`,
-      },
-      body: JSON.stringify(body),
-    })
-    const data = await res.json().catch(() => null)
-    if (!res.ok) return { ok: false, error: String(data?.message || data?.error || res.status) }
-    return data && typeof data === "object" ? (data as Record<string, unknown>) : null
-  } catch {
-    return null
-  }
+  const result = await supabaseRpc<unknown>(name, body, { timeoutMs: 15_000 })
+  if (!result.ok) return { ok: false, error: result.error || String(result.status) }
+  return result.data && typeof result.data === "object" && !Array.isArray(result.data)
+    ? result.data as Record<string, unknown>
+    : null
 }
 
 export async function ensureReferralCode(userId: string) {
@@ -122,15 +112,15 @@ export async function getReferralStatus(userId: string): Promise<{
 
     const [attrAsReferred, attrAsReferrer, rewards] = await Promise.all([
       fetch(
-        `${base}/rest/v1/ghc_referral_attributions?referred_user_id=eq.${encodeURIComponent(userId)}&select=referrer_user_id,created_at&limit=1`,
+        `ghc_referral_attributions?referred_user_id=eq.${encodeURIComponent(userId)}&select=referrer_user_id,attributed_at&limit=1`,
         { headers, cache: "no-store" },
       ),
       fetch(
-        `${base}/rest/v1/ghc_referral_attributions?referrer_user_id=eq.${encodeURIComponent(userId)}&select=referred_user_id&limit=200`,
+        `ghc_referral_attributions?referrer_user_id=eq.${encodeURIComponent(userId)}&select=referred_user_id&limit=200`,
         { headers, cache: "no-store" },
       ),
       fetch(
-        `${base}/rest/v1/ghc_referral_rewards?referrer_user_id=eq.${encodeURIComponent(userId)}&select=status,reward_ghc&limit=100`,
+        `ghc_referral_rewards?referrer_user_id=eq.${encodeURIComponent(userId)}&select=status,reward_ghc&limit=100`,
         { headers, cache: "no-store" },
       ),
     ])

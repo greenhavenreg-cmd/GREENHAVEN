@@ -1,4 +1,6 @@
 "use client"
+
+import { CURATION_UI_DEBOUNCE_MS, humanizeCurationError, isKnownCurationError, isSelfCuration } from "@/lib/curation/client-curation-guards"
 import { PostActionBar } from "./post-action-bar"
 import { toClientSafeErrorMessage } from "@/lib/client/safe-api-error"
 
@@ -43,12 +45,15 @@ import { resolveAvatarUrl } from "@/lib/avatar"
 import { AuthorRepChip } from "./author-rep-chip"
 import { authorReputationFromPost } from "@/lib/reputation/display"
 import { isOwnAuthor } from "@/lib/ownership"
+import { IdentityService } from "@/lib/identity/identity-service"
 import { ImageSkeleton } from "./skeleton-loaders"
 import { ReportChooser } from "./report-chooser"
 import { EngagementRosterSheet, type RosterKind } from "./engagement-roster-sheet"
 import { socialRecordAttention, socialSetCuration } from "@/lib/social/client"
 import { shouldSendAttention } from "@/lib/social/attention-client"
 import { PostRewardPanel } from "@/components/ghc/post-reward/post-reward-panel"
+import { QuotedPostPreview } from "./quoted-post-preview"
+import { safeCommunityCount, safeCommunityCountTotal } from "@/lib/active-upgrades/community"
 
 const REACTIONS: PostReaction[] = [
   { type: "support", emoji: "💪", label: "Support" },
@@ -59,17 +64,35 @@ const REACTIONS: PostReaction[] = [
   { type: "sad", emoji: "😢", label: "Concerned" },
 ]
 
+/** GHC amounts in toasts: up to 4 decimals, trailing zeros trimmed ("10.5000" -> "10.5", "10.0000" -> "10"). */
+function formatGhcAmount(value: unknown): string {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return "0"
+  const fixed = n.toFixed(4)
+  return fixed.includes(".") ? fixed.replace(/0+$/, "").replace(/\.$/, "") : fixed
+}
+
+function toastEvent(message: string, type: "success" | "error" | "info") {
+  try {
+    window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message, type } }))
+  } catch { /* toasts are best-effort */ }
+}
+
 interface EnhancedPostCardProps {
   post: Post
+  /** Shared rendering surface, used for consistent responsive treatment and diagnostics. */
+  surface?: "feed" | "profile" | "community"
   /** Prioritize only the first visible feed card's primary media. */
   priority?: boolean
+  /** Render historical/sample content with the canonical design but no post mutations. */
+  readOnly?: boolean
   /** @deprecated Post likes are not used for matching; optional legacy signal */
   isLiked?: boolean
   isSaved: boolean
   isOwnPost?: boolean
   /** @deprecated Prefer profile Like/Pass; optional legacy */
   onLike?: (postId: string, isDouble?: boolean) => void
-  onReact?: (postId: string, reaction: PostReaction["type"]) => void
+  onReact?: (postId: string, reaction: PostReaction["type"]) => void | boolean | Promise<void | boolean>
   onComment: (postId: string) => void
   onShare: (postId: string) => void
   onSave: (postId: string) => void
@@ -80,7 +103,7 @@ interface EnhancedPostCardProps {
   onArchive?: (postId: string) => void
   onNotInterested?: (postId: string) => void
   onMute?: (postId: string) => void
-  onReport?: (postId: string, reason: string) => void
+  onReport?: (postId: string, reason: string, details?: string) => void
   onBlock?: (postId: string) => void
   onCopyLink?: (postId: string) => void
   onInsights?: (postId: string) => void
@@ -99,7 +122,9 @@ interface EnhancedPostCardProps {
 
 function EnhancedPostCardInner({
   post,
+  surface = "feed",
   priority = false,
+  readOnly = false,
   isLiked = false,
   isSaved,
   isOwnPost = false,
@@ -126,7 +151,7 @@ function EnhancedPostCardInner({
   onOpenProfile,
 }: EnhancedPostCardProps) {
   const [showReactions, setShowReactions] = useState(false)
-  const [curationReactionKind, setCurationReactionKind] = useState<"positive" | "negative">("positive")
+  const [pendingSocialReaction, setPendingSocialReaction] = useState<PostReaction["type"] | null>(null)
   const isOwn = Boolean(isOwnPost || isOwnAuthor(post.authorId, post.authorName))
   const displayAuthor = (() => {
     const raw = String(post.authorName || "").trim()
@@ -150,6 +175,14 @@ function EnhancedPostCardInner({
   )
   const [editMediaBusy, setEditMediaBusy] = useState(false)
   const editImageInputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (!editingPost) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !editMediaBusy) setEditingPost(false)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [editingPost, editMediaBusy])
   const [imageIndex, setImageIndex] = useState<number>(0)
   const [mediaToolsOpen, setMediaToolsOpen] = useState(false)
   const mediaLongPressRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -173,20 +206,18 @@ function EnhancedPostCardInner({
     setRosterKind(kind)
     setRosterOpen(true)
   }
-  const seedUp = Number(
+  const seedUp = safeCommunityCount(
     (post as { upvoteCount?: number; upvote_count?: number }).upvoteCount ??
       (post as { upvote_count?: number }).upvote_count ??
       0
   )
-  const seedDown = Number(
+  const seedDown = safeCommunityCount(
     (post as { downvoteCount?: number; downvote_count?: number }).downvoteCount ??
       (post as { downvote_count?: number }).downvote_count ??
       0
   )
-  const [upvoteCount, setUpvoteCount] = useState(() => (Number.isFinite(seedUp) ? Math.max(0, seedUp) : 0))
-  const [downvoteCount, setDownvoteCount] = useState(() =>
-    Number.isFinite(seedDown) ? Math.max(0, seedDown) : 0
-  )
+  const [upvoteCount, setUpvoteCount] = useState(seedUp)
+  const [downvoteCount, setDownvoteCount] = useState(seedDown)
   const [curationBusy, setCurationBusy] = useState(false)
   const [rewardPercentage, setRewardPercentage] = useState(100)
   const lastCurationAtRef = useRef(0)
@@ -216,8 +247,8 @@ function EnhancedPostCardInner({
   const propDown = (post as { downvoteCount?: number; downvote_count?: number }).downvoteCount ?? (post as { downvote_count?: number }).downvote_count
   const propViewerChoice = String((post as { viewerCurationChoice?: string }).viewerCurationChoice || "").toLowerCase()
   useEffect(() => {
-    setUpvoteCount(typeof propUp === "number" && Number.isFinite(propUp) ? Math.max(0, propUp) : 0)
-    setDownvoteCount(typeof propDown === "number" && Number.isFinite(propDown) ? Math.max(0, propDown) : 0)
+    setUpvoteCount(safeCommunityCount(propUp))
+    setDownvoteCount(safeCommunityCount(propDown))
     setCurationChoice(propViewerChoice === "upvote" || propViewerChoice === "downvote" ? propViewerChoice : "neutral")
   }, [post.id, propUp, propDown, propViewerChoice])
   const visibleCommentCount = Math.max(0, Number(post.engagement?.comments ?? post.comments?.length ?? 0) || 0)
@@ -233,19 +264,35 @@ function EnhancedPostCardInner({
 
   const handleCuration = async (choice: "upvote" | "downvote") => {
     if (curationBusy) return
+    // Own posts cannot be curated (server also rejects; fail fast for clearer UX).
+    if (isOwn || isSelfCuration(IdentityService.getCurrentUserId(), post.authorId)) {
+      try {
+        window.dispatchEvent(new CustomEvent("ghc:toast", {
+          detail: { message: humanizeCurationError("SELF_CURATION"), type: "info" },
+        }))
+      } catch { /* */ }
+      return
+    }
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       try { window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "You are offline — vote when reconnected", type: "info" } })) } catch { /* */ }
       return
     }
-    if (Date.now() - lastCurationAtRef.current < 400) return
+    if (Date.now() - lastCurationAtRef.current < CURATION_UI_DEBOUNCE_MS) return
     lastCurationAtRef.current = Date.now()
     setCurationBusy(true)
     try {
       const res = await socialSetCuration(post.id, choice, rewardPercentage)
       if (!res.ok) {
         try {
+          const code = String(res.error || res.reason || "")
+          const message =
+            code === "NETWORK" || res.reason === "NETWORK"
+              ? "Could not vote — check connection"
+              : isKnownCurationError(code)
+                ? humanizeCurationError(code)
+                : toClientSafeErrorMessage(res.error, "Could not record vote")
           window.dispatchEvent(new CustomEvent("ghc:toast", {
-            detail: { message: res.reason === "NETWORK" || res.error === "NETWORK" ? "Could not vote — check connection" : toClientSafeErrorMessage(res.error, "Could not record vote"), type: "error" },
+            detail: { message, type: "error" },
           }))
         } catch { /* */ }
         return
@@ -260,8 +307,8 @@ function EnhancedPostCardInner({
       }
       if (res.ok && res.choice) {
         setCurationChoice(res.choice as "upvote" | "downvote" | "neutral")
-        const nextUp = typeof res.upvoteCount === "number" ? res.upvoteCount : upvoteCount
-        const nextDown = typeof res.downvoteCount === "number" ? res.downvoteCount : downvoteCount
+        const nextUp = typeof res.upvoteCount === "number" ? safeCommunityCount(res.upvoteCount) : upvoteCount
+        const nextDown = typeof res.downvoteCount === "number" ? safeCommunityCount(res.downvoteCount) : downvoteCount
         if (typeof res.upvoteCount === "number") setUpvoteCount(res.upvoteCount)
         if (typeof res.downvoteCount === "number") setDownvoteCount(res.downvoteCount)
         const redistributed = Boolean(res.redistribute?.credited) && Number(res.redistribute?.amount) > 0
@@ -269,13 +316,13 @@ function EnhancedPostCardInner({
           try {
             window.dispatchEvent(new CustomEvent("ghc:wallet-refresh"))
             window.dispatchEvent(new CustomEvent("ghc:content-reward-updated", { detail: { postId: post.id } }))
-            window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: `Vote saved and ${Number(res.redistribute?.amount).toFixed(4).replace(/\.?0+$/, "")} GHC contributed to this creator`, type: "success" } }))
+            window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: `Vote saved and ${formatGhcAmount(res.redistribute?.amount)} GHC contributed to this creator`, type: "success" } }))
           } catch { /* */ }
         } else if (res.reward?.credited && Number(res.reward.amount) > 0) {
           try {
             window.dispatchEvent(new CustomEvent("ghc:content-reward-updated", { detail: { postId: post.id } }))
             window.dispatchEvent(new CustomEvent("ghc:wallet-refresh"))
-            window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: `Vote saved and ${Number(res.reward.amount).toFixed(4).replace(/\.?0+$/, "")} GHC credited`, type: "success" } }))
+            window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: `Vote saved and ${formatGhcAmount(res.reward.amount)} GHC credited`, type: "success" } }))
           } catch { /* */ }
         } else {
           // A curation vote is a quality signal. GHC movement is a separate,
@@ -286,7 +333,7 @@ function EnhancedPostCardInner({
           const available = Number(res.redistribute?.availableBalanceAfter || 0)
           const message = redReason.includes("INSUFFICIENT")
             ? required > 0
-              ? `Vote saved. Your wallet needs ${required.toFixed(4).replace(/\.?0+$/, "")} GHC to fund this contribution.`
+              ? `Vote saved. Your wallet needs ${formatGhcAmount(required)} GHC to fund this contribution.`
               : "Vote saved. Fund your GHC wallet to make a curation contribution."
             : rewardReason.includes("DISABLED") || rewardReason.includes("DAILY_CLAIM_ONLY")
               ? "Vote saved. Curation reward issuance is gated; no GHC was created."
@@ -422,19 +469,21 @@ function EnhancedPostCardInner({
     onOpenPost?.(post.id)
   }
 
-  const handleQuickReaction = (reaction: PostReaction) => {
-    if ("vibrate" in navigator) {
-      try {
-        navigator.vibrate(100)
-      } catch {
-        /* ignore */
+  const handleQuickReaction = async (reaction: PostReaction) => {
+    // Social reactions are independent from quality curation votes and GHC rewards.
+    if (reaction.type === "like" || !onReact || pendingSocialReaction) return
+    setPendingSocialReaction(reaction.type)
+    try {
+      const result = await onReact(post.id, reaction.type)
+      if (result === false) return
+      if ("vibrate" in navigator) {
+        try { navigator.vibrate(35) } catch { /* ignore */ }
       }
-    }
-    setShowReactions(false)
-    // Post cards do not expose Like; Likes belong to profile/account cards.
-    if (reaction.type === "like") return
-    if (onReact) {
-      onReact(post.id, reaction.type)
+      setShowReactions(false)
+    } catch {
+      // The mutation owner reports its own failure; keep the tray open for retry.
+    } finally {
+      setPendingSocialReaction(null)
     }
   }
 
@@ -480,9 +529,16 @@ function EnhancedPostCardInner({
   const contentParts = parseContent(post.content)
 
   return (
-    <div
+    <article
       ref={containerRef}
-      style={{ contentVisibility: "auto", containIntrinsicSize: "320px" }} data-post-id={post.id} data-sentiment={(() => { const t = upvoteCount + downvoteCount; if (t < 5) return "none"; const r = upvoteCount / t; return r >= 0.7 ? "positive" : r <= 0.35 ? "critical" : "mixed" })()} role="article" tabIndex={onOpenPost ? 0 : undefined} aria-busy={curationBusy || undefined} aria-label={post.authorName ? `Post by ${displayAuthor}` : "Post"} className="gh-post-card gh-card-interactive max-w-full cursor-pointer overflow-x-hidden overflow-hidden rounded-[1.25rem] border border-border/50 bg-card text-card-foreground shadow-[var(--gh-card-shadow)] focus-visible:outline-none"
+      style={{ contentVisibility: "auto", containIntrinsicSize: "320px" }}
+      data-post-id={post.id}
+      data-post-surface={surface}
+      data-sentiment={(() => { const t = safeCommunityCountTotal([upvoteCount, downvoteCount]); if (t < 5) return "none"; const r = upvoteCount / t; return r >= 0.7 ? "positive" : r <= 0.35 ? "critical" : "mixed" })()}
+      tabIndex={onOpenPost ? 0 : undefined}
+      aria-busy={curationBusy || undefined}
+      aria-label={post.authorName ? `Post by ${displayAuthor}` : "Post"}
+      className={`gh-post-card gh-card-interactive group/post relative max-w-full overflow-x-hidden overflow-hidden rounded-[var(--gh-fb-card-radius,0.75rem)] border border-border/60 bg-card text-card-foreground shadow-[var(--gh-card-shadow)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${onOpenPost ? "cursor-pointer" : "cursor-default"}`}
       onClick={(event) => {
         const target = event.target as HTMLElement | null
         if (target?.closest("button, a, input, textarea, select, video, [role=button], [data-post-no-open]")) return
@@ -497,35 +553,48 @@ function EnhancedPostCardInner({
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 pb-2 pt-3 sm:px-4 sm:pt-4">
-        <div className="flex flex-1 items-center gap-2.5">
-          <button type="button" onClick={() => onOpenProfile?.(post.authorId)} className={`relative rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${(post as Post & { authorVerified?: boolean }).authorVerified ? "gh-avatar-halo" : ""}`} aria-label={`Open ${displayAuthor}'s profile`}>
+      <header className="flex min-w-0 items-start justify-between gap-2 px-3 pb-2.5 pt-3 sm:px-4 sm:pt-4">
+        <div className="flex min-w-0 flex-1 items-start gap-2.5">
+          <button
+            type="button"
+            disabled={readOnly || !onOpenProfile}
+            onClick={() => onOpenProfile?.(post.authorId)}
+            className={`relative rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default ${(post as Post & { authorVerified?: boolean }).authorVerified ? "gh-avatar-halo" : ""}`}
+            aria-label={`Open ${displayAuthor}'s profile`}
+          >
             <LazyImage
               src={resolveAvatarUrl(post.authorPhoto, { seed: post.authorId || post.authorName || "member", size: 96 })}
               alt={displayAuthor}
-              className="h-11 w-11 rounded-full object-cover bg-muted ring-2 ring-background shadow-sm"
+              className="h-10 w-10 sm:h-11 sm:w-11 rounded-full object-cover bg-muted ring-1 ring-border/40 shadow-sm"
             />
             {(post as Post & { authorOnline?: boolean }).authorOnline && <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background bg-emerald-500" title="Online now" aria-label="Online now" />}
             {(post as Post & { authorVerified?: boolean }).authorVerified && <span className="absolute -right-1 -top-1 rounded-full bg-card p-0.5 text-sky-600 shadow-sm ring-1 ring-border/40" title="Verified profile" aria-label="Verified profile"><ShieldCheck size={11} /></span>}
           </button>
-          <div className="min-w-0 flex-1">
-            <button type="button" onClick={() => onOpenProfile?.(post.authorId)} className="block max-w-full truncate text-left text-sm font-bold text-foreground hover:text-primary">{displayAuthor}</button>
-            <div className="flex flex-wrap items-center gap-1">
+          <div className="min-w-0 flex-1 pt-0.5">
+            {onOpenProfile && !readOnly ? (
+              <button type="button" onClick={() => onOpenProfile(post.authorId)} className="gh-fb-author-name block max-w-full truncate text-left leading-5 decoration-emerald-600/50 underline-offset-2 hover:text-primary hover:underline focus-visible:outline-none focus-visible:underline">{displayAuthor}</button>
+            ) : (
+              <p className="gh-fb-author-name block max-w-full truncate leading-5">{displayAuthor}</p>
+            )}
+            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
               <AuthorRepChip data={authorReputationFromPost(post as never)} />
               {(() => {
                 const p = post as Post & { authorProfession?: string; authorTitle?: string; communityName?: string }
                 const ctx = p.authorProfession || p.authorTitle || p.communityName
                 return ctx ? <span className="truncate text-[10px] font-medium text-muted-foreground">{ctx}</span> : null
               })()}
-              <p className="text-xs text-muted-foreground">
-                {timeAgo(post.createdAt)}
-                {(post.isEdited || post.editedAt) && (
-                  <span className="ml-1 text-[10px] font-semibold">· Edited</span>
-                )}
-              </p>
+              {!(readOnly && !(Number(post.createdAt) > 0)) ? (
+                <p className="gh-fb-meta-line text-[11px] leading-4">
+                  {timeAgo(post.createdAt)}
+                  {(post.isEdited || post.editedAt) && (
+                    <span className="ml-1 text-[10px] font-semibold">· Edited</span>
+                  )}
+                </p>
+              ) : null}
               {(() => {
                 const hasVideo = Boolean(post.video)
-                const realImages = (post.images || []).filter((u) => typeof u === "string" && isDurableMediaUrl(u))
+                // Uses the card-level `realImages` (which also accepts small inline images) so the
+                // "Photo" label always agrees with the gallery that is actually rendered below.
                 const hasImage = realImages.length > 0
                 const special = detectSpecialPost(post.content)
                 const isPoll = Boolean((post as Post & { poll?: unknown }).poll) || special === "poll"
@@ -545,7 +614,7 @@ function EnhancedPostCardInner({
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           {visibilityReason && (
             <button
               type="button"
@@ -557,23 +626,25 @@ function EnhancedPostCardInner({
               {(visibilityReason as { shortLabel?: string }).shortLabel || visibilityReason.reason?.split(" ")[0] || "Why"}
             </button>
           )}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              if (!showMenu) closeAllActionSheets()
-              setShowMenu(!showMenu)
-            }}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 active:scale-90"
-            aria-label="Post options"
-            aria-expanded={showMenu}
-          >
-            <MoreVertical size={16} />
-          </button>
+          {!readOnly ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (!showMenu) closeAllActionSheets()
+                setShowMenu(!showMenu)
+              }}
+              className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 active:scale-90"
+              aria-label="Post options"
+              aria-expanded={showMenu}
+            >
+              <MoreVertical size={16} />
+            </button>
+          ) : null}
         </div>
-      </div>
+      </header>
 
-      <ActionSheet
+      {!readOnly ? <ActionSheet
         open={showMenu}
         onClose={() => setShowMenu(false)}
         title={isOwn ? "Your post" : "Post options"}
@@ -644,13 +715,17 @@ function EnhancedPostCardInner({
         )}
         {!isOwn && onReport && (
           <div className="px-2 py-1">
-            <ReportChooser label="Report post" targetType="post" targetId={post.id} onSubmit={(reason) => { onReport(post.id, reason); setShowMenu(false) }} />
+            <ReportChooser label="Report post" targetType="post" targetId={post.id} onSubmit={(reason, _targetType, details) => { onReport(post.id, reason, details); setShowMenu(false) }} />
           </div>
         )}
         {!isOwn && onBlock && (
-          <ActionSheetItem destructive onClick={() => { onBlock(post.id); setShowMenu(false) }}>Block author</ActionSheetItem>
+          <ActionSheetItem destructive onClick={async () => {
+            setShowMenu(false)
+            // Blocking is hard to notice and awkward to undo, and Delete already asks first.
+            if (await confirmDialog({ title: `Block ${displayAuthor}?`, message: "This member will be blocked from your account.", confirmLabel: "Block", danger: true })) onBlock(post.id)
+          }}>Block author</ActionSheetItem>
         )}
-      </ActionSheet>
+      </ActionSheet> : null}
 
       {editingPost && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label="Edit post">
@@ -673,7 +748,7 @@ function EnhancedPostCardInner({
                                             <DurableImage loading="lazy" src={url} alt="" className="h-full w-full object-cover" />
                       <button
                         type="button"
-                        className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 text-white"
+                        className="absolute right-0 top-0 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                         aria-label="Remove image"
                         onClick={() => setDraftImages((prev) => prev.filter((u) => u !== url))}
                       >
@@ -686,7 +761,7 @@ function EnhancedPostCardInner({
               {draftVideo ? (
                 <div className="mb-2 flex items-center gap-2 rounded-xl border border-border/50 bg-muted/30 px-3 py-2 text-[12px]">
                   <span className="min-w-0 flex-1 truncate text-muted-foreground">Video attached</span>
-                  <button type="button" className="font-semibold text-rose-600" onClick={() => setDraftVideo(null)}>
+                  <button type="button" className="min-h-9 px-2 font-semibold text-rose-600" onClick={() => setDraftVideo(null)}>
                     Remove
                   </button>
                 </div>
@@ -703,30 +778,38 @@ function EnhancedPostCardInner({
                   if (!files?.length) return
                   void (async () => {
                     setEditMediaBusy(true)
+                    let imageSlots = 10 - draftImages.length
+                    let failed = 0
                     try {
-                      for (const file of Array.from(files).slice(0, 10 - draftImages.length)) {
-                        if (file.type.startsWith("video/")) {
-                          const res = await uploadDurableMedia(file, { fileName: file.name, category: file.type.startsWith("video/") ? "videos" : "images" })
+                      for (const file of Array.from<File>(files)) {
+                        const isVideo = file.type.startsWith("video/")
+                        const isImage = file.type.startsWith("image/")
+                        if (!isVideo && !isImage) continue
+                        // The 10-item cap applies to images only; it used to also block a video.
+                        if (isImage && imageSlots <= 0) continue
+                        try {
+                          const res = await uploadDurableMedia(file, { fileName: file.name, category: isVideo ? "videos" : "images" })
                           const url =
                             (res as { url?: string; publicUrl?: string })?.url ||
                             (res as { publicUrl?: string })?.publicUrl
-                          if (url && isDurableMediaUrl(String(url))) setDraftVideo(String(url))
-                          continue
-                        }
-                        if (!file.type.startsWith("image/")) continue
-                        const res = await uploadDurableMedia(file, { fileName: file.name, category: file.type.startsWith("video/") ? "videos" : "images" })
-                        const url =
-                          (res as { url?: string; publicUrl?: string })?.url ||
-                          (res as { publicUrl?: string })?.publicUrl
-                        if (url && isDurableMediaUrl(String(url))) {
-                          setDraftImages((prev) => [...prev, String(url)].slice(0, 10))
+                          if (url && isDurableMediaUrl(String(url))) {
+                            if (isVideo) setDraftVideo(String(url))
+                            else {
+                              imageSlots -= 1
+                              setDraftImages((prev) => [...prev, String(url)].slice(0, 10))
+                            }
+                          } else {
+                            failed += 1
+                          }
+                        } catch {
+                          failed += 1
                         }
                       }
-                    } catch {
-                      /* fail-soft — keep existing media */
                     } finally {
                       setEditMediaBusy(false)
                     }
+                    // Existing media is kept either way, but a failed upload must not be silent.
+                    if (failed > 0) toastEvent(failed === 1 ? "One file could not be uploaded." : `${failed} files could not be uploaded.`, "error")
                   })()
                 }}
               />
@@ -750,13 +833,24 @@ function EnhancedPostCardInner({
               </button>
               <button
                 type="button"
-                disabled={!draftContent.trim() || editMediaBusy}
+                // A media-only post has empty text, so text alone must not be required to save.
+                disabled={(!draftContent.trim() && draftImages.length === 0 && !draftVideo) || editMediaBusy}
                 onClick={() => {
-                  const media: PostEditMedia = {
-                    images: draftImages,
-                    video: draftVideo,
+                  const originalImages = Array.isArray(post.images) ? post.images.filter((u) => typeof u === "string" && isDurableMediaUrl(u)) : []
+                  const originalVideo = typeof post.video === "string" && isDurableMediaUrl(post.video) ? post.video : null
+                  const unchanged =
+                    draftContent.trim() === String(post.content ?? "").trim() &&
+                    draftVideo === originalVideo &&
+                    draftImages.length === originalImages.length &&
+                    draftImages.every((url, i) => url === originalImages[i])
+                  // Saving without changes must not stamp the post as "Edited".
+                  if (!unchanged) {
+                    const media: PostEditMedia = {
+                      images: draftImages,
+                      video: draftVideo,
+                    }
+                    onEdit?.(post.id, draftContent.trim(), media)
                   }
-                  onEdit?.(post.id, draftContent.trim(), media)
                   setEditingPost(false)
                 }}
                 className="rounded-xl bg-[var(--gh-green)] px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
@@ -769,13 +863,13 @@ function EnhancedPostCardInner({
       )}
 
       {/* Content with rich formatting */}
-      <div className="px-3 pb-2.5 pt-1 sm:px-4 sm:pb-3">
+      <div className="min-w-0 px-3 pb-3 pt-1 sm:px-4 sm:pb-3.5">
         {detectSpecialPost(post.content) ? (
           <SpecialPostBody content={post.content || ""} />
         ) : (
           <>
             <div
-              className={`mb-1 break-words text-[15px] leading-[1.55] tracking-[-0.011em] text-foreground sm:text-base ${
+              className={`mb-1 break-words [overflow-wrap:anywhere] text-[15px] leading-[1.62] tracking-[-0.008em] text-foreground sm:text-[15.5px] ${
                 !contentExpanded && (post.content?.length || 0) > 220 ? "line-clamp-5" : ""
               }`}
             >
@@ -807,12 +901,21 @@ function EnhancedPostCardInner({
                   )
                 }
                 if (part.type === "mention") {
+                  // Previews (readOnly) and cards without a profile handler used to render a button
+                  // that did nothing when tapped. Render plain emphasised text instead.
+                  if (readOnly || !onOpenProfile) {
+                    return <span key={idx} className="font-medium text-emerald-700 dark:text-emerald-400">{part.value}</span>
+                  }
                   return (
                     <button
                       key={idx}
                       type="button"
-                      className="text-emerald-700 hover:underline dark:text-emerald-400"
-                      onClick={() => onOpenProfile?.(String(part.value || "").replace(/^@/, ""))}
+                      data-post-no-open
+                      className="text-emerald-700 hover:underline focus-visible:outline-none focus-visible:underline dark:text-emerald-400"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onOpenProfile(String(part.value || "").replace(/^@/, ""))
+                      }}
                     >
                       {part.value}
                     </button>
@@ -861,7 +964,7 @@ function EnhancedPostCardInner({
         {/* Media gallery with improved viewing */}
         {realImages.length > 0 && (
           <div
-            className="group relative mb-2 aspect-[4/5] max-h-[24rem] w-full cursor-pointer overflow-hidden rounded-[1.15rem] bg-muted/50 sm:aspect-video sm:max-h-[26rem]"
+            className="group relative mb-2 aspect-[4/5] max-h-[26rem] w-full cursor-pointer overflow-hidden rounded-2xl bg-muted/50 ring-1 ring-inset ring-black/5 sm:aspect-video sm:max-h-[30rem]"
             onClick={handleImageTap}
             onPointerDown={(e) => {
               if (e.button !== 0) return
@@ -913,13 +1016,9 @@ function EnhancedPostCardInner({
 
         {typeof post.video === "string" && isDurableMediaUrl(post.video) ? <button type="button" onClick={handleVideoTap} className="relative mb-2 block aspect-video w-full overflow-hidden rounded-[1.15rem] bg-black text-left" aria-label="Play video full screen"><DurableVideo src={post.video} preload="none" muted playsInline className="absolute inset-0 h-full w-full object-contain" /><span className="absolute inset-0 flex items-center justify-center bg-black/15"><span className="flex h-14 w-14 items-center justify-center rounded-full border border-white/50 bg-black/50 text-2xl text-white shadow-lg">▶</span></span><span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white">Play video</span></button> : null}
 
-        {/* Quote repost */}
-        {post.quoteOf && (
-          <div className="mb-2 p-2 border border-border/80 rounded-lg bg-muted/40 text-xs text-muted-foreground">
-            <p className="font-semibold mb-1">Quoted post</p>
-            <p className="text-muted-foreground">Original post content preview...</p>
-          </div>
-        )}
+        {/* Shared quote renderer fetches only the referenced post and relies on the
+            authenticated post endpoint to enforce current viewer visibility. */}
+        {post.quoteOf ? <QuotedPostPreview postId={String(post.quoteOf)} /> : null}
       </div>
 
 
@@ -927,7 +1026,7 @@ function EnhancedPostCardInner({
         const pollView = resolvePostPoll(post as { content?: string; poll?: import("./poll-inline").PollView | null })
         return pollView ? (
           <div className="px-3.5">
-            <PollInline poll={pollView} postId={post.id} />
+            <PollInline poll={pollView} postId={post.id} readOnly={readOnly} />
           </div>
         ) : null
       })()}
@@ -935,22 +1034,25 @@ function EnhancedPostCardInner({
         const ch = resolvePostChallenge(post as { content?: string })
         return ch ? (
           <div className="px-3.5">
-            <ChallengeInline challenge={ch} />
+            <ChallengeInline challenge={ch} readOnly={readOnly} />
           </div>
         ) : null
       })()}
 
       {/* Reaction summary only. Comment/share totals live beside their single action controls below. */}
       {visibleReactionEntries.length > 0 ? (
-        <section className="mx-4 mb-2 px-1 py-1" aria-label="Reaction counts">
-          <div className="flex flex-wrap gap-1">
-            {visibleReactionEntries.slice(0, 5).map(([type, count]) => (
-              <span key={type} className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-card/70 px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
-                <span>{reactionEmoji[type] || "✨"}</span>
-                <span className="tabular-nums">{Number(count).toLocaleString()}</span>
-              </span>
+        <section className="gh-fb-reaction-summary" aria-label="Reaction counts">
+          <div className="gh-fb-emoji-stack" aria-hidden="true">
+            {visibleReactionEntries.slice(0, 3).map(([type]) => (
+              <span key={type}>{reactionEmoji[type] || "✨"}</span>
             ))}
           </div>
+          <span className="min-w-0 truncate tabular-nums">
+            {(() => {
+              const total = visibleReactionEntries.reduce((sum, [, c]) => sum + Number(c || 0), 0)
+              return total > 0 ? total.toLocaleString() : null
+            })()}
+          </span>
         </section>
       ) : null}
 
@@ -963,17 +1065,18 @@ function EnhancedPostCardInner({
         </div>
       ) : null}
 
-      {showReactions && (
-        <div className="gh-pab-tray mx-3 mb-2 flex flex-wrap items-center gap-2 rounded-full border border-border/60 bg-card/80 px-3 py-2 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]" role="group" aria-label={curationReactionKind === "positive" ? "Positive curation reactions" : "Negative curation reactions"}>
-          <span className="px-1 text-xs font-semibold text-muted-foreground">{curationReactionKind === "positive" ? "Positive reaction" : "Negative reaction"}</span>
-          {REACTIONS.filter((reaction) => curationReactionKind === "positive" ? reaction.type !== "sad" && reaction.type !== "like" : reaction.type === "sad").map((reaction) => (
-            <button key={reaction.type} type="button" onClick={() => handleQuickReaction(reaction)} className="flex h-10 min-w-10 items-center justify-center rounded-full bg-muted/70 px-1.5 text-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500" title={reaction.label} aria-label={reaction.label}>{reaction.emoji}</button>
+      {!readOnly && showReactions && (
+        <div className="gh-pab-tray mx-3 mb-2 flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-card/80 px-3 py-2 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.20)]" role="group" aria-label="Social reactions" aria-busy={pendingSocialReaction !== null || undefined}>
+          <span className="w-full px-1 text-xs font-semibold text-muted-foreground">Social reaction <span className="font-normal">· separate from quality votes</span></span>
+          {REACTIONS.filter((reaction) => reaction.type !== "like").map((reaction) => (
+            <button key={reaction.type} type="button" disabled={pendingSocialReaction !== null} onClick={() => void handleQuickReaction(reaction)} className="flex h-10 min-w-10 items-center justify-center rounded-full bg-muted/70 px-1.5 text-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:cursor-wait disabled:opacity-60" title={reaction.label} aria-label={pendingSocialReaction === reaction.type ? `Sending ${reaction.label} reaction` : reaction.label} aria-busy={pendingSocialReaction === reaction.type || undefined}>{pendingSocialReaction === reaction.type ? <Loader2 size={17} className="animate-spin" aria-hidden="true" /> : reaction.emoji}</button>
           ))}
-          <button type="button" onClick={() => setShowReactions(false)} className="ml-auto min-h-9 rounded-full px-3 text-xs font-semibold text-muted-foreground hover:bg-muted">Cancel</button>
+          <button type="button" disabled={pendingSocialReaction !== null} onClick={() => setShowReactions(false)} className="ml-auto min-h-9 rounded-full px-3 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50">Cancel</button>
         </div>
       )}
 
-      {/* Primary actions — see post-action-bar.tsx */}
+      {/* Primary actions — hidden for historical/sample previews that are not durable posts. */}
+      {!readOnly ? <>
       <div className="border-t border-border/35" />
       <PostActionBar
         choice={curationChoice}
@@ -1025,7 +1128,8 @@ function EnhancedPostCardInner({
         kind={rosterKind}
         postId={post.id}
       />
-      {mediaToolsOpen && (
+      </> : null}
+      {!readOnly && mediaToolsOpen && (
         <div
           className="fixed inset-0 z-[210] flex items-end justify-center bg-black/45 sm:items-center"
           onClick={(e) => {
@@ -1092,7 +1196,7 @@ function EnhancedPostCardInner({
         </div>
       )}
 
-    </div>
+    </article>
   )
 }
 
@@ -1130,7 +1234,7 @@ export function VisibilityReasonTooltip({
   useEffect(() => {
     const previousActiveElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const dialog = dialogRef.current
-    const getFocusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>(
+    const getFocusable = (): HTMLElement[] => Array.from<HTMLElement>(dialog?.querySelectorAll<HTMLElement>(
       'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
     ) || [])
     getFocusable()[0]?.focus()

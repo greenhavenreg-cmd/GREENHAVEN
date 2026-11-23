@@ -14,7 +14,7 @@ const checks = [
   ['api.ts uses safe messages', /toClientSafeErrorMessage/.test(read('lib/api.ts'))],
   ['wallet domain provider non-mutating', /canMutateFinances:\s*false/.test(read('contexts/domains/wallet-domain-provider.tsx'))],
   ['wallet read provider non-mutating', /canMutateFinances:\s*false/.test(read('contexts/domains/wallet-read-provider.tsx'))],
-  ['bottom nav Home Messages Communities Cart Profile', /BOTTOM_NAV_IDS = \["home", "messages", "communities", "cart", "profile"\]/.test(read('lib/navigation/destinations.ts'))],
+  ['bottom nav Home Discover Messages Communities Cart Profile', /BOTTOM_NAV_IDS = \["home", "discover", "messages", "communities", "cart", "profile"\]/.test(read('lib/navigation/destinations.ts'))],
   ['app nav items messages communities cart profile', /id: "messages"/.test(read('components/ghc/app.tsx')) && /id: "communities"/.test(read('components/ghc/app.tsx')) && /id: "cart"/.test(read('components/ghc/app.tsx')) && /id: "profile"/.test(read('components/ghc/app.tsx')) && !/NAV_ITEMS[\s\S]{0,800}id: "wallet"/.test(read('components/ghc/app.tsx'))],
   ['cart opens marketplace', /id === "cart"/.test(read('components/ghc/app.tsx')) && /setMarketplaceOpen\(true\)/.test(read('components/ghc/app.tsx'))],
   ['wallet overlay remains reachable', /const openWallet =/.test(read('components/ghc/app.tsx')) && /openWallet\(\)/.test(read('components/ghc/app.tsx'))],

@@ -19,6 +19,7 @@ import { isSessionStoreDurable } from "@/lib/server/identity/session-store"
 import { isMessagingStoreDurable } from "@/lib/server/messaging/message-store"
 import { socialDbConfigured } from "@/lib/server/social/rpc"
 import { readGhcServerEnv } from "@/lib/server/economy/env"
+import { supabaseRest } from "@/lib/server/supabase/rest-client"
 
 export type CheckStatus = "pass" | "fail" | "warn" | "info"
 export type CheckSeverity = "critical" | "high" | "medium" | "low" | "info"
@@ -79,14 +80,14 @@ export type ReadinessReport = {
     signInCallback: "/signin/callback"
   }
   /**
-   * Configured credentials ≠ applied schema.
-   * schemaProbe is lightweight (boolean flags from env/durable helpers only).
-   * Full object probes belong to operator migration checklist.
+   * The synchronous evaluator reports configuration-only evidence. The /api/health
+   * wrapper upgrades identity/session to live PostgREST read probes; write grants
+   * still require catalog/postflight verification. Other stores remain config-only.
    */
   schemaReadiness: {
-    probe: "config_and_durable_flags"
-    identity: "ready" | "configured_unverified" | "missing"
-    sessions: "ready" | "configured_unverified" | "missing"
+    probe: "configuration_only" | "live_read_probe"
+    identity: "ready" | "configured_unverified" | "missing" | "failed"
+    sessions: "ready" | "configured_unverified" | "missing" | "failed"
     messaging: "ready" | "configured_unverified" | "missing"
     payments: "configured_unverified" | "missing"
     economyLedger: "configured_unverified" | "missing"
@@ -149,7 +150,12 @@ export function evaluateReadiness(opts?: {
     /* */
   }
 
-  const allowDevAuth =
+  // Read the effective policy, not the raw opt-in flag. In Vercel Preview,
+  // NODE_ENV is normally "production" even though VERCEL_ENV is "preview".
+  // readGhcServerEnv() hard-denies dev auth in that runtime, so readiness must
+  // evaluate the same effective value used by the auth implementation.
+  const allowDevAuth = ghcEnv.allowDevAuth
+  const devAuthFlagConfigured =
     process.env.GHC_ALLOW_DEV_AUTH === "1" ||
     process.env.GHC_ALLOW_DEV_AUTH === "true"
   const memoryFinancial =
@@ -184,30 +190,29 @@ export function evaluateReadiness(opts?: {
   })
 
   // --- Critical in production: durable identity/session ---
-  const durableOk = identityDurable && sessionDurable
   const supabaseConfigured = supabaseUrl && supabaseService
   checks.push({
     id: "identity_durable",
-    label: "Durable Pi identity mapping",
-    status: identityDurable ? "pass" : isProduction ? "fail" : "warn",
-    severity: isProduction ? "critical" : "high",
+    label: "Pi identity storage configuration",
+    status: identityDurable ? "warn" : isProduction ? "fail" : "warn",
+    severity: identityDurable ? "high" : isProduction ? "critical" : "high",
     detail: identityDurable
-      ? "gh_pi_identities backed by durable store"
-      : "Identity mapping is memory-only — returning users may see onboarding again after cold start",
+      ? "Supabase credentials are configured; gh_pi_identities existence, schema and service_role SELECT/INSERT/UPDATE privileges are not verified by this configuration-only health probe"
+      : "Privileged Supabase storage is not configured; production Pi identity persistence is unavailable",
     remediation:
-      "Set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY and apply migration gh_pi_identities",
+      "Verify public.gh_pi_identities columns, RLS deny-client policy, and service_role SELECT/INSERT/UPDATE grants against the target Testnet database",
   })
 
   checks.push({
     id: "session_durable",
-    label: "Durable GH server sessions",
-    status: sessionDurable ? "pass" : isProduction ? "fail" : "warn",
-    severity: isProduction ? "critical" : "high",
+    label: "GH session storage configuration",
+    status: sessionDurable ? "warn" : isProduction ? "fail" : "warn",
+    severity: sessionDurable ? "high" : isProduction ? "critical" : "high",
     detail: sessionDurable
-      ? "gh_sessions backed by durable store"
-      : "Sessions are memory-only — multi-instance / redeploy drops auth state",
+      ? "Supabase credentials are configured; gh_sessions existence, schema and service_role SELECT/INSERT/UPDATE privileges are not verified by this configuration-only health probe"
+      : "Privileged Supabase storage is not configured; production GH session persistence is unavailable",
     remediation:
-      "Set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY and apply migration gh_sessions",
+      "Verify public.gh_sessions columns, RLS deny-client policy, and service_role SELECT/INSERT/UPDATE grants against the target Testnet database",
   })
 
   checks.push({
@@ -288,13 +293,15 @@ export function evaluateReadiness(opts?: {
 
   // --- Critical security: dev auth must not be on in production ---
   if (isProduction && allowDevAuth) {
+    // This branch should be unreachable while readGhcServerEnv remains the
+    // authority. Keep the fail-closed guard in case that policy changes.
     checks.push({
       id: "dev_auth_locked",
       label: "Dev authentication disabled in production",
       status: "fail",
       severity: "critical",
-      detail: "GHC_ALLOW_DEV_AUTH is enabled while running as production",
-      remediation: "Unset GHC_ALLOW_DEV_AUTH on Production Vercel environment",
+      detail: "Effective server policy unexpectedly permits development authentication in a production runtime",
+      remediation: "Restore the production hard-deny in readGhcServerEnv(); never enable development auth in production runtimes",
     })
   } else {
     checks.push({
@@ -303,7 +310,9 @@ export function evaluateReadiness(opts?: {
       status: "pass",
       severity: "high",
       detail: isProduction
-        ? "Dev Bearer user:<id> blocked in production"
+        ? devAuthFlagConfigured
+          ? "Dev auth is hard-disabled by production runtime policy; GHC_ALLOW_DEV_AUTH has no effect here and should be removed from Preview/Production configuration"
+          : "Dev Bearer user:<id> is hard-blocked by production runtime policy"
         : allowDevAuth
           ? "Dev auth allowed (non-production only)"
           : "Dev auth not enabled",
@@ -412,17 +421,13 @@ export function evaluateReadiness(opts?: {
       signInCallback: "/signin/callback",
     },
     schemaReadiness: {
-      probe: "config_and_durable_flags" as const,
-      identity: identityDurable
-        ? ("ready" as const)
-        : supabaseConfigured
-          ? ("configured_unverified" as const)
-          : ("missing" as const),
-      sessions: sessionDurable
-        ? ("ready" as const)
-        : supabaseConfigured
-          ? ("configured_unverified" as const)
-          : ("missing" as const),
+      probe: "configuration_only" as const,
+      identity: identityDurable && supabaseConfigured
+        ? ("configured_unverified" as const)
+        : ("missing" as const),
+      sessions: sessionDurable && supabaseConfigured
+        ? ("configured_unverified" as const)
+        : ("missing" as const),
       messaging: messagingDurable
         ? ("ready" as const)
         : supabaseConfigured
@@ -449,6 +454,51 @@ export function evaluateReadiness(opts?: {
     },
     ts: new Date().toISOString(),
   }
+}
+
+/**
+ * Live readiness used by /api/health. Unlike evaluateReadiness(), this performs
+ * bounded, read-only PostgREST probes against the exact identity/session column
+ * contracts using the server-only service_role credential. A 200 response with
+ * an empty result proves table/column visibility for the runtime role; it does
+ * not claim INSERT/UPDATE ACLs (those are verified by catalog checks and the
+ * applied least-privilege migration).
+ */
+export async function evaluateLiveReadiness(opts?: { hostname?: string | null }): Promise<ReadinessReport> {
+  const report = evaluateReadiness(opts)
+  const identityPath = "gh_pi_identities?select=pi_app_uid,gh_user_id,pi_username,onboarding_completed,greenhaven_profile_id,created_at,updated_at,last_seen_at,verified_at&limit=0"
+  const sessionPath = "gh_sessions?select=id,token_hash,gh_user_id,created_at,last_seen_at,expires_at,absolute_expires_at,revoked_at,user_agent_hash,meta&limit=0"
+  const [identityProbe, sessionProbe] = await Promise.all([
+    supabaseRest<unknown[]>(identityPath, { method: "GET", timeoutMs: 5000, maxResponseBytes: 16_384 }),
+    supabaseRest<unknown[]>(sessionPath, { method: "GET", timeoutMs: 5000, maxResponseBytes: 16_384 }),
+  ])
+  const identityReady = identityProbe.ok && Array.isArray(identityProbe.data)
+  const sessionsReady = sessionProbe.ok && Array.isArray(sessionProbe.data)
+  report.schemaReadiness.probe = "live_read_probe"
+  report.schemaReadiness.identity = identityReady ? "ready" : report.schemaReadiness.identity === "missing" ? "missing" : "failed"
+  report.schemaReadiness.sessions = sessionsReady ? "ready" : report.schemaReadiness.sessions === "missing" ? "missing" : "failed"
+
+  const applyProbe = (id: string, ok: boolean, result: typeof identityProbe, table: string) => {
+    const check = report.checks.find((item) => item.id === id)
+    if (!check) return
+    check.status = ok ? "pass" : report.environment.isProduction ? "fail" : "warn"
+    check.severity = report.environment.isProduction ? "critical" : "high"
+    check.detail = ok
+      ? `${table}: live PostgREST read succeeded; required columns are visible to the service_role runtime.`
+      : `${table}: live PostgREST probe failed (${result.ok ? "INVALID_RESPONSE" : result.error}); table shape, API exposure or service_role SELECT access is not ready.`
+    check.remediation = `Verify ${table} columns, Data API exposure, service_role SELECT privilege, and the RUN377 ACL migration on the exact Preview Supabase project.`
+  }
+  applyProbe("identity_durable", identityReady, identityProbe, "public.gh_pi_identities")
+  applyProbe("session_durable", sessionsReady, sessionProbe, "public.gh_sessions")
+
+  const warnings = report.checks.filter((item) => item.status === "warn").map((item) => `${item.label}: ${item.detail || item.id}`)
+  const criticalFails = report.checks.some((item) => item.status === "fail" && item.severity === "critical")
+  const highFails = report.checks.some((item) => item.status === "fail" && item.severity === "high")
+  report.warnings = warnings
+  report.blockers = report.checks.filter((item) => item.status === "fail" && item.severity === "critical").map((item) => item.remediation || item.detail || item.id)
+  report.ready = !criticalFails
+  report.status = criticalFails ? (report.environment.isProduction ? "not_ready" : "degraded") : highFails || warnings.length ? "degraded" : "ready"
+  return report
 }
 
 /** HTTP status for readiness: 503 only when production and not ready */

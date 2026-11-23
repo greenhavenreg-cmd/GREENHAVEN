@@ -11,7 +11,7 @@ import { X, Send, ChevronDown, ChevronUp, Heart, MessageCircle, LoaderCircle } f
 import { useGHC } from "@/contexts/ghc-context"
 import type { Post, PostComment } from "@/lib/ghc-types"
 import { timeAgo } from "@/lib/ghc-data"
-import { buildCommentTree, countThread } from "@/lib/comment-thread-utils"
+import { buildCommentTree, countThread, filterBlockedCommentThreads } from "@/lib/comment-thread-utils"
 import { LazyImage } from "./lazy-image"
 import { downloadMedia } from "@/lib/media/download-media"
 import { ReportChooser } from "./report-chooser"
@@ -59,6 +59,7 @@ export function CommentSheet({ post, open, onClose }: CommentSheetProps) {
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [commentsLoadingMore, setCommentsLoadingMore] = useState(false)
   const [commentsCursor, setCommentsCursor] = useState<{ before: number; beforeId: string } | null>(null)
+  const [pendingFocus, setPendingFocus] = useState<{ commentId: string; threadRootId: string; attempts: number } | null>(null)
   const [mediaPreview, setMediaPreview] = useState<{ url: string; alt: string; kind: "image" | "video" } | null>(null)
   const [reloadVersion, setReloadVersion] = useState(0)
   const listRef = useRef<HTMLDivElement | null>(null)
@@ -70,7 +71,8 @@ export function CommentSheet({ post, open, onClose }: CommentSheetProps) {
 
   const tree = useMemo(() => {
     if (!post?.comments?.length) return [] as PostComment[]
-    const built = buildCommentTree(post.comments)
+    const visibleComments = filterBlockedCommentThreads(post.comments, blockedUsers)
+    const built = buildCommentTree(visibleComments)
     const score = (comment: PostComment) => Object.values(comment.reactionCounts || {}).reduce((sum, count) => sum + Math.max(0, Number(count) || 0), 0) + Math.max(0, Number(comment.replyCount || comment.replies?.length || 0))
     const sorted = [...built].sort((a, b) => {
       const ta = a.createdAt || 0
@@ -80,8 +82,7 @@ export function CommentSheet({ post, open, onClose }: CommentSheetProps) {
       const qualityDelta = score(b) - score(a)
       return qualityDelta !== 0 ? qualityDelta : tb - ta
     })
-    const blockedSet = new Set(blockedUsers || [])
-    return sorted.filter((c) => c.authorId && !blockedSet.has(c.authorId))
+    return sorted
   }, [post, sortMode, blockedUsers])
 
   
@@ -90,6 +91,7 @@ export function CommentSheet({ post, open, onClose }: CommentSheetProps) {
     let cancelled = false
     setCommentsLoadError(false)
     setCommentsCursor(null)
+    setPendingFocus(null)
     setVisibleCount(40)
     setCommentsLoading(true)
     ;(async () => {
@@ -113,19 +115,52 @@ export function CommentSheet({ post, open, onClose }: CommentSheetProps) {
   useEffect(() => {
     if (!open || !post?.id) return
     const onFocusComment = (ev: Event) => {
-      const detail = (ev as CustomEvent<{ postId?: string; commentId?: string }>).detail
+      const detail = (ev as CustomEvent<{ postId?: string; commentId?: string; parentId?: string; threadRootId?: string }>).detail
       if (!detail?.commentId || detail.postId !== post.id) return
-      setExpandedThreads((prev) => ({ ...prev, [detail.commentId as string]: true }))
-      window.setTimeout(() => {
-        try {
-          const el = document.querySelector(`[data-comment-id="${CSS.escape(detail.commentId as string)}"]`) as HTMLElement | null
-          el?.scrollIntoView({ behavior: "smooth", block: "center" })
-        } catch { /* */ }
-      }, 120)
+      const rootId = String(detail.threadRootId || detail.parentId || detail.commentId).trim()
+      setExpandedThreads((prev) => ({ ...prev, [rootId]: true }))
+      setPendingFocus({ commentId: detail.commentId, threadRootId: rootId, attempts: 0 })
     }
     window.addEventListener("ghc:focus-comment", onFocusComment as EventListener)
     return () => window.removeEventListener("ghc:focus-comment", onFocusComment as EventListener)
   }, [open, post?.id])
+
+  useEffect(() => {
+    if (!open || !post?.id || !pendingFocus || commentsLoading || commentsLoadingMore) return
+    const targetLoaded = (post.comments || []).some((comment) => String(comment.id) === pendingFocus.commentId)
+    if (targetLoaded) {
+      const timer = window.setTimeout(() => {
+        const target = document.querySelector(`[data-comment-id="${CSS.escape(pendingFocus.commentId)}"]`) as HTMLElement | null
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "center" })
+          setPendingFocus(null)
+        }
+      }, 120)
+      return () => window.clearTimeout(timer)
+    }
+    if (commentsLoadError || !commentsCursor || pendingFocus.attempts >= 16) {
+      setPendingFocus(null)
+      return
+    }
+    const cursor = commentsCursor
+    setCommentsLoadingMore(true)
+    void loadPostComments(post.id, { before: cursor.before, beforeId: cursor.beforeId, append: true })
+      .then((result) => {
+        if (!result?.ok) {
+          setPendingFocus(null)
+          return
+        }
+        const next = result.nextCursor || null
+        if (next && next.before === cursor.before && next.beforeId === cursor.beforeId) {
+          setCommentsCursor(null)
+        } else {
+          setCommentsCursor(next)
+        }
+        setPendingFocus((current) => current ? { ...current, attempts: current.attempts + 1 } : null)
+      })
+      .catch(() => setPendingFocus(null))
+      .finally(() => setCommentsLoadingMore(false))
+  }, [open, post?.id, post?.comments, pendingFocus, commentsLoading, commentsLoadingMore, commentsLoadError, commentsCursor, loadPostComments])
 
   useEffect(() => {
     if (!open || !post?.id) return
@@ -171,7 +206,7 @@ useEffect(() => {
       if (event.key !== "Tab") return
       const root = mediaPreviewRef.current
       if (!root) return
-      const focusable = Array.from(root.querySelectorAll<HTMLElement>(
+      const focusable = Array.from<HTMLElement>(root.querySelectorAll<HTMLElement>(
         'button:not([disabled]), video[controls], [tabindex]:not([tabindex="-1"])'
       )).filter((element) => element.getClientRects().length > 0)
       if (!focusable.length) { event.preventDefault(); return }
@@ -206,7 +241,7 @@ useEffect(() => {
       if (event.key !== "Tab" || mediaPreview) return
       const root = dialogRef.current
       if (!root) return
-      const focusable = Array.from(root.querySelectorAll<HTMLElement>(
+      const focusable = Array.from<HTMLElement>(root.querySelectorAll<HTMLElement>(
         'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
       )).filter((element) => element.getClientRects().length > 0)
       if (!focusable.length) { event.preventDefault(); root.focus(); return }
@@ -288,7 +323,8 @@ useEffect(() => {
     submittingRef.current = true
     setBusy(true)
     try {
-      await addComment(post.id, value, replyToId || undefined, media.length ? media : undefined)
+      const saved = await addComment(post.id, value, replyToId || undefined, media.length ? media : undefined)
+      if (saved === false) return
       setPendingMedia([])
       try {
         await loadPostComments?.(post.id)

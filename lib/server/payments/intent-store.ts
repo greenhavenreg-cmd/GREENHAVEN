@@ -10,6 +10,7 @@ import type {
   CreatePaymentIntentInput,
   PaymentIntentAuditEvent,
 } from "./intent-types"
+import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
 export type { PaymentIntent, PaymentIntentStatus, CreatePaymentIntentInput } from "./intent-types"
 import { readGhcServerEnv } from "@/lib/server/economy/env"
@@ -76,20 +77,7 @@ async function rpcJson(
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
   try {
-    const res = await fetch(
-      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/${fn}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: env.supabaseServiceRoleKey,
-          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-        },
-        body: JSON.stringify(body),
-        cache: "no-store",
-        signal: AbortSignal.timeout(8_000),
-      }
-    )
+    const res = await (async () => { const r = await supabaseRpc(fn, body, { timeoutMs: 8000 }); return { ok: r.ok, status: r.status, json: async () => r.ok ? r.data : r.body, text: async () => JSON.stringify(r.ok ? r.data : r.body) }; })()
     if (!res.ok) return null
     const text = await res.text()
     if (!text || text === "null") return null
@@ -584,7 +572,7 @@ export async function listIntentsForUserAsync(userId: string): Promise<PaymentIn
   }
 
   try {
-    const base = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/ghc_payment_intents`
+    const base = `ghc_payment_intents`
     const params = new URLSearchParams()
     params.set("user_id", `eq.${uid}`)
     params.set("order", "created_at.desc")

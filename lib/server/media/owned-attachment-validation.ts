@@ -1,4 +1,5 @@
 import { readGhcServerEnv } from "@/lib/server/economy/env"
+import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 import {
   reconcileAttachmentWithAsset, sanitizeAttachmentFileName, type DurableAttachment,
 } from "@/lib/server/media/message-attachment-policy"
@@ -60,39 +61,29 @@ export async function validateOwnedMediaAttachments(input: {
 
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return { ok: false, error: "MEDIA_AUTHORIZATION_UNAVAILABLE" }
-  const base = env.supabaseUrl.replace(/\/$/, "")
-  const headers = {
-    "Content-Type": "application/json",
-    apikey: env.supabaseServiceRoleKey,
-    Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-  }
   const reconciled = new Map<string, DurableAttachment>()
   const uniqueIds = [...new Set(parsed.map((attachment) => attachment.id))]
   for (const mediaId of uniqueIds) {
     try {
-      const response = await fetch(`${base}/rest/v1/rpc/gh_media_authorize_viewer`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ p_media_id: mediaId, p_viewer_id: ownerId }),
-        cache: "no-store",
-        signal: AbortSignal.timeout(8_000),
-      })
-      if (!response.ok) return { ok: false, error: "MEDIA_AUTHORIZATION_UNAVAILABLE" }
-      const asset = await response.json() as { ok?: boolean; mediaId?: string; ownerId?: string }
+      const authorization = await supabaseRpc<{ ok?: boolean; mediaId?: string; ownerId?: string }>("gh_media_authorize_viewer", {
+        p_media_id: mediaId,
+        p_viewer_id: ownerId,
+      }, { timeoutMs: 8_000 })
+      if (!authorization.ok) return { ok: false, error: "MEDIA_AUTHORIZATION_UNAVAILABLE" }
+      const asset = authorization.data
       if (asset?.ok !== true || asset.mediaId !== mediaId || asset.ownerId !== ownerId) {
         return { ok: false, error: "ATTACHMENT_NOT_OWNED" }
       }
       // Re-read the stored record for authoritative MIME type, kind and size.
-      const rowResponse = await fetch(
-        `${base}/rest/v1/gh_media_assets?id=eq.${encodeURIComponent(mediaId)}&select=owner_id,mime_type,byte_size,media_kind,status,deleted_at&limit=1`,
-        { method: "GET", headers, cache: "no-store", signal: AbortSignal.timeout(8_000) },
+      const rowResult = await supabaseRest<Array<Record<string, unknown>>>(
+        `gh_media_assets?id=eq.${encodeURIComponent(mediaId)}&select=owner_id,mime_type,byte_size,media_kind,status,deleted_at&limit=1`,
+        { method: "GET", timeoutMs: 8_000 },
       )
-      if (!rowResponse.ok) return { ok: false, error: "MEDIA_AUTHORIZATION_UNAVAILABLE" }
-      const rows = await rowResponse.json() as unknown
-      const row = Array.isArray(rows) ? rows[0] : undefined
+      if (!rowResult.ok) return { ok: false, error: "MEDIA_AUTHORIZATION_UNAVAILABLE" }
+      const row = rowResult.data?.[0]
       if (!row || typeof row !== "object") return { ok: false, error: "ATTACHMENT_NOT_OWNED" }
       const declared = parsed.find((attachment) => attachment.id === mediaId)!
-      const result = reconcileAttachmentWithAsset(declared, row as Record<string, unknown>, ownerId)
+      const result = reconcileAttachmentWithAsset(declared, row, ownerId)
       if (!result.ok) return result
       reconciled.set(mediaId, result.attachment)
     } catch {

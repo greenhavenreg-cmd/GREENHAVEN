@@ -13,7 +13,7 @@
  */
 
 import { NextResponse } from "next/server"
-import { verifyPiAccessToken } from "@/lib/server/economy/auth"
+import { verifyPiAccessTokenDetailed } from "@/lib/server/economy/auth"
 import { checkDurableRateLimit, appendSecurityEvent, requestCorrelationId, durableRateLimitStatus, durableRateLimitCode } from "@/lib/server/security/control-plane"
 import { createHash } from "node:crypto"
 import {
@@ -34,11 +34,24 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function POST(request: Request) {
+  const correlationId = requestCorrelationId(request)
   try {
     const forwardedParts = (request.headers.get("x-forwarded-for") || "").split(",").map((part) => part.trim()).filter(Boolean)
     const forwarded = forwardedParts.length ? forwardedParts[forwardedParts.length - 1] : ""
     const clientIp = request.headers.get("x-real-ip")?.trim() || forwarded || "unknown"
-    const correlationId = requestCorrelationId(request)
+    const fetchSiteHeader = request.headers.get("sec-fetch-site")?.toLowerCase() || "unknown"
+    const fetchSite = ["same-origin", "same-site", "cross-site", "none"].includes(fetchSiteHeader)
+      ? fetchSiteHeader
+      : "other"
+    // Safe, token-free arrival telemetry distinguishes a request that reached
+    // the route from browser, middleware, or network failures before the route.
+    console.info("[GH_PI_AUTH_STAGE]", { code: "PI_AUTH_ROUTE_REACHED", stage: "request_received", correlationId, originPresent: Boolean(request.headers.get("origin")), fetchSite })
+    void appendSecurityEvent({
+      eventType: "auth.pi.request_received",
+      outcome: "challenged",
+      correlationId,
+      metadata: { originPresent: Boolean(request.headers.get("origin")), fetchSite },
+    })
     const rate = await checkDurableRateLimit(`pi-auth:${createHash("sha256").update(clientIp).digest("hex").slice(0, 24)}`, 12, 60_000, { onUnavailable: "deny" })
     if (!rate.ok) {
       void appendSecurityEvent({ eventType: "auth.pi.rate_limited", outcome: "blocked", reasonCode: durableRateLimitCode(rate), correlationId })
@@ -85,19 +98,41 @@ export async function POST(request: Request) {
       )
     }
 
-    const piUser = await verifyPiAccessToken(accessToken)
-    if (!piUser?.uid) {
-      void appendSecurityEvent({ eventType: "auth.pi.rejected", outcome: "blocked", reasonCode: "INVALID_PI_TOKEN", correlationId })
+    console.info("[GH_PI_AUTH_STAGE]", { code: "PI_PLATFORM_VERIFY_START", stage: "platform_verify", correlationId })
+    const verification = await verifyPiAccessTokenDetailed(accessToken)
+    if (!verification.ok) {
+      const unavailable = verification.reason === "PI_UNAVAILABLE"
+      const malformed = verification.reason === "INVALID_PI_RESPONSE"
+      const error = unavailable
+        ? "PI_VERIFICATION_UNAVAILABLE"
+        : malformed
+          ? "PI_VERIFICATION_INVALID_RESPONSE"
+          : "INVALID_PI_TOKEN"
+      console.warn("[GH_PI_AUTH_STAGE]", { code: error, stage: "platform_verify", correlationId, status: unavailable ? 503 : malformed ? 502 : 401 })
+      void appendSecurityEvent({
+        eventType: "auth.pi.rejected",
+        outcome: unavailable || malformed ? "error" : "blocked",
+        reasonCode: error,
+        correlationId,
+      })
       return NextResponse.json(
         {
           ok: false,
-          error: "INVALID_PI_TOKEN",
-          detail:
-            "Pi /me rejected the access token. Re-authenticate in Pi Browser.",
+          error,
+          diagnosticCode: error,
+          correlationId,
+          detail: unavailable
+            ? "Pi identity verification is temporarily unavailable. Please retry; your account was not changed."
+            : malformed
+              ? "Pi returned an unexpected identity response. Please retry shortly."
+              : "Pi rejected the access token. Sign in with Pi again.",
+          retryable: unavailable || malformed,
         },
-        { status: 401 }
+        { status: unavailable ? 503 : malformed ? 502 : 401, headers: { "Cache-Control": "no-store" } }
       )
     }
+    const piUser = verification.user
+    console.info("[GH_PI_AUTH_STAGE]", { code: "PI_PLATFORM_VERIFY_OK", stage: "platform_verify", correlationId })
 
     const prod =
       process.env.NODE_ENV === "production" ||
@@ -114,6 +149,8 @@ export async function POST(request: Request) {
         {
           ok: false,
           error: "IDENTITY_STORE_UNAVAILABLE",
+          diagnosticCode: "PI_IDENTITY_STORE_UNAVAILABLE",
+          correlationId,
           detail:
             "Server identity storage is not configured. Operators must set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY and apply gh_pi_identities / gh_sessions migrations.",
         },
@@ -123,6 +160,7 @@ export async function POST(request: Request) {
 
     let record
     let isNew
+    console.info("[GH_PI_AUTH_STAGE]", { code: "PI_IDENTITY_RESOLVE_START", stage: "identity_resolve", correlationId })
     try {
       const result = await findOrCreateFromVerifiedPi({
         piAppUid: piUser.uid,
@@ -130,13 +168,17 @@ export async function POST(request: Request) {
       })
       record = result.record
       isNew = result.isNew
+      console.info("[GH_PI_AUTH_STAGE]", { code: "PI_IDENTITY_RESOLVE_OK", stage: "identity_resolve", correlationId, isNew })
     } catch (err) {
       const msg = err instanceof Error ? err.message : "unknown"
+      console.error("[GH_PI_AUTH_STAGE]", { code: "PI_IDENTITY_RESOLVE_FAILED", stage: "identity_resolve", correlationId, reason: msg === "IDENTITY_DURABILITY_UNAVAILABLE" ? msg : "IDENTITY_LOOKUP_OR_WRITE_FAILED" })
       if (msg === "IDENTITY_DURABILITY_UNAVAILABLE") {
         return NextResponse.json(
           {
             ok: false,
             error: "IDENTITY_STORE_UNAVAILABLE",
+            diagnosticCode: "PI_IDENTITY_STORE_WRITE_FAILED",
+            correlationId,
             detail:
               "Durable identity write failed. Check Supabase connectivity and migrations.",
           },
@@ -164,18 +206,23 @@ export async function POST(request: Request) {
     // Issue GH server session only after verified Pi identity
     const ua = request.headers.get("user-agent")
     let issued
+    console.info("[GH_PI_AUTH_STAGE]", { code: "PI_SESSION_CREATE_START", stage: "session_create", correlationId })
     try {
       issued = await createSession({
         ghUserId: record.ghUserId,
         userAgent: ua,
       })
+      console.info("[GH_PI_AUTH_STAGE]", { code: "PI_SESSION_CREATE_OK", stage: "session_create", correlationId, durable: isSessionStoreDurable() })
     } catch (sessErr) {
       const msg = sessErr instanceof Error ? sessErr.message : "unknown"
+      console.error("[GH_PI_AUTH_STAGE]", { code: "PI_SESSION_CREATE_FAILED", stage: "session_create", correlationId, reason: msg.includes("DURABILITY") ? "SESSION_DURABILITY_UNAVAILABLE" : "SESSION_WRITE_FAILED" })
       if (msg.includes("DURABILITY") || (prod && !isSessionStoreDurable())) {
         return NextResponse.json(
           {
             ok: false,
             error: "SESSION_STORE_UNAVAILABLE",
+            diagnosticCode: "PI_SESSION_STORE_WRITE_FAILED",
+            correlationId,
             detail: "Durable session storage failed.",
           },
           { status: 503 }
@@ -226,6 +273,7 @@ export async function POST(request: Request) {
       buildSessionCookieHeader(issued.rawToken)
     )
 
+    console.info("[GH_PI_AUTH_STAGE]", { code: "PI_AUTH_COMPLETE", stage: "response", correlationId, durable: identityDurable, sessionDurable })
     void appendSecurityEvent({ eventType: "auth.pi.success", outcome: "allowed", actorUserId: record.ghUserId, correlationId })
     void recordPioneerActivity({
       userId: record.ghUserId,
@@ -234,16 +282,15 @@ export async function POST(request: Request) {
     })
     return res
   } catch (err) {
-    console.error(
-      "[auth/pi] bridge failed",
-      err instanceof Error ? err.message : "unknown"
-    )
+    console.error("[GH_PI_AUTH_STAGE]", { code: "PI_AUTH_BRIDGE_UNHANDLED", stage: "unhandled", correlationId, errorName: err instanceof Error ? err.name : "UnknownError" })
     const msg = err instanceof Error ? err.message : ""
     if (msg === "IDENTITY_DURABILITY_UNAVAILABLE") {
       return NextResponse.json(
         {
           ok: false,
           error: "IDENTITY_STORE_UNAVAILABLE",
+          diagnosticCode: "PI_IDENTITY_STORE_UNAVAILABLE",
+          correlationId,
           detail:
             "Durable identity storage is unavailable on this deployment.",
         },
@@ -254,6 +301,8 @@ export async function POST(request: Request) {
       {
         ok: false,
         error: "AUTH_BRIDGE_FAILED",
+        diagnosticCode: "PI_AUTH_BRIDGE_UNHANDLED",
+        correlationId,
       },
       { status: 500 }
     )
