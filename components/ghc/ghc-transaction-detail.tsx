@@ -12,13 +12,13 @@ import type { GhcTransaction } from "@/lib/domains/economy-types"
 import { navigateGhcActivityTarget, resolveGhcActivityAttribution } from "@/lib/domains/ghc-activity-attribution"
 
 const KIND_LABELS: Record<string, string> = {
-  earned: "Activity credit",
+  earned: "Earned",
   spent: "Spent",
   purchased: "Purchased",
   pending: "Pending credit",
   reversed: "Reversed",
   expired: "Expired",
-  adjusted: "Adjusted",
+  adjusted: "Adjustment",
   transfer_out: "Sent",
   transfer_in: "Received",
   transfer_request: "Request (no balance change)",
@@ -32,22 +32,12 @@ const STATUS_HELP: Record<string, string> = {
   failed: "This operation did not complete.",
 }
 
-/**
- * Absolute amount with a currency mark. The sign is rendered separately so negative values never
- * read "₲ -5.00". Up to 8 decimals are kept (matching the exported record) so small ledger
- * amounts are not rounded to a misleading "0.00". Unknown amounts render "—", never zero.
- */
 function formatGhc(n: number): string {
-  if (!Number.isFinite(n)) return "—"
-  return `₲ ${Math.abs(n).toLocaleString(undefined, {
+  if (!Number.isFinite(n)) return "₲ 0.00"
+  return `₲ ${n.toLocaleString(undefined, {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 8,
+    maximumFractionDigits: 2,
   })}`
-}
-
-function amountSign(n: number): string {
-  if (!Number.isFinite(n) || n === 0) return ""
-  return n > 0 ? "+" : "−"
 }
 
 function formatWhen(ts?: number) {
@@ -82,19 +72,14 @@ export type GhcTransactionDetailProps = {
 export function GhcTransactionDetail({ tx, open, onClose }: GhcTransactionDetailProps) {
   const [copied, setCopied] = useState(false)
   const [receiptFeedback, setReceiptFeedback] = useState<string | null>(null)
-  // Memoized: a fresh array every render made the `receipt` memo below recompute on every render.
-  const correlationReferences = useMemo(
-    () =>
-      [
-        ["Order", metaString(tx?.metadata, "orderId")],
-        ["Reward", metaString(tx?.metadata, "rewardId")],
-        ["Request", metaString(tx?.metadata, "requestId")],
-        ["Payment intent", metaString(tx?.metadata, "paymentIntentId")],
-        ["Correlation", metaString(tx?.metadata, "correlationId")],
-        ["Provider payment", metaString(tx?.metadata, "providerPaymentId")],
-      ].filter((item): item is [string, string] => Boolean(item[1] && item[1].length <= 200 && !/[\u0000-\u001f\u007f]/.test(item[1]))),
-    [tx?.metadata],
-  )
+  const correlationReferences = [
+    ["Order", metaString(tx?.metadata, "orderId")],
+    ["Reward", metaString(tx?.metadata, "rewardId")],
+    ["Request", metaString(tx?.metadata, "requestId")],
+    ["Payment intent", metaString(tx?.metadata, "paymentIntentId")],
+    ["Correlation", metaString(tx?.metadata, "correlationId")],
+    ["Provider payment", metaString(tx?.metadata, "providerPaymentId")],
+  ].filter((item): item is [string, string] => Boolean(item[1] && item[1].length <= 200 && !/[\u0000-\u001f\u007f]/.test(item[1])))
   const receipt = useMemo(() => {
     if (!tx) return ""
     const amount = Number.isFinite(tx.amount)
@@ -117,11 +102,6 @@ export function GhcTransactionDetail({ tx, open, onClose }: GhcTransactionDetail
     ].join("\n")
   }, [tx, correlationReferences])
   useEffect(() => {
-    // Feedback from a previous record must not appear on the next one.
-    setCopied(false)
-    setReceiptFeedback(null)
-  }, [open, tx?.id])
-  useEffect(() => {
     if (!open) return
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose() }
     window.addEventListener("keydown", onKeyDown)
@@ -129,7 +109,7 @@ export function GhcTransactionDetail({ tx, open, onClose }: GhcTransactionDetail
   }, [open, onClose])
   if (!open || !tx) return null
 
-  const positive = Number.isFinite(tx.amount) && tx.amount >= 0
+  const positive = tx.amount >= 0
   const attribution = resolveGhcActivityAttribution(tx)
   const kindLabel = KIND_LABELS[tx.kind] || tx.kind
   const counterparty =
@@ -144,10 +124,8 @@ export function GhcTransactionDetail({ tx, open, onClose }: GhcTransactionDetail
   const copyRef = async () => {
     const text = tx.referenceId || tx.id
     try {
-      if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable")
-      await navigator.clipboard.writeText(text)
+      await navigator.clipboard?.writeText(text)
       setCopied(true)
-      setReceiptFeedback(null)
       window.setTimeout(() => setCopied(false), 1600)
     } catch {
       setReceiptFeedback("Reference copy is unavailable in this browser.")
@@ -176,7 +154,7 @@ export function GhcTransactionDetail({ tx, open, onClose }: GhcTransactionDetail
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement("a")
       anchor.href = url
-      anchor.download = `greenhaven-ghc-ledger-${String(tx.id).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 12) || "record"}.txt`
+      anchor.download = `greenhaven-ghc-ledger-${tx.id.slice(0, 12)}.txt`
       document.body.appendChild(anchor)
       anchor.click()
       anchor.remove()
@@ -228,7 +206,7 @@ export function GhcTransactionDetail({ tx, open, onClose }: GhcTransactionDetail
                     : "text-rose-700"
               }`}
             >
-              {amountSign(tx.amount)}
+              {positive ? "+" : ""}
               {formatGhc(tx.amount)}{" "}
               <span className="text-base font-bold text-muted-foreground">GHC</span>
             </p>
@@ -350,8 +328,7 @@ export function GhcTransactionDetail({ tx, open, onClose }: GhcTransactionDetail
           <button
             type="button"
             onClick={onClose}
-            autoFocus
-            className="w-full min-h-11 rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+            className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white"
           >
             Done
           </button>

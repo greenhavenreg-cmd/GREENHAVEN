@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict'
 import {
-  normalizePushCategoryPreferences, normalizePushDeviceId,
+  hashPushEndpoint, normalizePushCategoryPreferences, normalizePushDeviceId,
   normalizePushEndpoint, validatePushSubscription,
 } from '../lib/notification-push-contract.ts'
-import { hashPushEndpoint } from '../lib/server/notifications/push-hash.ts'
 
 let passed = 0
 function check(name, fn) { fn(); passed += 1; process.stdout.write(`PASS ${name}\n`) }

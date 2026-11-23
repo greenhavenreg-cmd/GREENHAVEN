@@ -1,5 +1,4 @@
 import { readGhcServerEnv } from "./env"
-import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 /**
  * Authoritative GHC store interface + in-memory implementation for tests.
  *
@@ -827,21 +826,35 @@ export async function executeDurableGhcSpend(input: {
   if (!ref) return { ok: false, error: "REFERENCE_REQUIRED" }
 
   try {
-    const result = await supabaseRpc("ghc_execute_spend", {
-      p_user_id: input.userId,
-      p_amount: amount,
-      p_reference_id: ref,
-      p_reason: input.reason,
-      p_source_event: input.sourceEvent || "SYSTEM",
-    }, { timeoutMs: 10_000 })
-    if (!result.ok) return { ok: false, error: "SPEND_FAILED" }
-    const data = result.data
-    const parsedResult = parseGhcSpendRpcResult(data, { amount, referenceId: ref })
-    if (!parsedResult.ok) return { ok: false, error: parsedResult.error }
+    const res = await fetch(
+      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_execute_spend`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+          apikey: env.supabaseServiceRoleKey,
+          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        },
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
+        body: JSON.stringify({
+          p_user_id: input.userId,
+          p_amount: amount,
+          p_reference_id: ref,
+          p_reason: input.reason,
+          p_source_event: input.sourceEvent || "SYSTEM",
+        }),
+      }
+    )
+    const data = await res.json().catch(() => null)
+    if (!res.ok) return { ok: false, error: "SPEND_FAILED" }
+    const result = parseGhcSpendRpcResult(data, { amount, referenceId: ref })
+    if (!result.ok) return { ok: false, error: result.error }
     return {
       ok: true,
-      tx: parsedResult.tx as GhcLedgerRow,
-      idempotent: parsedResult.idempotent,
+      tx: result.tx as GhcLedgerRow,
+      idempotent: result.idempotent,
       raw: data,
     }
   } catch (e) {

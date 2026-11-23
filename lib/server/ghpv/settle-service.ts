@@ -15,7 +15,6 @@
 
 import { socialRpc } from "@/lib/server/social/rpc"
 import { computeSettlement, judgmentEventIdempotencyKey } from "@/lib/server/ghpv/settlement"
-import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 import {
   applySettlementToCalibrations,
   defaultCalibration,
@@ -86,7 +85,7 @@ async function loadCalibrationMap(reviewerIds: string[]): Promise<Map<string, Cu
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey || reviewerIds.length === 0) return map
   const list = reviewerIds.map((id) => `"${id.replace(/"/g, "")}"`).join(",")
   const url =
-    `gh_curator_calibration` +
+    `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_curator_calibration` +
     `?user_id=in.(${encodeURIComponent(list)})` +
     `&select=user_id,jcs,integrity_score,correct_count,incorrect_count,unresolved_count,curation_power`
   try {

@@ -15,7 +15,7 @@ export const DurableVideo = forwardRef<HTMLVideoElement, DurableVideoProps>(func
   playsInline = true,
   autoPlay = false,
   loop = false,
-  preload = "none",
+  preload = "metadata",
   ...videoProps
 }, ref) {
   const [playSrc, setPlaySrc] = useState<string | null>(null)

@@ -10,7 +10,6 @@ import { isPiIdentityDurable } from "@/lib/server/identity/pi-identity-store"
 import { isSessionStoreDurable } from "@/lib/server/identity/session-store"
 import { isPiOnlyCommerceEnabled } from "@/lib/server/economy/pi-only-commerce"
 import { countEngagedPioneers } from "@/lib/server/engagement/pioneer-activity"
-import { supabaseRest } from "@/lib/server/supabase/rest-client"
 
 export type ChecklistItem = {
   id: string
@@ -24,16 +23,33 @@ export type ChecklistItem = {
 async function countDurablePiIdentities(): Promise<number | null> {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
-  const result = await supabaseRest<unknown[]>("gh_pi_identities?select=gh_user_id", {
-    method: "GET",
-    headers: { Prefer: "count=exact", Range: "0-0" },
-    timeoutMs: 12_000,
-  })
-  if (!result.ok) return null
-  const range = result.headers.get("content-range") || ""
-  const match = range.match(/\/(\d+)\s*$/)
-  if (match) return Number(match[1])
-  return Array.isArray(result.data) ? result.data.length : null
+  try {
+    const base = env.supabaseUrl.replace(/\/$/, "")
+    // Prefer count header
+    const res = await fetch(
+      `${base}/rest/v1/gh_pi_identities?select=gh_user_id`,
+      {
+        headers: {
+          apikey: env.supabaseServiceRoleKey,
+          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+          Prefer: "count=exact",
+          Range: "0-0",
+        },
+        cache: "no-store",
+        signal: AbortSignal.timeout(12_000),
+      },
+    )
+    const range = res.headers.get("content-range") || ""
+    const m = range.match(/\/(\d+)\s*$/)
+    if (m) return Number(m[1])
+    if (res.ok) {
+      const rows = (await res.json().catch(() => [])) as unknown[]
+      return Array.isArray(rows) ? rows.length : null
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
 export async function buildPiListingReadiness(): Promise<{

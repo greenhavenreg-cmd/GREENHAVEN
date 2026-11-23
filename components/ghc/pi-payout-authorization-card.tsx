@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { ShieldCheck, Loader2 } from "lucide-react"
 import { confirmDialog } from "@/lib/ui/global-interactions"
-import { fetchWalletAuthorizationStatus, requestPiWalletConsent } from "@/lib/client/pi-wallet-consent"
+import { requestPiWalletConsent } from "@/lib/client/pi-wallet-consent"
 
 type AuthSnap = {
   authorizationActive?: boolean
@@ -17,7 +17,6 @@ type AuthSnap = {
   mappedUsername?: string | null
   consentedAt?: string | null
   error?: string
-  authorizationReason?: string | null
 }
 
 export function PiPayoutAuthorizationCard({
@@ -36,21 +35,22 @@ export function PiPayoutAuthorizationCard({
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await fetchWalletAuthorizationStatus()
-      if (result.ok) {
-        const body: AuthSnap = {
-          authorizationActive: result.status.authorizationActive,
-          uidMatchesAuthorization: result.status.uidMatchesAuthorization,
-          hasMapping: result.status.hasMapping,
-          mappedUsername: result.status.mappedUsername,
-          authorizationReason: result.status.authorizationReason,
-        }
+      const res = await fetch("/api/identity/wallet-authorization", {
+        credentials: "include",
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      })
+      const body = (await res.json().catch(() => null)) as (AuthSnap & { ok?: boolean }) | null
+      if (res.ok && body && body.ok !== false) {
         setSnap(body)
         onChanged?.(body.authorizationActive === true && body.uidMatchesAuthorization === true)
       } else {
-        setSnap({ error: result.code })
+        setSnap({ error: body?.error || "WALLET_AUTHORIZATION_UNAVAILABLE" })
         onChanged?.(false)
       }
+    } catch {
+      setSnap({ error: "NETWORK_ERROR" })
+      onChanged?.(false)
     } finally {
       setLoading(false)
     }
@@ -110,7 +110,6 @@ export function PiPayoutAuthorizationCard({
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({ reason: "user_revoked" }),
         cache: "no-store",
-        signal: AbortSignal.timeout(15_000),
       })
       const body = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null
       if (!res.ok || !body?.ok) {
@@ -187,11 +186,6 @@ export function PiPayoutAuthorizationCard({
           <p className="text-[12px] font-semibold text-amber-950 dark:text-amber-100">
             Authorization required before any Pi withdrawal.
           </p>
-          {snap?.authorizationReason === "PI_WALLET_ADDRESS_REQUIRED" || snap?.authorizationReason === "PI_WALLET_ADDRESS_UNVERIFIED" ? (
-            <p className="mt-1 text-[11px] leading-relaxed text-amber-950 dark:text-amber-100">
-              Your previous Pi consent did not include a verified wallet_address permission. Re-authorize below and tap Allow on the wallet-address prompt. If this repeats, check that wallet_address permission is enabled for GreenHaven in the Pi Developer Portal.
-            </p>
-          ) : null}
           <label className="mt-2 flex items-start gap-2 text-[12px] text-amber-950 dark:text-amber-100">
             <input
               type="checkbox"

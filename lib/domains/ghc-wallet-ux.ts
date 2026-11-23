@@ -1,4 +1,3 @@
-import { isGhcRequestExpired } from "@/lib/active-upgrades/ghc"
 /**
  * D7.1 — Shared GHC Wallet presentation helpers.
  * Display only. Never authoritative for balances or transfers.
@@ -203,7 +202,7 @@ export function requestStatusLabel(status: string): string {
 /** Pending requests only may show Pay */
 export function isRequestPayable(status: string, expiresAt?: number | null): boolean {
   if (String(status).toUpperCase() !== "PENDING") return false
-  if (isGhcRequestExpired(expiresAt)) return false
+  if (expiresAt != null && expiresAt > 0 && expiresAt < Date.now()) return false
   return true
 }
 

@@ -9,7 +9,6 @@
 
 import { createHash, randomBytes } from "crypto"
 import { readGhcServerEnv, hasPrivilegedDatabase } from "@/lib/server/economy/env"
-import { supabaseRest, supabaseRpc } from "@/lib/server/supabase/rest-client"
 
 /** Cookie name for GH server session */
 export const GH_SESSION_COOKIE = "gh_session"
@@ -157,9 +156,15 @@ async function dbInsert(rec: SessionRecord): Promise<boolean> {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return false
   try {
-    const result = await supabaseRest("gh_sessions", {
+    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_sessions`
+    const res = await fetch(url, {
       method: "POST",
-      headers: { Prefer: "return=minimal" },
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        Prefer: "return=minimal",
+      },
       body: JSON.stringify({
         id: rec.id,
         token_hash: rec.tokenHash,
@@ -168,14 +173,14 @@ async function dbInsert(rec: SessionRecord): Promise<boolean> {
         last_seen_at: new Date(rec.lastSeenAt).toISOString(),
         expires_at: new Date(rec.expiresAt).toISOString(),
         absolute_expires_at: new Date(rec.absoluteExpiresAt).toISOString(),
-        revoked_at: rec.revokedAt == null ? null : new Date(rec.revokedAt).toISOString(),
+        revoked_at: null,
         user_agent_hash: rec.userAgentHash,
-        meta: rec.deviceLabel ? { deviceLabel: rec.deviceLabel } : {},
+        meta: { deviceLabel: rec.deviceLabel || "Unknown device" },
       }),
-      timeoutMs: 10_000,
+      cache: "no-store",
     })
-    if (!result.ok) {
-      console.error("[session] dbInsert failed", result.status)
+    if (!res.ok) {
+      console.error("[session] dbInsert failed", res.status)
       return false
     }
     return true
@@ -185,30 +190,19 @@ async function dbInsert(rec: SessionRecord): Promise<boolean> {
   }
 }
 
-
-/** Atomically revoke overflow sessions and insert the replacement under a per-user DB lock. */
-async function dbIssueWithCap(rec: SessionRecord): Promise<boolean> {
-  const result = await supabaseRpc<{ ok?: boolean; error?: string }>("gh_session_issue_with_cap", {
-    p_id: rec.id,
-    p_token_hash: rec.tokenHash,
-    p_gh_user_id: rec.ghUserId,
-    p_created_at: new Date(rec.createdAt).toISOString(),
-    p_last_seen_at: new Date(rec.lastSeenAt).toISOString(),
-    p_expires_at: new Date(rec.expiresAt).toISOString(),
-    p_absolute_expires_at: new Date(rec.absoluteExpiresAt).toISOString(),
-    p_user_agent_hash: rec.userAgentHash,
-    p_meta: rec.deviceLabel ? { deviceLabel: rec.deviceLabel } : {},
-    p_max_active: SESSION_MAX_ACTIVE_PER_USER,
-  }, { timeoutMs: 10_000 })
-  return result.ok && Boolean(result.data && typeof result.data === "object" && result.data.ok === true)
-}
-
 async function dbSelectByHash(tokenHash: string): Promise<SessionRecord | null> {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
   try {
-    const restResult = await supabaseRest(`gh_sessions?token_hash=eq.${encodeURIComponent(tokenHash)}&select=*&limit=1`, { method: "GET", body: undefined, timeoutMs: 10000 })
-    const res = { ok: restResult.ok, status: restResult.status, json: async () => restResult.ok ? restResult.data : restResult.body, text: async () => JSON.stringify(restResult.ok ? restResult.data : restResult.body) }
+    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_sessions?token_hash=eq.${encodeURIComponent(tokenHash)}&select=*&limit=1`
+    const res = await fetch(url, {
+      headers: {
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    })
     if (!res.ok) return null
     const rows = (await res.json()) as DbRow[]
     if (!Array.isArray(rows) || !rows[0]) return null
@@ -225,8 +219,18 @@ async function dbPatch(
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return false
   try {
-    const restResult = await supabaseRest(`gh_sessions?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch), timeoutMs: 10000 })
-    const res = { ok: restResult.ok, status: restResult.status, json: async () => restResult.ok ? restResult.data : restResult.body, text: async () => JSON.stringify(restResult.ok ? restResult.data : restResult.body) }
+    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_sessions?id=eq.${encodeURIComponent(id)}`
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(patch),
+      cache: "no-store",
+    })
     return res.ok
   } catch {
     return false
@@ -272,31 +276,30 @@ export async function createSession(input: {
     }
   }
 
-  // Atomic durable issuance is opt-in until its held SQL proposal has been
-  // rehearsed and applied. Existing deployments retain the proven REST path.
-  const atomicSessionCapEnabled = process.env.GHC_ATOMIC_SESSION_CAP_RPC_ENABLED === "1"
-  if (!dbConfigured()) {
-    const active = [...memByHash.values()].filter((session) => session.ghUserId === ghUserId && session.revokedAt == null && !isExpired(session))
+  // Phase 4: enforce concurrent session ceiling (oldest active first)
+  {
+    const active = (await listSessionsForUser(ghUserId)).filter(
+      (s) => s.revokedAt == null && !isExpired(s)
+    )
     if (active.length >= SESSION_MAX_ACTIVE_PER_USER) {
-      const overflow = active.sort((a, b) => a.lastSeenAt - b.lastSeenAt).slice(0, active.length - SESSION_MAX_ACTIVE_PER_USER + 1)
+      const overflow = active
+        .slice()
+        .sort((a, b) => a.lastSeenAt - b.lastSeenAt)
+        .slice(0, Math.max(0, active.length - SESSION_MAX_ACTIVE_PER_USER + 1))
       for (const old of overflow) {
+        if (dbConfigured()) {
+          const persisted = await dbPatch(old.id, { revoked_at: new Date(t).toISOString() })
+          if (!persisted) throw new Error("SESSION_REVOCATION_UNAVAILABLE")
+        }
         const revoked = { ...old, revokedAt: t }
         memById.set(old.id, revoked)
         memByHash.set(old.tokenHash, revoked)
       }
-    }
-  } else if (!atomicSessionCapEnabled) {
-    const active = (await listSessionsForUser(ghUserId)).filter((session) => session.revokedAt == null && !isExpired(session))
-    if (active.length >= SESSION_MAX_ACTIVE_PER_USER) {
-      const overflow = active.slice().sort((a, b) => a.lastSeenAt - b.lastSeenAt).slice(0, active.length - SESSION_MAX_ACTIVE_PER_USER + 1)
-      for (const old of overflow) {
-        const persisted = await dbPatch(old.id, { revoked_at: new Date(t).toISOString() })
-        if (!persisted) throw new Error("SESSION_REVOCATION_UNAVAILABLE")
-        const revoked = { ...old, revokedAt: t }
-        memById.set(old.id, revoked)
-        memByHash.set(old.tokenHash, revoked)
-      }
-      console.info("[session] SESSION_CAP_ENFORCED", { userId: ghUserId, revoked: overflow.length, cap: SESSION_MAX_ACTIVE_PER_USER })
+      console.info("[session] SESSION_CAP_ENFORCED", {
+        userId: ghUserId,
+        revoked: overflow.length,
+        cap: SESSION_MAX_ACTIVE_PER_USER,
+      })
     }
   }
 
@@ -328,8 +331,7 @@ export async function createSession(input: {
       throw new Error("SESSION_DURABILITY_UNAVAILABLE")
     }
   } else {
-    const ok = atomicSessionCapEnabled ? await dbIssueWithCap(rec) : await dbInsert(rec)
-    if (ok && atomicSessionCapEnabled) console.info("[session] SESSION_CAP_ENFORCED", { userId: ghUserId, cap: SESSION_MAX_ACTIVE_PER_USER })
+    const ok = await dbInsert(rec)
     if (!ok) {
       if (isProd) {
         console.error("[session] durable insert failed; refusing memory session in production")
@@ -452,12 +454,19 @@ export async function revokeAllSessionsForUser(ghUserId: string): Promise<number
       throw new Error("SESSION_REVOCATION_UNAVAILABLE")
     }
     try {
-      const result = await supabaseRest(`gh_sessions?gh_user_id=eq.${encodeURIComponent(uid)}&revoked_at=is.null`, {
+      const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_sessions?gh_user_id=eq.${encodeURIComponent(uid)}&revoked_at=is.null`
+      const response = await fetch(url, {
         method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: env.supabaseServiceRoleKey,
+          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+          Prefer: "return=minimal",
+        },
         body: JSON.stringify({ revoked_at: new Date(t).toISOString() }),
-        timeoutMs: 10_000,
+        cache: "no-store",
       })
-      if (!result.ok) throw new Error("durable revoke returned non-success")
+      if (!response.ok) throw new Error("durable revoke returned non-success")
     } catch {
       // Do not mutate the local cache or claim success if the shared store did
       // not confirm revocation. Other app instances rely on this durable state.
@@ -563,8 +572,15 @@ async function dbListByUser(ghUserId: string): Promise<SessionRecord[]> {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return []
   try {
-    const restResult = await supabaseRest(`gh_sessions?gh_user_id=eq.${encodeURIComponent(ghUserId)}&order=last_seen_at.desc&select=id,token_hash,gh_user_id,created_at,last_seen_at,expires_at,absolute_expires_at,revoked_at,user_agent_hash,meta&limit=50`, { method: "GET", body: undefined, timeoutMs: 10000 })
-    const res = { ok: restResult.ok, status: restResult.status, json: async () => restResult.ok ? restResult.data : restResult.body, text: async () => JSON.stringify(restResult.ok ? restResult.data : restResult.body) }
+    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_sessions?gh_user_id=eq.${encodeURIComponent(ghUserId)}&order=last_seen_at.desc&select=id,token_hash,gh_user_id,created_at,last_seen_at,expires_at,absolute_expires_at,revoked_at,user_agent_hash,meta&limit=50`
+    const res = await fetch(url, {
+      headers: {
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    })
     if (!res.ok) return []
     const rows = (await res.json()) as DbRow[]
     if (!Array.isArray(rows)) return []

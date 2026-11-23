@@ -5,7 +5,6 @@
 
 import { randomBytes } from "crypto"
 import { readGhcServerEnv, hasPrivilegedDatabase } from "@/lib/server/economy/env"
-import { supabaseRest } from "@/lib/server/supabase/rest-client"
 
 export type StoredCredential = {
   id: string
@@ -216,9 +215,14 @@ async function dbInsertChallenge(rec: StoredChallenge) {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return
   try {
-    await supabaseRest("gh_webauthn_challenges", {
+    await fetch(`${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_webauthn_challenges`, {
       method: "POST",
-      headers: { Prefer: "return=minimal" },
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        Prefer: "return=minimal",
+      },
       body: JSON.stringify({
         id: rec.id,
         gh_user_id: rec.ghUserId,
@@ -226,9 +230,8 @@ async function dbInsertChallenge(rec: StoredChallenge) {
         challenge: rec.challenge,
         purpose: rec.purpose,
         expires_at: new Date(rec.expiresAt).toISOString(),
-        used_at: rec.usedAt == null ? null : new Date(rec.usedAt).toISOString(),
       }),
-      timeoutMs: 15_000,
+      cache: "no-store",
     })
   } catch {
     /* */
@@ -243,8 +246,14 @@ async function dbFindChallenge(input: {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
   try {
-    const restResult = await supabaseRest(`gh_webauthn_challenges?gh_user_id=eq.${encodeURIComponent(input.ghUserId)}&purpose=eq.${encodeURIComponent(input.purpose)}&challenge=eq.${encodeURIComponent(input.challenge)}&used_at=is.null&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&limit=1&select=*`, { method: "GET", timeoutMs: 10000 })
-    const res = { ok: restResult.ok, status: restResult.status, json: async () => restResult.ok ? restResult.data : restResult.body, text: async () => JSON.stringify(restResult.ok ? restResult.data : restResult.body) }
+    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_webauthn_challenges?gh_user_id=eq.${encodeURIComponent(input.ghUserId)}&purpose=eq.${encodeURIComponent(input.purpose)}&challenge=eq.${encodeURIComponent(input.challenge)}&used_at=is.null&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&limit=1&select=*`
+    const res = await fetch(url, {
+      headers: {
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      cache: "no-store",
+    })
     if (!res.ok) return null
     const rows = (await res.json()) as Array<Record<string, unknown>>
     if (!rows?.[0]) return null
@@ -267,11 +276,19 @@ async function dbMarkChallengeUsed(id: string) {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return
   try {
-    await supabaseRest(`gh_webauthn_challenges?id=eq.${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      body: JSON.stringify({ used_at: new Date().toISOString() }),
-      timeoutMs: 15_000,
-    })
+    await fetch(
+      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_webauthn_challenges?id=eq.${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: env.supabaseServiceRoleKey,
+          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        },
+        body: JSON.stringify({ used_at: new Date().toISOString() }),
+        cache: "no-store",
+      }
+    )
   } catch {
     /* */
   }
@@ -281,9 +298,14 @@ async function dbInsertCredential(rec: StoredCredential) {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return
   try {
-    await supabaseRest("gh_webauthn_credentials", {
+    await fetch(`${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_webauthn_credentials`, {
       method: "POST",
-      headers: { Prefer: "return=minimal" },
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        Prefer: "return=minimal",
+      },
       body: JSON.stringify({
         id: rec.id,
         gh_user_id: rec.ghUserId,
@@ -295,10 +317,8 @@ async function dbInsertCredential(rec: StoredCredential) {
         backed_up: rec.backedUp,
         label: rec.label,
         created_at: new Date(rec.createdAt).toISOString(),
-        last_used_at: rec.lastUsedAt == null ? null : new Date(rec.lastUsedAt).toISOString(),
-        revoked_at: rec.revokedAt == null ? null : new Date(rec.revokedAt).toISOString(),
       }),
-      timeoutMs: 15_000,
+      cache: "no-store",
     })
   } catch {
     /* */
@@ -312,7 +332,7 @@ async function dbListCredentials(
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return []
   try {
-    let url = `gh_webauthn_credentials?gh_user_id=eq.${encodeURIComponent(ghUserId)}&select=*&order=created_at.desc`
+    let url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_webauthn_credentials?gh_user_id=eq.${encodeURIComponent(ghUserId)}&select=*&order=created_at.desc`
     if (!includeRevoked) url += "&revoked_at=is.null"
     const res = await fetch(url, {
       headers: {
@@ -346,8 +366,14 @@ async function dbGetCredential(credentialId: string): Promise<StoredCredential |
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
   try {
-    const restResult = await supabaseRest(`gh_webauthn_credentials?credential_id=eq.${encodeURIComponent(credentialId)}&revoked_at=is.null&limit=1&select=*`, { method: "GET", timeoutMs: 10000 })
-    const res = { ok: restResult.ok, status: restResult.status, json: async () => restResult.ok ? restResult.data : restResult.body, text: async () => JSON.stringify(restResult.ok ? restResult.data : restResult.body) }
+    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_webauthn_credentials?credential_id=eq.${encodeURIComponent(credentialId)}&revoked_at=is.null&limit=1&select=*`
+    const res = await fetch(url, {
+      headers: {
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      cache: "no-store",
+    })
     if (!res.ok) return null
     const rows = (await res.json()) as Array<Record<string, unknown>>
     if (!rows?.[0]) return null
@@ -375,11 +401,22 @@ async function dbUpdateCounter(credentialId: string, counter: number) {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return
   try {
-    await supabaseRest(`gh_webauthn_credentials?credential_id=eq.${encodeURIComponent(credentialId)}`, {
-      method: "PATCH",
-      body: JSON.stringify({ counter, last_used_at: new Date().toISOString() }),
-      timeoutMs: 15_000,
-    })
+    await fetch(
+      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_webauthn_credentials?credential_id=eq.${encodeURIComponent(credentialId)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: env.supabaseServiceRoleKey,
+          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        },
+        body: JSON.stringify({
+          counter,
+          last_used_at: new Date().toISOString(),
+        }),
+        cache: "no-store",
+      }
+    )
   } catch {
     /* */
   }
@@ -389,11 +426,19 @@ async function dbRevoke(id: string) {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return
   try {
-    await supabaseRest(`gh_webauthn_credentials?id=eq.${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      body: JSON.stringify({ revoked_at: new Date().toISOString() }),
-      timeoutMs: 15_000,
-    })
+    await fetch(
+      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_webauthn_credentials?id=eq.${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: env.supabaseServiceRoleKey,
+          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        },
+        body: JSON.stringify({ revoked_at: new Date().toISOString() }),
+        cache: "no-store",
+      }
+    )
   } catch {
     /* */
   }

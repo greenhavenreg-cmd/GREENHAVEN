@@ -31,7 +31,6 @@ import {
   ArrowDown,
   Store,
   RefreshCw,
-  MoreHorizontal,
 } from "lucide-react"
 import {
   notificationSystem,
@@ -46,7 +45,6 @@ import {
   navigateNotificationDeepLink,
   type NotificationCenterBucket,
 } from "@/lib/notification-center"
-import { isSafeInternalNotificationPath } from "@/lib/notification-targets"
 import { useRegionalContext } from "@/contexts/regional-context"
 import { getSocialMessage as socialText } from "@/lib/i18n/social"
 import { useLiveNow } from "@/hooks/use-live-now"
@@ -230,7 +228,7 @@ export function NotificationBell({
           socialRes?.json().catch(() => ({})) || {},
           announcementsRes?.json().catch(() => ({})) || {},
         ]) as [
-          { ok?: boolean; durable?: boolean; notifications?: Array<{ id?: string; type?: string; title?: string; body?: string; createdAt?: string; readAt?: string | null; actorUserId?: string; sourceId?: string; sourceType?: string; metadata?: Record<string, unknown>; correlationId?: string | null; requestId?: string | null }> },
+          { ok?: boolean; durable?: boolean; notifications?: Array<{ id?: string; type?: string; title?: string; body?: string; createdAt?: string; readAt?: string | null; actorUserId?: string; sourceId?: string; sourceType?: string; metadata?: Record<string, unknown>; correlationId?: string | null }> },
           { ok?: boolean; items?: Array<{ id?: string; eventType?: string; title?: string; body?: string; createdAt?: number; readAt?: number | string | null; referenceId?: string; requestId?: string; metadata?: Record<string, unknown> }> },
           { ok?: boolean; durable?: boolean; notifications?: Array<{ id?: string; type?: string; title?: string; body?: string; createdAt?: string | number; readAt?: string | null; actorUserId?: string; sourceId?: string; sourceType?: string; metadata?: Record<string, unknown>; correlationId?: string | null; entityType?: string; entityId?: string; requestId?: string }> },
           { ok?: boolean; announcements?: Array<{ id?: string; title?: string; body?: string; severity?: string; actionPath?: string | null; publishedAt?: number; read?: boolean }>; unreadCount?: number },
@@ -257,16 +255,12 @@ export function NotificationBell({
           const open = typeof meta.open === "string" ? meta.open : undefined
           const type: NotificationType =
             /message|chat/i.test(eventType) || open === "messages" ? "message" :
-            /marketplace.*comment|listing.*response/i.test(eventType) ? "marketplace_comment" :
-            /marketplace.*listing|listing.*published|listing_created/i.test(eventType) ? "marketplace_listing" :
-            /marketplace.*order|order.*marketplace|marketplace.*payment|payment.*marketplace|order_updated|order_paid|order_response|fulfil|purchase/i.test(eventType) ? "marketplace_order" :
-            /ghc_sent|transfer_out/i.test(eventType) ? "ghc_sent" :
-            /ghc_received|transfer_in/i.test(eventType) ? "ghc_received" :
-            /payment|^pi_/i.test(eventType) ? "payment" :
             /reward|claim|streak/i.test(eventType) ? "reward" :
+            /ghc|transfer|payment/i.test(eventType) ? "ghc_received" :
             /follow|connection|friend/i.test(eventType) ? "friend_request" :
             /like|curation|upvote|downvote/i.test(eventType) ? "like" :
-            /comment|reply|mention/i.test(eventType) ? "comment" : "system"
+            /comment|reply|mention/i.test(eventType) ? "comment" :
+            /marketplace|order|listing/i.test(eventType) ? "marketplace_order" : "system"
           return {
             id: String(n.id || ""), type,
             title: String(n.title || "Activity"), message: String(n.body || ""),
@@ -274,17 +268,13 @@ export function NotificationBell({
             timestamp: n.createdAt ? new Date(n.createdAt).getTime() : Date.now(),
             read: Boolean(n.readAt),
             data: {
-              ...meta, durable: true, sourceStore: "unified", source: n.sourceType,
-              actorUserId: n.actorUserId, sourceId: n.sourceId, sourceType: n.sourceType,
-              entityType: meta.entityType || n.sourceType, entityId: meta.entityId || n.sourceId,
+              ...meta, durable: true, actorUserId: n.actorUserId, sourceId: n.sourceId, sourceType: n.sourceType,
               postId, commentId, conversationId,
-              transactionId: meta.transactionId || meta.txId,
-              paymentIntentId: meta.paymentIntentId || meta.intentId || meta.paymentId,
-              requestId: (typeof meta.requestId === 'string' ? meta.requestId : n.requestId),
-              referenceId: meta.referenceId || (n.sourceType === "economy" ? n.sourceId : undefined),
+              transactionId: meta.transactionId,
+              requestId: (typeof meta.requestId === 'string' ? meta.requestId : undefined),
               fromUserId: n.actorUserId, userId: meta.userId || n.actorUserId,
               open: open || (type === "message" ? "messages" : undefined),
-              eventType, socialType: eventType, correlationId: n.correlationId,
+              correlationId: n.correlationId,
             },
           }
         })
@@ -343,7 +333,6 @@ export function NotificationBell({
             data: {
               ...meta,
               durable: true,
-              sourceStore: "social",
               actorUserId: row.actorUserId || n.actorUserId,
               entityId: entityId || undefined,
               entityType: entityType || undefined,
@@ -384,13 +373,8 @@ export function NotificationBell({
             read: Boolean(n.readAt),
             data: {
               durableEconomy: true,
-              sourceStore: "economy",
               eventType,
               referenceId: n.referenceId,
-              transactionId: (n.metadata?.transactionId as string | undefined) || n.referenceId,
-              paymentIntentId: n.metadata?.paymentIntentId as string | undefined,
-              rewardId: n.metadata?.rewardId as string | undefined,
-              claimId: n.metadata?.claimId as string | undefined,
               requestId: n.requestId,
               ...(n.metadata || {}),
             },
@@ -398,15 +382,9 @@ export function NotificationBell({
         })
 
         const suppress = new Set([...blockedUsers, ...mutedUsers].map(String))
-        const unifiedAvailable = Boolean(unifiedRes?.ok && unifiedData.ok && Array.isArray(unifiedData.notifications))
-        // gh_notification_inbox is the canonical projection of social + economy rows.
-        // Fetch legacy feeds only as recovery lanes; merging all three duplicates every
-        // social/economy event because database projection triggers already mirror them.
-        const unifiedIds = new Set(mappedUnified.map((item) => item.id))
         const durableSocialVisible = mappedSocial.filter((n) => {
           const actor = String((n.data as { actorUserId?: string } | undefined)?.actorUserId || "")
-          const projectedId = `social_${n.id}`
-          return (!unifiedAvailable || !unifiedIds.has(projectedId)) && (!actor || !suppress.has(actor))
+          return !actor || !suppress.has(actor)
         })
         const mappedAnnouncements: Notification[] = announcementsRes?.ok && announcementsData.ok && Array.isArray(announcementsData.announcements)
           ? announcementsData.announcements.map((n) => ({
@@ -420,7 +398,7 @@ export function NotificationBell({
               data: { durableAnnouncement: true, announcementId: String(n.id || ""), actionPath: n.actionPath || undefined },
             })).filter((n) => Boolean((n.data as { announcementId?: string }).announcementId))
           : []
-        const durableEconomyVisible = mappedEconomy.filter((n) => !unifiedAvailable || !unifiedIds.has(`economy_${n.id}`))
+        const durableEconomyVisible = mappedEconomy
         setItems((prev) => {
           const localOnly = prev.filter((x) => {
             const d = x.data as { durable?: boolean; durableEconomy?: boolean } | undefined
@@ -663,75 +641,86 @@ export function NotificationBell({
       durableEconomy?: boolean
       durableAnnouncement?: boolean
       announcementId?: string
-      sourceStore?: "unified" | "social" | "economy"
-      sourceType?: string
+      socialType?: string
+      source?: string
     }
-    if (notificationData.durableAnnouncement && notificationData.announcementId) {
-      void fetch("/api/system/announcements", {
-        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: notificationData.announcementId }),
-      }).then((response) => {
-        if (!response?.ok) throw new Error("READ_STATE_FAILED")
-        window.dispatchEvent(new CustomEvent("ghc:notifications-read"))
-      }).catch(() => {
-        setItems((prev) => prev.map((item) => item.id === n.id ? { ...item, read: false } : item))
-        if (!n.read) setUnread((count) => count + 1)
-        setFailedActionId(n.id)
-        setStatusMsg("Could not save this read state. Please retry.")
-      })
-      return
-    }
-
-    const sourceStore = notificationData.sourceStore
-    const sourceType = String(notificationData.sourceType || "")
-    const unifiedId = n.id
-    const socialId = sourceStore === "unified" && unifiedId.startsWith("social_") ? unifiedId.slice(7) : unifiedId
-    const economyId = sourceStore === "unified" && unifiedId.startsWith("economy_") ? unifiedId.slice(8) : unifiedId
-    const requests: Promise<Response | null>[] = []
-    if (sourceStore === "unified") {
-      requests.push(fetch("/api/notifications", {
-        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "mark_read", ids: [unifiedId] }),
-      }).catch(() => null))
-      // Keep the legacy source read marker coherent as a fallback, but the unified
-      // projection remains the canonical state for the visible notification center.
-      if (sourceType === "social") requests.push(fetch("/api/social/notifications", {
-        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "mark_read", ids: [socialId] }),
-      }).catch(() => null))
-      if (sourceType === "economy") requests.push(fetch(`/api/economy/notifications/${encodeURIComponent(economyId)}/read`, {
-        method: "POST", credentials: "include", headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(10_000),
-      }).catch(() => null))
-    } else if (sourceStore === "social") {
-      requests.push(fetch("/api/social/notifications", {
-        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "mark_read", ids: [n.id] }),
-      }).catch(() => null))
-    } else if (sourceStore === "economy") {
-      requests.push(fetch(`/api/economy/notifications/${encodeURIComponent(n.id)}/read`, {
-        method: "POST", credentials: "include", headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(10_000),
-      }).catch(() => null))
-    }
-    if (requests.length) {
-      void Promise.all(requests).then((responses) => {
-        const canonicalFailed = !responses[0]?.ok
-        if (canonicalFailed) {
+    const looksSocial =
+      Boolean(notificationData.durable) ||
+      Boolean(notificationData.socialType) ||
+      notificationData.source === "social"
+    if (looksSocial && n.id) {
+      // Social durable inbox (recipient session-bound)
+      void Promise.all([
+        fetch("/api/social/notifications", {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "mark_read", ids: [n.id] }),
+        }).catch(() => null),
+        // Unified inbox path when present. Wait for both write attempts before
+        // notifying listeners, otherwise a fast refresh can restore the old badge.
+        fetch("/api/notifications", {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "mark_read", ids: [n.id] }),
+        }).catch(() => null),
+      ]).then((responses) => {
+        const failed = responses.some((response) => !response || !response.ok)
+        if (failed) {
           setItems((prev) => prev.map((item) => item.id === n.id ? { ...item, read: false } : item))
           if (!n.read) setUnread((count) => count + 1)
           setFailedActionId(n.id)
           setStatusMsg("Could not save this read state. Please retry.")
-        } else if (responses.slice(1).some((response) => !response?.ok)) {
-          setStatusMsg("Read state saved. Legacy notification sync will retry on refresh.")
         }
         window.dispatchEvent(new CustomEvent("ghc:notifications-read"))
       })
+    } else if (notificationData.durableAnnouncement && notificationData.announcementId) {
+      void fetch("/api/system/announcements", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: notificationData.announcementId }),
+      })
+        .then((response) => {
+          if (!response?.ok) {
+            setItems((prev) => prev.map((item) => item.id === n.id ? { ...item, read: false } : item))
+            if (!n.read) setUnread((count) => count + 1)
+            setFailedActionId(n.id)
+            setStatusMsg("Could not save this read state. Please retry.")
+          }
+          window.dispatchEvent(new CustomEvent("ghc:notifications-read"))
+        })
+        .catch(() => {
+          setItems((prev) => prev.map((item) => item.id === n.id ? { ...item, read: false } : item))
+          if (!n.read) setUnread((count) => count + 1)
+          setFailedActionId(n.id)
+          setStatusMsg("Could not save this read state. Please retry.")
+        })
+    } else if (notificationData.durableEconomy && n.id) {
+      void fetch(`/api/economy/notifications/${encodeURIComponent(n.id)}/read`, {
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(10_000),
+      })
+        .then((response) => {
+          if (!response?.ok) {
+            setItems((prev) => prev.map((item) => item.id === n.id ? { ...item, read: false } : item))
+            if (!n.read) setUnread((count) => count + 1)
+            setFailedActionId(n.id)
+            setStatusMsg("Could not save this read state. Please retry.")
+          }
+          window.dispatchEvent(new CustomEvent("ghc:notifications-read"))
+        })
+        .catch(() => {
+          setItems((prev) => prev.map((item) => item.id === n.id ? { ...item, read: false } : item))
+          if (!n.read) setUnread((count) => count + 1)
+          setFailedActionId(n.id)
+          setStatusMsg("Could not save this read state. Please retry.")
+        })
     }
-
   }
 
-  /** Secondary details action; the primary notification tap opens its exact target. */
+  /** Tap opens detail + channel history (like DM thread). Navigate via Open action. */
   const onTap = (n: Notification) => {
     markOneRead(n)
     setExpandedId(n.id)
@@ -740,9 +729,13 @@ export function NotificationBell({
 
   const openTarget = (n: Notification) => {
     markOneRead(n)
-    const notificationData = (n.data || {}) as { actionPath?: string; durableAnnouncement?: boolean }
+    const notificationData = (n.data || {}) as { actionPath?: string }
     const link = resolveNotificationDeepLink(n)
-    if (notificationData.durableAnnouncement && isSafeInternalNotificationPath(notificationData.actionPath)) {
+    if (
+      notificationData.actionPath &&
+      notificationData.actionPath.startsWith("/") &&
+      !notificationData.actionPath.startsWith("//")
+    ) {
       window.location.assign(notificationData.actionPath)
     } else {
       navigateNotificationDeepLink(link)
@@ -778,11 +771,6 @@ export function NotificationBell({
     try {
       window.dispatchEvent(new CustomEvent("ghc:notifications-changed", { detail: { unread: 0 } }))
     } catch { /* */ }
-    const legacyEconomyIds: string[] = Array.from(new Set<string>(items.flatMap((item): string[] => {
-      const data = (item.data || {}) as { sourceStore?: string; sourceType?: string }
-      if (data.sourceStore !== "economy" && !(data.sourceStore === "unified" && data.sourceType === "economy")) return []
-      return [String(item.id).replace(/^economy_/, "")]
-    })))
     const results = await Promise.all([
       fetch("/api/social/notifications", {
         method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
@@ -792,10 +780,9 @@ export function NotificationBell({
         method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ markAll: true }),
       }).catch(() => null),
-      ...legacyEconomyIds.map((id) => fetch(`/api/economy/notifications/${encodeURIComponent(id)}/read`, {
+      fetch("/api/economy/notifications/read-all", {
         method: "POST", credentials: "include", headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(10_000),
-      }).catch(() => null)),
+      }).catch(() => null),
       fetch("/api/system/announcements", {
         method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ markAll: true }),
@@ -837,7 +824,7 @@ export function NotificationBell({
 
       {open && typeof document !== "undefined"
         ? createPortal(
-        <div ref={dialogRef} className="gh-world-notifications fixed inset-0 z-[200] isolate" data-gh-module="notifications" role="dialog" aria-modal="true" aria-label={t("notifications")}>
+        <div ref={dialogRef} className="gh-world-notifications fixed inset-0 z-[200] isolate" role="dialog" aria-modal="true" aria-label={t("notifications")}>
           <button type="button" data-dialog-dismiss="true" className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" aria-label={t("closeNotifications")} onClick={closePanel} />
           <div className="absolute inset-0 flex flex-col bg-background sm:inset-x-auto sm:left-1/2 sm:top-0 sm:h-full sm:w-full sm:max-w-[28rem] sm:-translate-x-1/2 sm:border-x sm:border-border sm:shadow-2xl">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border/50 bg-background/95 px-4 py-3.5 backdrop-blur-xl">
@@ -1149,12 +1136,10 @@ export function NotificationBell({
                     const n = th.latest
                     return (
                     <li key={th.channelKey}>
-                      <div className="group flex w-full items-stretch gap-1 transition hover:bg-muted/45">
                       <button
                         type="button"
-                        onClick={() => openTarget(n)}
-                        aria-label={`Open ${n.title}`}
-                        className={`flex min-w-0 flex-1 items-start gap-3 px-4 py-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 ${
+                        onClick={() => onTap(n)}
+                        className={`group flex w-full items-start gap-3 px-4 py-4 text-left transition hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 ${
                           th.unreadCount > 0 ? "bg-primary/[0.045]" : ""
                         }`}
                       >
@@ -1188,16 +1173,6 @@ export function NotificationBell({
                           </span>
                         ) : null}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => onTap(n)}
-                        aria-label={`Notification details and history for ${n.title}`}
-                        title="Details and history"
-                        className="mr-2 mt-3 flex h-9 w-9 shrink-0 items-center justify-center self-start rounded-full text-muted-foreground opacity-70 transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary/40 sm:opacity-0 sm:group-hover:opacity-100"
-                      >
-                        <MoreHorizontal size={17} />
-                      </button>
-                      </div>
                     </li>
                     )
                   })}

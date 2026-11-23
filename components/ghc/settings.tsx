@@ -1195,44 +1195,33 @@ export function SettingsScreen({
               const inAppOn = categoryPrefs.length ? categoryPrefs.every((prefs) => Boolean(prefs.inApp)) : (typeof raw === "boolean" ? raw : t.defaultOn)
               const browserOn = categoryPrefs.length ? categoryPrefs.every((prefs) => Boolean(prefs.push)) : false
               const updateChannel = (channel: "inApp" | "push", enabled: boolean) => {
-                // Capture the owner at interaction time. Permission prompts and network
-                // requests can outlive an account switch; never apply their result to
-                // the newly active account's Settings state.
-                const owner = notificationIdentityId
-                if (!owner || owner !== IdentityService.getCurrentUserId()) return
                 if (channel === "push" && enabled && browserPermission !== "granted") {
                   void ensureBrowserNotificationPermission().then((ok) => {
                     setBrowserPermission(typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported")
-                    if (!ok || IdentityService.getCurrentUserId() !== owner) return
-                    const next = { ...loadNotificationPreferences(owner) }
+                    if (!ok) return
+                    const next = { ...notificationPrefs }
                     for (const category of t.categories) next[category] = { ...next[category], push: true }
                     setNotificationPrefs(next)
-                    saveNotificationPreferences(next, owner)
+                    saveNotificationPreferences(next, notificationIdentityId)
                   })
                   return
                 }
                 const next = { ...notificationPrefs }
                 for (const category of t.categories) next[category] = { ...next[category], [channel]: enabled }
-                if (IdentityService.getCurrentUserId() !== owner) return
                 setNotificationPrefs(next)
-                saveNotificationPreferences(next, owner)
+                saveNotificationPreferences(next, notificationIdentityId)
                 if (channel === "inApp") {
                   void handleSelect(t.key as never, enabled as never)
-                  const authHeaders = IdentityService.getAuthHeaders()
                   void fetch("/api/notifications/preferences", {
                     method: "PATCH",
-                    headers: { "Content-Type": "application/json", ...authHeaders },
+                    headers: { "Content-Type": "application/json", ...IdentityService.getAuthHeaders() },
                     body: JSON.stringify({ preferences: serializeAccountNotificationPreferences(next) }),
                   }).then(async (response) => {
                     const body = await response.json().catch(() => null)
-                    if (IdentityService.getCurrentUserId() !== owner) return
                     if (!response.ok || body?.ok !== true || body?.durable !== true) {
                       window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "In-app preference saved on this device; account sync is unavailable", type: "info" } }))
                     }
-                  }).catch(() => {
-                    if (IdentityService.getCurrentUserId() !== owner) return
-                    window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "In-app preference saved locally; account sync will retry when online", type: "info" } }))
-                  })
+                  }).catch(() => window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "In-app preference saved locally; account sync will retry when online", type: "info" } })))
                 }
               }
               return (
@@ -1594,7 +1583,7 @@ export function SettingsScreen({
   ]
 
   return (
-    <div className="gh-world-settings flex h-full min-h-0 flex-col bg-background" data-gh-module="settings" role="region" aria-label={msg("settingsTitle")}>
+    <div className="gh-world-settings flex h-full min-h-0 flex-col bg-background" role="region" aria-label={msg("settingsTitle")}>
       <div className="flex shrink-0 items-center gap-3 border-b border-border/50 bg-card/95 p-4 backdrop-blur-md">
         <button
           type="button"
@@ -1631,7 +1620,7 @@ export function SettingsScreen({
         <div className="space-y-5 px-4 py-4">
           {!settingsQuery.trim() ? (
             <section aria-labelledby="settings-overview-title" className="space-y-3">
-              <div className="rounded-[1.35rem] border border-[var(--gh-ref-line)] bg-card p-4 shadow-[var(--gh-card-shadow)]">
+              <div className="rounded-[1.5rem] border border-border/60 bg-gradient-to-br from-primary/10 via-card to-card p-4 shadow-[var(--gh-card-shadow)]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Your control centre</p>

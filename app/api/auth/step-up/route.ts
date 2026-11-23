@@ -35,7 +35,6 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function POST(request: Request) {
-  let rotatedSession: Awaited<ReturnType<typeof rotateSession>> = null
   try {
     pruneRateLimitBuckets()
 
@@ -130,34 +129,40 @@ export async function POST(request: Request) {
       )
     }
 
-    // Rotate before issuing the proof. A step-up must never remain bound to the
-    // pre-rotation token if the session-token replacement cannot be persisted.
-    const raw = extractSessionTokenFromCookie(request.headers)
-    if (!raw) {
-      return NextResponse.json({ ok: false, error: "SESSION_REQUIRED" }, { status: 403, headers: { "Cache-Control": "no-store" } })
-    }
-    rotatedSession = await rotateSession({ rawToken: raw, userAgent: request.headers.get("user-agent") })
-    if (!rotatedSession) {
-      return NextResponse.json({ ok: false, error: "SESSION_ROTATION_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store" } })
-    }
-
-    // The new proof is bound to the rotated session. If durable proof storage
-    // fails, the catch below still returns the replacement cookie without elevation.
     const record = await createStepUp({
       ghUserId: auth.userId,
-      sessionId: rotatedSession.record.id,
+      sessionId: auth.sessionId,
       authMethod: "pi_fresh_auth",
     })
+
+    // Phase 4: rotate session token after successful step-up so a stolen pre-step-up
+    // cookie cannot keep a long-lived elevated context.
     const res = NextResponse.json(
       {
         ok: true,
-        stepUp: { expiresAt: record.expiresAt, ttlMs: STEP_UP_TTL_MS, authMethod: record.authMethod },
-        sessionRotated: true,
+        stepUp: {
+          expiresAt: record.expiresAt,
+          ttlMs: STEP_UP_TTL_MS,
+          authMethod: record.authMethod,
+        },
+        sessionRotated: false as boolean,
       },
       { headers: { "Cache-Control": "no-store" } }
     )
-    res.headers.append("Set-Cookie", buildSessionCookieHeader(rotatedSession.rawToken))
-    console.info("[step-up] SESSION_ROTATED_AFTER_STEP_UP", { sessionId: rotatedSession.record.id.slice(0, 8) })
+    const raw = extractSessionTokenFromCookie(request.headers)
+    if (raw) {
+      const rotated = await rotateSession({
+        rawToken: raw,
+        userAgent: request.headers.get("user-agent"),
+      })
+      if (rotated) {
+        res.headers.append("Set-Cookie", buildSessionCookieHeader(rotated.rawToken))
+        // mutate JSON body flag via rewrite is awkward; log only — client refreshes session via /api/auth/session
+        console.info("[step-up] SESSION_ROTATED_AFTER_STEP_UP", {
+          sessionId: rotated.record.id.slice(0, 8),
+        })
+      }
+    }
     return res
   } catch (err) {
     console.error(
@@ -165,13 +170,9 @@ export async function POST(request: Request) {
       err instanceof Error ? err.message : "unknown"
     )
     const durabilityFailure = err instanceof Error && err.message === "STEP_UP_DURABILITY_UNAVAILABLE"
-    const response = NextResponse.json(
-      { ok: false, error: durabilityFailure ? "STEP_UP_DURABILITY_UNAVAILABLE" : "STEP_UP_FAILED", sessionRotated: Boolean(rotatedSession) },
+    return NextResponse.json(
+      { ok: false, error: durabilityFailure ? "STEP_UP_DURABILITY_UNAVAILABLE" : "STEP_UP_FAILED" },
       { status: durabilityFailure ? 503 : 500, headers: { "Cache-Control": "no-store" } }
     )
-    // Rotation invalidates the previous cookie. Preserve the new session even
-    // when the step-up proof write fails; no elevation is granted in that case.
-    if (rotatedSession) response.headers.append("Set-Cookie", buildSessionCookieHeader(rotatedSession.rawToken))
-    return response
   }
 }

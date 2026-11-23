@@ -34,28 +34,11 @@ export interface SavedCollection {
   createdAt: number
 }
 
-const COLLECTIONS_KEY_PREFIX = "ghc_save_collections_v2"
+const COLLECTIONS_KEY = "ghc_save_collections_v1"
 
-/** Keep device-local collection names and post references isolated by signed-in account. */
-function collectionsStorageKey(scopeId?: string): string {
-  const owner = String(scopeId || "guest").trim() || "guest"
-  // Avoid putting raw account identifiers in browser storage keys while keeping
-  // the namespace deterministic across renders and browser sessions.
-  let first = 0x811c9dc5
-  let second = 0x811c9dc5
-  for (let index = 0; index < owner.length; index += 1) {
-    const code = owner.charCodeAt(index)
-    first = Math.imul(first ^ code, 0x01000193)
-    second = Math.imul(second ^ (code + index), 0x01000193)
-  }
-  const scopeHash = `${(first >>> 0).toString(36)}${(second >>> 0).toString(36)}`
-  return `${COLLECTIONS_KEY_PREFIX}:${scopeHash}`
-}
-
-export function loadCollections(scopeId?: string): SavedCollection[] {
-  const storageKey = collectionsStorageKey(scopeId)
+export function loadCollections(): SavedCollection[] {
   try {
-    const raw = localStorage.getItem(storageKey)
+    const raw = localStorage.getItem(COLLECTIONS_KEY)
     if (!raw) {
       const seeded = DEFAULT_SAVE_COLLECTIONS.map((name, i) => ({
         id: `col_${i}`,
@@ -63,22 +46,10 @@ export function loadCollections(scopeId?: string): SavedCollection[] {
         postIds: [] as string[],
         createdAt: Date.now(),
       }))
-      localStorage.setItem(storageKey, JSON.stringify(seeded))
+      localStorage.setItem(COLLECTIONS_KEY, JSON.stringify(seeded))
       return seeded
     }
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) throw new Error("Invalid saved collections")
-    return parsed.filter((item): item is SavedCollection => {
-      if (!item || typeof item !== "object") return false
-      const candidate = item as Partial<SavedCollection>
-      return typeof candidate.id === "string" && typeof candidate.name === "string" &&
-        Array.isArray(candidate.postIds) && typeof candidate.createdAt === "number"
-    }).map((item) => ({
-      id: item.id.slice(0, 120),
-      name: item.name.trim().slice(0, 40),
-      postIds: Array.from(new Set(item.postIds.filter((id): id is string => typeof id === "string" && id.length > 0 && id.length <= 200))).slice(0, 5000),
-      createdAt: Number.isFinite(item.createdAt) && item.createdAt > 0 ? item.createdAt : Date.now(),
-    })).filter((item) => item.id && item.name)
+    return JSON.parse(raw)
   } catch {
     const seeded = DEFAULT_SAVE_COLLECTIONS.map((name, i) => ({
       id: `col_${i}`,
@@ -87,7 +58,7 @@ export function loadCollections(scopeId?: string): SavedCollection[] {
       createdAt: Date.now(),
     }))
     try {
-      localStorage.setItem(storageKey, JSON.stringify(seeded))
+      localStorage.setItem(COLLECTIONS_KEY, JSON.stringify(seeded))
     } catch {
       /* */
     }
@@ -95,15 +66,15 @@ export function loadCollections(scopeId?: string): SavedCollection[] {
   }
 }
 
-export function savePostToCollection(collectionId: string, postId: string, scopeId?: string): SavedCollection[] {
-  const cols = loadCollections(scopeId)
+export function savePostToCollection(collectionId: string, postId: string): SavedCollection[] {
+  const cols = loadCollections()
   const next = cols.map((c) =>
     c.id === collectionId
       ? { ...c, postIds: Array.from(new Set([postId, ...c.postIds])) }
       : c
   )
   try {
-    localStorage.setItem(collectionsStorageKey(scopeId), JSON.stringify(next))
+    localStorage.setItem(COLLECTIONS_KEY, JSON.stringify(next))
   } catch {
     /* */
   }
@@ -111,9 +82,9 @@ export function savePostToCollection(collectionId: string, postId: string, scope
 }
 
 
-export function createCollection(name: string, scopeId?: string): SavedCollection {
+export function createCollection(name: string): SavedCollection {
   const trimmed = String(name || "").trim().slice(0, 40)
-  const cols = loadCollections(scopeId)
+  const cols = loadCollections()
   if (!trimmed) {
     return cols[0] || { id: "col_0", name: "Later", postIds: [], createdAt: Date.now() }
   }
@@ -127,20 +98,20 @@ export function createCollection(name: string, scopeId?: string): SavedCollectio
   }
   const next = [col, ...cols]
   try {
-    localStorage.setItem(collectionsStorageKey(scopeId), JSON.stringify(next))
+    localStorage.setItem(COLLECTIONS_KEY, JSON.stringify(next))
   } catch {
     /* */
   }
   return col
 }
 
-export function removePostFromCollections(postId: string, scopeId?: string): SavedCollection[] {
-  const next = loadCollections(scopeId).map((c) => ({
+export function removePostFromCollections(postId: string): SavedCollection[] {
+  const next = loadCollections().map((c) => ({
     ...c,
     postIds: c.postIds.filter((id) => id !== postId),
   }))
   try {
-    localStorage.setItem(collectionsStorageKey(scopeId), JSON.stringify(next))
+    localStorage.setItem(COLLECTIONS_KEY, JSON.stringify(next))
   } catch {
     /* */
   }

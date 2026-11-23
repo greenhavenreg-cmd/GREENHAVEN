@@ -9,7 +9,6 @@
  */
 
 import { readGhcServerEnv } from "@/lib/server/economy/env"
-import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
 export type VerificationRequestType =
   | "identity"
@@ -128,7 +127,10 @@ async function rest<T>(
   }
   if (init.prefer) headers.Prefer = init.prefer
   try {
-    const res = await (async () => { const r = await supabaseRest(`${path}`, { method: "GET", timeoutMs: 15000 }); return { ok: r.ok, status: r.status, json: async () => r.ok ? r.data : r.body, text: async () => JSON.stringify(r.ok ? r.data : r.body) }; })()
+    const res = await fetch(`${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/${path}`, {
+      ...init,
+      headers: { ...headers, ...(init.headers as Record<string, string> | undefined) },
+    })
     const text = await res.text()
     let data: T | null = null
     if (text) {
@@ -145,7 +147,7 @@ async function rest<T>(
         data,
         error: typeof data === "object" && data && "message" in (data as object)
           ? String((data as { message?: string }).message)
-          : text.slice(0, 200) || `HTTP_${res.status}`,
+          : text.slice(0, 200) || res.statusText,
       }
     }
     return { ok: true, status: res.status, data }

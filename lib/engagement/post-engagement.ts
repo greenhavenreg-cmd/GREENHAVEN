@@ -15,8 +15,6 @@ export type PostEngagementDetail = {
   commentDelta?: number
   commentCount?: number
   saved?: boolean
-  /** Active viewer bookmark state; never a global save count. */
-  savedByMe?: boolean
   /** Authoritative like/reaction total when server returns it */
   likeCount?: number
   likedByMe?: boolean

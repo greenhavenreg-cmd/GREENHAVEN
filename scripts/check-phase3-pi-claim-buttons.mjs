@@ -2,7 +2,6 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { hasProjectDoc } from './lib/read-project-doc.mjs'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (f) => readFileSync(join(root, f), 'utf8')
 const card = read('components/ghc/registration-bonus-card.tsx')
@@ -21,7 +20,7 @@ const checks = [
   ['API ignores client amount', /Body ignored/.test(route)],
   ['API POST rate-limited', /reg-bonus-claim/.test(route)],
   ['migration-pending UI', /20261030010001_registration_bonus_v2_reconciliation/.test(card)],
-  ['phase 3 doc present', hasProjectDoc('docs/PHASE3_PI_CLAIM_BUTTONS.md')],
+  ['phase 3 doc present', existsSync(join(root, 'docs/PHASE3_PI_CLAIM_BUTTONS.md'))],
 ]
 let failed = 0
 for (const [label, ok] of checks) {

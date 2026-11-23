@@ -1,5 +1,4 @@
 import { addCalendarMonths, getMembershipGhcPrice, getMembershipPiPrice } from "@/lib/membership-pricing"
-import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 /**
  * Server-authoritative membership entitlements.
  * DATABASE is production authority. Memory is cache / Studio-only fallback.
@@ -123,7 +122,7 @@ export async function loadEntitlementFromDb(
   }
   const env = readGhcServerEnv()
   try {
-    const url = `ghc_membership_entitlements?user_id=eq.${encodeURIComponent(userId)}&select=*&limit=1`
+    const url = `${env.supabaseUrl!.replace(/\/$/, "")}/rest/v1/ghc_membership_entitlements?user_id=eq.${encodeURIComponent(userId)}&select=*&limit=1`
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 8_000)
     let res: Response
@@ -478,13 +477,20 @@ export async function listOrphanMembershipPurchaseCandidates(
     return { ok: false, candidates: [], error: "SERVER_UNAVAILABLE" }
   }
   try {
-    const result = await supabaseRpc<{ ok?: boolean; candidates?: unknown[]; error?: string }>(
-      "ghc_membership_list_orphan_purchase_candidates",
-      { p_limit: Math.min(100, Math.max(1, Math.trunc(Number(limit) || 50))) },
-      { timeoutMs: 15_000 },
+    const res = await fetch(
+      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_membership_list_orphan_purchase_candidates`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: env.supabaseServiceRoleKey,
+          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        },
+        body: JSON.stringify({ p_limit: limit }),
+      }
     )
-    const data = result.ok ? result.data : result.body as { ok?: boolean; candidates?: unknown[]; error?: string } | undefined
-    if (!result.ok || !data?.ok) {
+    const data = await res.json().catch(() => null)
+    if (!res.ok || !data?.ok) {
       return { ok: false, candidates: [], error: String(data?.error || "LIST_FAILED") }
     }
     return { ok: true, candidates: Array.isArray(data.candidates) ? data.candidates : [] }
@@ -511,18 +517,25 @@ export async function completeOrphanedMembershipPurchase(input: {
     return { ok: false, error: "SERVER_UNAVAILABLE" }
   }
   try {
-    const result = await supabaseRpc<{ ok?: boolean; error?: string; idempotent?: boolean }>(
-      "ghc_membership_complete_orphaned_purchase",
+    const res = await fetch(
+      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_membership_complete_orphaned_purchase`,
       {
-        p_user_id: input.userId,
-        p_reference_id: input.referenceId,
-        p_row: input.row,
-        p_operator_note: input.operatorNote || "ops_orphan_entitlement_complete",
-      },
-      { timeoutMs: 15_000 },
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: env.supabaseServiceRoleKey,
+          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        },
+        body: JSON.stringify({
+          p_user_id: input.userId,
+          p_reference_id: input.referenceId,
+          p_row: input.row,
+          p_operator_note: (input.operatorNote || "ops_orphan_entitlement_complete").slice(0, 160),
+        }),
+      }
     )
-    const data = result.ok ? result.data : result.body as { ok?: boolean; error?: string; idempotent?: boolean } | undefined
-    if (!result.ok || !data?.ok) {
+    const data = await res.json().catch(() => null)
+    if (!res.ok || !data?.ok) {
       return { ok: false, error: String(data?.error || "RECONCILE_FAILED") }
     }
     return { ok: true, idempotent: Boolean(data.idempotent) }

@@ -12,7 +12,7 @@ export const RESERVE_ON_ACCEPTED_PAYOUT_REQUEST = true
 export function humanizeReservationState(state: string | null | undefined): string {
   const s = String(state || "").toLowerCase()
   if (s === "reserved" || s === "pending_execution") {
-    return "Reserved for an open withdrawal request. Return reserved π is available only when provider execution never started. If a request may have reached Pi, its reservation stays protected until the provider outcome is reconciled."
+    return "Reserved for an open withdrawal request. It will return to available if the request fails or is cancelled by policy."
   }
   if (s === "available" || s === "eligible") {
     return "Available to withdraw (fees and limits still apply)."
@@ -22,8 +22,3 @@ export function humanizeReservationState(state: string | null | undefined): stri
   }
   return "Balance state from server; GreenHaven does not invent availability."
 }
-
-/** Incomplete reservations with no Pi payment evidence may be returned by the account holder. */
-export const SELF_SERVICE_RELEASE_INCOMPLETE_WITHOUT_PROVIDER_EVIDENCE = true
-/** Rows with provider_payment_id / provider_txid never self-release without reconcile. */
-export const FORCE_RELEASE_WITH_PROVIDER_EVIDENCE = false

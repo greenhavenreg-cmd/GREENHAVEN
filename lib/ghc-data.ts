@@ -1,4 +1,3 @@
-import { secureHex } from "./secure-id.ts"
 import { isDemoDataAllowed } from "@/lib/demo-data-policy"
 import type { Profile, Settings, Candidate, Post, StoryItem } from "./ghc-types"
 
@@ -438,7 +437,7 @@ export function timeAgo(timestamp: number): string {
 }
 
 export function generateId(): string {
-  return secureHex(8)
+  return Math.random().toString(36).substring(2, 11)
 }
 
 /** @deprecated Prefer purpose-aware helpers from @/lib/media/compress-image */

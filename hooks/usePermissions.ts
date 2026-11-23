@@ -63,10 +63,10 @@ export function usePermissions() {
     reportUser,
     reportPost,
     reportContent,
-  } = useGHC()
+  } = useGHC() as any
 
   const matchIds = useMemo(
-    () => matches.map((match) => match.userId),
+    () => (matches || []).map((m: { userId: string }) => m.userId),
     [matches]
   )
 
@@ -85,7 +85,7 @@ export function usePermissions() {
   const ctx: PermissionContext = useMemo(
     () =>
       buildPermissionContext({
-        currentUserId: profile.id,
+        currentUserId: "current-user",
         blockedUsers: graph.blockedUsers,
         followingIds: graph.followingIds,
         matchIds: graph.matchIds,

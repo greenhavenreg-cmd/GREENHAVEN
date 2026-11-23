@@ -1,10 +1,7 @@
 import { readGhcServerEnv } from "@/lib/server/economy/env"
-import { hashPushEndpoint } from "@/lib/server/notifications/push-hash"
 import { hasPushSubscriptionEncryptionKey, validateVapidConfiguration } from "@/lib/server/notifications/push-secrets"
-import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
-export { hashPushEndpoint }
-export { normalizePushCategoryPreferences, normalizePushDeviceId, normalizePushEndpoint, validatePushSubscription } from "@/lib/notification-push-contract"
+export { hashPushEndpoint, normalizePushCategoryPreferences, normalizePushDeviceId, normalizePushEndpoint, validatePushSubscription } from "@/lib/notification-push-contract"
 
 export function getWebPushConfiguration() {
   const env = readGhcServerEnv()
@@ -28,33 +25,22 @@ export function getWebPushConfiguration() {
   }
 }
 
-function isRpcRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-}
-
 export async function notificationPushRpc(name: string, body: Record<string, unknown>) {
   const env = readGhcServerEnv()
-  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
-    return { ok: false as const, data: null, error: "DB_UNAVAILABLE" }
-  }
-  const result = await supabaseRpc<unknown>(name, body, { timeoutMs: 15_000 })
-  if (!result.ok) {
-    return { ok: false as const, data: null, error: result.error || "PUSH_STORE_UNAVAILABLE" }
-  }
-  if (!isRpcRecord(result.data)) {
-    return { ok: false as const, data: null, error: "INVALID_PUSH_RPC_RESPONSE" }
-  }
-  const data = result.data
-  if (data.ok !== true) {
-    return {
-      ok: false as const,
-      data,
-      error: typeof data.error === "string" ? data.error : "PUSH_RPC_REJECTED",
-    }
-  }
-  return {
-    ok: true as const,
-    data,
-    error: typeof data.error === "string" ? data.error : undefined,
-  }
+  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return { ok: false, data: null as any, error: "DB_UNAVAILABLE" }
+  try {
+    const response = await fetch(`${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/${name}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    })
+    const data = await response.json().catch(() => null)
+    if (!response.ok) return { ok: false, data, error: `HTTP_${response.status}` }
+    return { ok: data?.ok !== false, data, error: data?.error ? String(data.error) : undefined }
+  } catch { return { ok: false, data: null as any, error: "RPC_FAILED" } }
 }

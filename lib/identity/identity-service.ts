@@ -3,9 +3,8 @@
  *
  * Production chain:
  *   Pi UID (verified access token on server)
- *     → immutable gh_pi_identities mapping
- *       → canonical GreenHaven user ID (independent internal UUID)
- *         → Profile / GHC account / Wallet
+ *     → GreenHaven user ID (same string as Pi UID when linked)
+ *       → Profile / GHC account / Wallet
  *
  * Studio/local may use "current-user" only when no Pi UID is available.
  * Never treat "current-user" as a production wallet or transfer party.
@@ -31,9 +30,8 @@ export type AccountStatus =
   | "suspended"
 
 export interface SessionIdentity {
-  /** Canonical internal GreenHaven user id from the durable identity mapping. */
+  /** Canonical app user id — prefer verified Pi app uid */
   userId: string
-  /** Pi authentication-provider subject; never a GreenHaven account ID. */
   piUserId: string | null
   username: string | null
   displayName: string | null
@@ -85,18 +83,18 @@ function emit() {
 }
 
 /**
- * Resolve the canonical GreenHaven account id from trusted application signals.
- * Pi UID is an authentication-provider subject, never an application account id.
- * It is intentionally excluded from this resolver; only the server-side verified
- * Pi→GH mapping may supply canonicalUserId.
+ * Resolve the canonical user id from available signals.
+ * Order: Pi UID → explicit profile id → local studio fallback.
  */
 export function resolveCanonicalUserId(input?: {
+  piUid?: string | null
   profileUserId?: string | null
   explicitUserId?: string | null
-  canonicalUserId?: string | null
 }): string {
+  // A newly verified Pi UID must outrank a previously cached explicit ID.
+  // Otherwise an account switch can accidentally keep the prior user's identity.
   const candidates = [
-    input?.canonicalUserId,
+    input?.piUid,
     input?.explicitUserId,
     input?.profileUserId,
   ]
@@ -140,12 +138,7 @@ export const IdentityService = {
     return false
   },
 
-  /**
-   * Transitional lookup aliases for legacy rows written with Pi UIDs.
-   * The first item is always the canonical GreenHaven account ID. This list is
-   * a compatibility aid only and must never authorize server-side ownership,
-   * wallet, payout, or financial operations.
-   */
+  /** Alias list for ownership and graph filters (userId + piUserId). */
   getIdentityAliases(): string[] {
     const out: string[] = []
     const seen = new Set<string>()
@@ -183,9 +176,7 @@ export const IdentityService = {
   },
 
   isProductionIdentity(): boolean {
-    return !identity.isLocalStudioId &&
-      Boolean(identity.piUserId) &&
-      identity.verificationState === "server_verified"
+    return !identity.isLocalStudioId && Boolean(identity.piUserId)
   },
 
   /**
@@ -193,10 +184,7 @@ export const IdentityService = {
    * Prefer Pi UID as the permanent userId when present.
    */
   setFromPi(input: {
-    /** App-specific Pi UID returned by Pi.authenticate / verified /v2/me mapping. */
     uid?: string | null
-    /** Canonical internal GH user ID returned by POST /api/auth/pi. */
-    canonicalUserId?: string | null
     username?: string | null
     displayName?: string | null
     accessToken?: string | null
@@ -204,65 +192,37 @@ export const IdentityService = {
     /** From POST /api/auth/pi — false for returning Pioneers who finished GH onboarding */
     needsOnboarding?: boolean
   }): SessionIdentity {
-    const hasUid = Object.prototype.hasOwnProperty.call(input, "uid")
     const piUid = String(input.uid || "").trim() || null
-    const canonicalUserId = String(input.canonicalUserId || "").trim() || null
-    const accountChanged =
-      (hasUid && piUid !== identity.piUserId) ||
-      Boolean(canonicalUserId && !isStudioPlaceholderId(identity.userId) && canonicalUserId !== identity.userId)
-    // Never carry a previous account's bearer token, profile labels, onboarding
-    // state or verification status across an account switch.
-    const base = accountChanged ? defaultIdentity() : identity
-    // A Pi SDK UID alone is not a GreenHaven account identifier. Until the
-    // server returns the durable mapping, keep the local non-production
-    // placeholder so no domain, wallet, or ownership operation can bind to it.
-    const sameVerifiedAccount = Boolean(
-      piUid && piUid === identity.piUserId &&
-      identity.verificationState === "server_verified" &&
-      !isStudioPlaceholderId(identity.userId)
-    )
-    const acceptedCanonicalUserId =
-      input.verifiedByServer === true && Boolean(piUid) &&
-      canonicalUserId && !isStudioPlaceholderId(canonicalUserId)
-        ? canonicalUserId
-        : null
-    const userId = acceptedCanonicalUserId || (sameVerifiedAccount
-      ? identity.userId
-      : piUid
-        ? LOCAL_STUDIO_USER_ID
-        : resolveCanonicalUserId({
-            explicitUserId: base.userId !== LOCAL_STUDIO_USER_ID ? base.userId : null,
-          }))
-    const hasTrustedCanonicalId = Boolean(piUid) && !isStudioPlaceholderId(userId)
-    const serverVerified = input.verifiedByServer === true && hasTrustedCanonicalId
-    const hasAccessToken = Object.prototype.hasOwnProperty.call(input, "accessToken")
-    const nextAccessToken = hasAccessToken
-      ? (typeof input.accessToken === "string" && input.accessToken.trim() ? input.accessToken.trim() : null)
-      : base.accessToken
+    const userId = resolveCanonicalUserId({
+      piUid,
+      explicitUserId: identity.userId !== LOCAL_STUDIO_USER_ID ? identity.userId : null,
+    })
 
     identity = {
-      ...base,
+      ...identity,
       userId,
       piUserId: piUid,
-      username: input.username?.trim() || base.username,
-      displayName: input.displayName?.trim() || base.displayName,
-      accessToken: nextAccessToken,
-      // Pi SDK completion is not GreenHaven server authentication. The auth
-      // lifecycle may still show the provider as linked, but production identity
-      // is established only after the durable server mapping is verified.
-      authState: serverVerified ? "authenticated" : (piUid || nextAccessToken ? "unknown" : base.authState),
-      verificationState: serverVerified
+      username: input.username?.trim() || identity.username,
+      displayName: input.displayName?.trim() || identity.displayName,
+      accessToken: input.accessToken?.trim() || identity.accessToken,
+      authState: piUid || input.accessToken ? "authenticated" : identity.authState,
+      verificationState: input.verifiedByServer
         ? "server_verified"
         : piUid
           ? "pi_linked"
-          : base.verificationState,
-      accountStatus: base.accountStatus === "setup" && serverVerified ? "active" : base.accountStatus,
+          : identity.verificationState,
+      accountStatus: identity.accountStatus === "setup" && piUid ? "active" : identity.accountStatus,
       isLocalStudioId: isStudioPlaceholderId(userId),
+      // Once onboarding is complete on this device, do not flip back to required
+      // on transient Pi reauth / PIN step-up / non-durable bridge responses.
+      // Hard clear() still resets. Explicit false from server still applies.
       needsOnboarding:
-        serverVerified && typeof input.needsOnboarding === "boolean"
-          ? input.needsOnboarding
-          : base.needsOnboarding,
-      serverVerifiedAt: serverVerified ? Date.now() : (accountChanged ? null : base.serverVerifiedAt),
+        typeof input.needsOnboarding === "boolean"
+          ? identity.needsOnboarding === false && input.needsOnboarding === true
+            ? false
+            : input.needsOnboarding
+          : identity.needsOnboarding,
+      serverVerifiedAt: input.verifiedByServer ? Date.now() : identity.serverVerifiedAt,
       updatedAt: Date.now(),
     }
     emit()
@@ -278,15 +238,17 @@ export const IdentityService = {
       updatedAt: Date.now(),
     }
     try {
-      if (!isStudioPlaceholderId(identity.userId)) {
-        void import("@/lib/onboarding-local").then((m) =>
-          m.stampLocalOnboardingComplete({
-            userId: identity.userId,
-            username: identity.username,
-            altUserIds: [identity.userId],
-          })
-        )
-      }
+      void import("@/lib/onboarding-local").then((m) =>
+        m.stampLocalOnboardingComplete({
+          userId: identity.userId || identity.piUserId || (identity as { piUid?: string }).piUid,
+          username: identity.username,
+          altUserIds: [
+            identity.userId,
+            identity.piUserId,
+            (identity as { piUid?: string }).piUid,
+          ],
+        })
+      )
     } catch {
       /* */
     }
@@ -311,12 +273,11 @@ export const IdentityService = {
       identity.verificationState === "server_verified" && Boolean(identity.piUserId)
     const nextUserId = keepPi
       ? identity.userId
-      : identity.piUserId
-        ? LOCAL_STUDIO_USER_ID
-        : resolveCanonicalUserId({
-            profileUserId: profileId || null,
-            explicitUserId: identity.userId !== LOCAL_STUDIO_USER_ID ? identity.userId : null,
-          })
+      : resolveCanonicalUserId({
+          piUid: identity.piUserId,
+          profileUserId: profileId || null,
+          explicitUserId: identity.userId !== LOCAL_STUDIO_USER_ID ? identity.userId : null,
+        })
     identity = {
       ...identity,
       userId: nextUserId,

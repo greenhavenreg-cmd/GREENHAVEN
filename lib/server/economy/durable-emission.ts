@@ -4,13 +4,23 @@
  */
 import { hasPrivilegedDatabase, readGhcServerEnv } from "@/lib/server/economy/env"
 import { isDatabaseConfigured } from "@/lib/server/economy/http"
-import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
 async function rpc<T = unknown>(fn: string, body: Record<string, unknown>): Promise<T | null> {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
   try {
-    const res = await (async () => { const r = await supabaseRpc(fn, body, { timeoutMs: 15000 }); return { ok: r.ok, status: r.status, json: async () => r.ok ? r.data : r.body, text: async () => JSON.stringify(r.ok ? r.data : r.body) }; })()
+    const res = await fetch(
+      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/${fn}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: env.supabaseServiceRoleKey,
+          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        },
+        body: JSON.stringify(body),
+      }
+    )
     if (!res.ok) return null
     return (await res.json()) as T
   } catch {

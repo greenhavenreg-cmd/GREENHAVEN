@@ -6,7 +6,6 @@ import { readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
-import { hasProjectDoc } from './lib/read-project-doc.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (f) => readFileSync(join(root, f), 'utf8')
@@ -37,7 +36,7 @@ for (const script of nested) {
 const env = existsSync(join(root, '.env.example')) ? read('.env.example') : ''
 const pkg = JSON.parse(read('package.json'))
 const checks = [
-  ['phase5 doc present', hasProjectDoc('docs/PHASE5_WALLET_RELEASE_GATE.md')],
+  ['phase5 doc present', existsSync(join(root, 'docs/PHASE5_WALLET_RELEASE_GATE.md'))],
   ['operator checklist present', existsSync(join(root, 'docs/OPERATOR_CHECKLIST_WALLET_PI_5PHASE.md'))],
   ['roadmap present', existsSync(join(root, 'docs/ROADMAP-WALLET-PI-CLAIM-WITHDRAW-5PHASE.md'))],
   ['registration migration present', existsSync(join(root, 'supabase/migrations/20261030010001_registration_bonus_v2_reconciliation.sql'))],

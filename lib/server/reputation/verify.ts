@@ -4,7 +4,6 @@
  */
 import { readGhcServerEnv } from "@/lib/server/economy/env"
 import type { ReputationEventType } from "@/lib/server/reputation/config"
-import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
 type RestGetSuccess = {
   ok: true
@@ -33,10 +32,20 @@ async function restGet(
   }
 
   try {
-    const res = await (async () => { const r = await supabaseRest(`${pathAndQuery.replace(
+    const res = await fetch(
+      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/${pathAndQuery.replace(
         /^\//,
         ""
-      )}`, { method: "GET", timeoutMs: 15000 }); return { ok: r.ok, status: r.status, json: async () => r.ok ? r.data : r.body, text: async () => JSON.stringify(r.ok ? r.data : r.body) }; })()
+      )}`,
+      {
+        headers: {
+          Accept: "application/json",
+          apikey: env.supabaseServiceRoleKey,
+          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        },
+        cache: "no-store",
+      }
+    )
 
     const data = await res.json().catch(() => null)
 

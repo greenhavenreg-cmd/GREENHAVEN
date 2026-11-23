@@ -19,13 +19,13 @@ const checks = [
   ['feed ranking receives muted account IDs', /mutedUserIds:\s*Array\.from\(new Set\(\[\.\.\.\(mutedUsers \|\| \[\]\), \.\.\.\(settings\?\.mutedUsers \|\| \[\]\)\]/.test(feed)],
   ['feed ranking merges blocked IDs from typed settings', /settings\?\.blockedUsers/.test(feed)],
   ['feed ranking avoids unsafe settings cast for mute IDs', !/\(settings as any\)\?\.mutedUsers/.test(feed)],
-  ['muted IDs are included in feed ranking dependencies', /selectedTopic, mutedTopics, mutedUsers, hasFeedPreferenceOwner, feedPreferencesLoadedFor, notInterestedLoadedFor, topicPreferencesLoadedFor, feedPreferencesReady, feedPreferenceOwnerId\]/.test(feed)],
+  ['muted IDs are included in feed ranking dependencies', /selectedTopic, mutedTopics, mutedUsers\]/.test(feed)],
   ['layout shell width token is unique', (design.match(/contentMax:/g) || []).length === 1],
   ['inner content width has a separate semantic token', /contentWidth:\s*["']var\(--gh-content-max\)["']/.test(design)],
   ['outer shell width uses its dedicated token', /contentMax:\s*["']var\(--gh-shell-content-max\)["']/.test(design)],
   ['feed loading skeleton announces status', /role=["']status["']/.test(feed)],
   ['feed loading skeleton exposes busy state', /aria-busy=["']true["']/.test(feed)],
-  ['feed filter persistence is guarded against storage failure', /ghc\.feed-preferences\.v2:\$\{feedPreferenceOwnerId\}/.test(feed) && /localStorage\.setItem\(feedPreferencesStorageKey/.test(feed) && /catch\s*\{\s*\/\* device storage may be unavailable \*\//.test(feed)],
+  ['feed filter persistence is guarded against storage failure', /localStorage\.setItem\(["']ghc\.feedFilter["']/.test(feed) && /catch\s*\{\s*\/\* storage may be unavailable \*\//.test(feed)],
   ['reduced-data preference is respected at initialization', /useState\(\(\)\s*=>\s*preferReducedData\(\)\)/.test(feed)],
 ]
 let failed = 0

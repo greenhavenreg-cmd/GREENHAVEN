@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Bell, Calendar, CheckCircle2, ChevronRight, Clock, FileText, Heart, MapPin, MessageSquare, Pin, Share2, ThumbsUp, Trash2, Users, X } from "lucide-react"
+import { Bell, Calendar, CheckCircle2, ChevronRight, Clock, FileText, Heart, MapPin, MessageSquare, Share2, ThumbsUp, Trash2, Users, X } from "lucide-react"
 import type {
   Announcement,
   Poll,
@@ -12,43 +12,47 @@ import type {
 } from "@/lib/community-features-engine"
 import { formatEventDate, getUpcomingEvents, getActivePolls } from "@/lib/community-features-engine"
 import { safeCommunityResourceUrl } from "@/lib/domains/adapters/community-participation-hub"
-import { safeCommunityCount, safeCommunityCountTotal } from "@/lib/active-upgrades/community"
 
 // Announcements Component
 export function AnnouncementCard({ announcement, onDismiss }: { announcement: Announcement; onDismiss?: () => void }) {
-  const type = ["info", "important", "celebration", "maintenance"].includes(announcement.type) ? announcement.type : "info"
-  const typeLabels = { info: "Update", important: "Important", celebration: "Celebration", maintenance: "Maintenance" }
-  const createdAt = Number.isFinite(Number(announcement.createdAt)) && Number(announcement.createdAt) > 0 ? new Date(Number(announcement.createdAt)) : null
   const typeStyles = {
-    info: "border-border/70 bg-card text-foreground",
-    important: "border-amber-300/70 bg-amber-50/60 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100",
-    celebration: "border-violet-200/70 bg-violet-50/50 text-violet-950 dark:border-violet-900/50 dark:bg-violet-950/15 dark:text-violet-100",
-    maintenance: "border-slate-300/70 bg-slate-50/70 text-slate-900 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-100",
+    info: "bg-blue-50 border-blue-200 text-blue-900",
+    important: "bg-red-50 border-red-200 text-red-900",
+    celebration: "bg-violet-50 border-violet-200 text-violet-900",
+    maintenance: "bg-yellow-50 border-yellow-200 text-yellow-900",
   }
+
+  const typeIcons = {
+    info: "ℹ️",
+    important: "⚠️",
+    celebration: "🎉",
+    maintenance: "🔧",
+  }
+
   return (
-    <article className={`rounded-2xl border p-3.5 shadow-[var(--gh-card-shadow)] ${typeStyles[type]}`} aria-label={`${typeLabels[type]} announcement`}>
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background/80 text-muted-foreground ring-1 ring-border/60" aria-hidden="true">
-          {announcement.pinned ? <Pin size={16} /> : <Bell size={16} />}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">{typeLabels[type]}</span>
-            {announcement.pinned ? <span className="inline-flex items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 text-[9px] font-semibold text-muted-foreground ring-1 ring-border/60"><Pin size={10} /> Pinned</span> : null}
-            {createdAt && Number.isFinite(createdAt.getTime()) ? (
-              <time className="ml-auto text-[10px] text-muted-foreground" dateTime={createdAt.toISOString()}>{new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(createdAt)}</time>
-            ) : null}
+    <div className={`border rounded-lg p-4 flex gap-3 ${typeStyles[announcement.type]}`}>
+      <div className="text-xl flex-shrink-0">{typeIcons[announcement.type]}</div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-sm">{announcement.title}</h3>
+            <p className="text-sm mt-1 opacity-80">{announcement.content}</p>
           </div>
-          <h3 className="mt-1 text-[13px] font-bold leading-5">{announcement.title}</h3>
-          <p className="mt-1 whitespace-pre-wrap break-words text-[12px] leading-[1.6] text-current/80">{announcement.content}</p>
+          {onDismiss && (
+            <button
+              onClick={onDismiss}
+              className="p-1 hover:bg-black hover:bg-opacity-10 rounded transition flex-shrink-0"
+              aria-label="Dismiss"
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
-        {onDismiss ? (
-          <button type="button" onClick={onDismiss} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-background/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50" aria-label="Dismiss announcement">
-            <X size={15} />
-          </button>
-        ) : null}
+        {announcement.pinned && (
+          <div className="text-xs font-semibold mt-2 opacity-70">📌 Pinned</div>
+        )}
       </div>
-    </article>
+    </div>
   )
 }
 
@@ -62,12 +66,8 @@ export function PollCard({
   onVote?: (optionId: string) => void
   userVoted?: string[]
 }) {
-  const options = Array.isArray(poll.options)
-    ? poll.options.filter((option) => option && typeof option.id === "string" && option.id.length <= 120 && typeof option.text === "string").slice(0, 20)
-    : []
-  const totalVotes = safeCommunityCountTotal(options.map((option) => option.votes))
-  const status = typeof poll.status === "string" && poll.status.length <= 40 ? poll.status : "unavailable"
-  const isActive = status === "active" && typeof onVote === "function"
+  const totalVotes = poll.options.reduce((sum, opt) => sum + opt.votes, 0)
+  const isActive = poll.status === "active"
 
   return (
     <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-4 border border-blue-200">
@@ -75,23 +75,20 @@ export function PollCard({
         <div className="text-lg">📊</div>
         <div className="flex-1">
           <h3 className="font-semibold text-sm text-foreground">{poll.question}</h3>
-          <p className="text-xs text-muted-foreground mt-0.5" aria-live="polite">{totalVotes.toLocaleString()} votes</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{totalVotes} votes</p>
         </div>
       </div>
 
       <div className="space-y-2">
-        {options.map((option) => {
-          const safeVotes = safeCommunityCount(option.votes)
-          const percentage = totalVotes > 0 ? Math.min(100, Math.max(0, (safeVotes / totalVotes) * 100)) : 0
-          const userVotedThis = userVoted?.includes(option.id) === true
+        {poll.options.map((option) => {
+          const percentage = totalVotes > 0 ? (option.votes / totalVotes) * 100 : 0
+          const userVotedThis = userVoted?.includes(option.id)
 
           return (
             <button
               key={option.id}
               onClick={() => isActive && onVote?.(option.id)}
               disabled={!isActive}
-              aria-pressed={userVotedThis}
-              aria-label={`${option.text}, ${safeVotes} votes, ${Math.round(percentage)} percent${userVotedThis ? ", selected" : ""}`}
               className={`w-full text-left p-2 rounded-lg border transition ${
                 userVotedThis
                   ? "bg-blue-100 border-blue-400"
@@ -103,18 +100,13 @@ export function PollCard({
                   <p className="text-sm font-medium text-foreground truncate">{option.text}</p>
                   <div className="w-full bg-muted rounded-full h-2 mt-1 overflow-hidden">
                     <div
-                      role="progressbar"
-                      aria-label={`${option.text} vote share`}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-valuenow={Math.round(percentage)}
                       className={`h-full transition-all ${userVotedThis ? "bg-[var(--gh-green)]" : "bg-emerald-300 dark:bg-emerald-800"}`}
                       style={{ width: `${percentage}%` }}
                     />
                   </div>
                 </div>
                 <span className="text-xs font-semibold text-muted-foreground flex-shrink-0 w-8 text-right">
-                  {safeVotes}
+                  {option.votes}
                 </span>
               </div>
             </button>
@@ -123,7 +115,7 @@ export function PollCard({
       </div>
 
       {!isActive && (
-        <p className="text-xs text-muted-foreground mt-3 text-center">Poll is {status}</p>
+        <p className="text-xs text-muted-foreground mt-3 text-center">Poll is {poll.status}</p>
       )}
     </div>
   )

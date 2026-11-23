@@ -11,7 +11,6 @@ import { formatCommunityRole, communityRoleBadgeClass } from "@/lib/community/ro
 import { socialListCommunityPosts } from "@/lib/social/client"
 import type { Post } from "@/lib/ghc-types"
 import { CommunityCanonicalPostCard } from "./community-canonical-post-card"
-import { CommunityReadOnlyPostCard } from "./community-read-only-post-card"
 import { useCallback, useMemo, useState, useEffect, useRef } from "react"
 import { onCloseTransientUI } from "@/lib/transient-ui"
 import {
@@ -116,29 +115,6 @@ type CommunitySummary = {
   /** User muted this community's notifications */
   isMuted?: boolean
   samplePosts?: { id: string; author: string; excerpt: string }[]
-}
-
-function sortCommunityBoardPosts(posts: any[], mode: "new" | "hot" | "top"): any[] {
-  const now = Date.now()
-  const engagementScore = (post: any) =>
-    Math.max(0, Number(post.likes ?? post.likeCount ?? 0) || 0) +
-    2 * Math.max(0, Number(post.comments ?? post.commentCount ?? (Array.isArray(post.replies) ? post.replies.length : 0)) || 0) +
-    3 * Math.max(0, Number(post.shares ?? post.shareCount ?? 0) || 0)
-  return [...posts].sort((a, b) => {
-    const pinned = Number(Boolean(b.pinned)) - Number(Boolean(a.pinned))
-    if (pinned) return pinned
-    const aTime = Math.max(0, Number(a.createdAt) || 0)
-    const bTime = Math.max(0, Number(b.createdAt) || 0)
-    if (mode === "top") {
-      const score = engagementScore(b) - engagementScore(a)
-      if (score) return score
-    } else if (mode === "hot") {
-      const hotScore = (post: any) => engagementScore(post) / Math.pow(Math.max(1, (now - Math.max(0, Number(post.createdAt) || 0)) / 3_600_000) + 2, 0.7)
-      const score = hotScore(b) - hotScore(a)
-      if (score) return score
-    }
-    return (bTime - aTime) || String(b.id || "").localeCompare(String(a.id || ""))
-  })
 }
 
 function toCanonicalCommunityPost(raw: Record<string, any>): Post {
@@ -285,28 +261,14 @@ export function PremiumCommunityHub({
   const [chatMuted, setChatMuted] = useState(false)
   const [chatState, setChatState] = useState<{ enabled: boolean; privacy: "members" | "approval"; chatMember: boolean; requestStatus?: string | null; owner: boolean } | null>(null)
   const [chatBusy, setChatBusy] = useState(false)
-  const chatStateRequestRef = useRef(0)
   const loadChatState = useCallback(async () => {
-    const requestId = ++chatStateRequestRef.current
-    // Never keep a previous positive membership snapshot while a fresh check is pending.
-    setChatState(null)
     try {
-      const r = await fetch(`/api/communities/${encodeURIComponent(community.id)}/chat`, { credentials: "include", cache: "no-store" })
+      const r = await fetch(`/api/communities/${encodeURIComponent(community.id)}/chat`, { cache: "no-store" })
       const d = await r.json().catch(() => null)
-      if (requestId !== chatStateRequestRef.current) return
-      if (r.ok && d?.ok) {
-        setChatState({ enabled: !!d.enabled, privacy: d.privacy === "approval" ? "approval" : "members", chatMember: !!d.chatMember, requestStatus: d.requestStatus || null, owner: !!d.owner })
-      } else {
-        setChatState(null)
-      }
-    } catch {
-      if (requestId === chatStateRequestRef.current) setChatState(null)
-    }
+      if (r.ok && d?.ok) setChatState({ enabled: !!d.enabled, privacy: d.privacy === "approval" ? "approval" : "members", chatMember: !!d.chatMember, requestStatus: d.requestStatus || null, owner: !!d.owner })
+    } catch { /* fail closed: chat remains unavailable */ }
   }, [community.id])
-  useEffect(() => {
-    void loadChatState()
-    return () => { chatStateRequestRef.current += 1 }
-  }, [community.id, community.isJoined, loadChatState])
+  useEffect(() => { void loadChatState() }, [community.id, community.isJoined, loadChatState])
   const runChatAction = async (action: "create" | "join", privacy?: "members" | "approval") => {
     if (chatBusy) return
     setChatBusy(true)
@@ -328,23 +290,18 @@ export function PremiumCommunityHub({
   const [boardQuery, setBoardQuery] = useState("")
   const [boardRefreshing, setBoardRefreshing] = useState(false)
   const [canonicalBoardPosts, setCanonicalBoardPosts] = useState<Partial<Post>[]>([])
-  const [canonicalBoardNextCursor, setCanonicalBoardNextCursor] = useState<{ before: number; beforeId: string } | null>(null)
-  const [canonicalBoardLoadingMore, setCanonicalBoardLoadingMore] = useState(false)
   const [canonicalBoardStatus, setCanonicalBoardStatus] = useState<"loading" | "ready" | "unavailable">("loading")
   const canonicalBoardRequestRef = useRef(0)
   const hasCanonicalBoardSnapshotRef = useRef(false)
   const canonicalBoardCommunityRef = useRef(community.id)
   const loadCanonicalBoardPosts = useCallback(async () => {
     const requestId = ++canonicalBoardRequestRef.current
-    setCanonicalBoardLoadingMore(false)
-    setCanonicalBoardNextCursor(null)
     if (!hasCanonicalBoardSnapshotRef.current) setCanonicalBoardStatus("loading")
     try {
       const result = await socialListCommunityPosts(community.id, 60)
       if (requestId !== canonicalBoardRequestRef.current) return
       if (result.ok && result.durable) {
         setCanonicalBoardPosts(result.posts)
-        setCanonicalBoardNextCursor(result.nextCursor || null)
         hasCanonicalBoardSnapshotRef.current = true
         setCanonicalBoardStatus("ready")
       } else {
@@ -355,41 +312,11 @@ export function PremiumCommunityHub({
       if (requestId === canonicalBoardRequestRef.current) setCanonicalBoardStatus("unavailable")
     }
   }, [community.id])
-  const loadMoreCanonicalBoardPosts = useCallback(async () => {
-    const cursor = canonicalBoardNextCursor
-    if (!cursor || canonicalBoardLoadingMore) return
-    const requestId = ++canonicalBoardRequestRef.current
-    setCanonicalBoardLoadingMore(true)
-    try {
-      const result = await socialListCommunityPosts(community.id, 60, cursor)
-      if (requestId !== canonicalBoardRequestRef.current) return
-      if (!result.ok || !result.durable) {
-        setCanonicalBoardStatus("unavailable")
-        return
-      }
-      setCanonicalBoardPosts((current) => {
-        const byId = new Map(current.map((post) => [String(post.id || ""), post]))
-        for (const post of result.posts) {
-          const id = String(post.id || "")
-          if (id) byId.set(id, { ...(byId.get(id) || {}), ...post })
-        }
-        return Array.from(byId.values())
-      })
-      setCanonicalBoardNextCursor(result.nextCursor || null)
-      setCanonicalBoardStatus("ready")
-    } catch {
-      if (requestId === canonicalBoardRequestRef.current) setCanonicalBoardStatus("unavailable")
-    } finally {
-      if (requestId === canonicalBoardRequestRef.current) setCanonicalBoardLoadingMore(false)
-    }
-  }, [community.id, canonicalBoardNextCursor, canonicalBoardLoadingMore])
   useEffect(() => {
     if (canonicalBoardCommunityRef.current !== community.id) {
       canonicalBoardCommunityRef.current = community.id
       hasCanonicalBoardSnapshotRef.current = false
       setCanonicalBoardPosts([])
-      setCanonicalBoardNextCursor(null)
-      setCanonicalBoardLoadingMore(false)
       setCanonicalBoardStatus("loading")
     }
     void loadCanonicalBoardPosts()
@@ -413,14 +340,11 @@ export function PremiumCommunityHub({
     }
     return Array.from(byId.values()).sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
   }, [boardPosts, canonicalBoardPosts])
-  // Community membership is not chat membership. A member must explicitly join
-  // the channel (or be approved) before the UI exposes any chat-opening action.
-  const effectiveCanChat = !!community.isJoined && !!canChat && !!chatState?.enabled && !!chatState?.chatMember
+  const effectiveCanChat = !!chatState?.chatMember || (canChat && !!chatState?.enabled)
 
   const upcoming = useMemo(() => getUpcomingEvents(events).slice(0, 5), [events])
   const activePolls = useMemo(() => getActivePolls(polls).slice(0, 3), [polls])
-  const sortedAnnouncements = [...announcements].sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
-  const pinnedAnnouncements = sortedAnnouncements.filter((a) => a.pinned).slice(0, 3)
+  const pinnedAnnouncements = announcements.filter((a) => a.pinned).slice(0, 3)
   const rules = (community.rules && community.rules.length > 0 ? community.rules : DEFAULT_RULES).slice(0, 8)
   const tags = community.tags?.length
     ? community.tags
@@ -437,53 +361,8 @@ export function PremiumCommunityHub({
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({})
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({})
   const [safetyTick, setSafetyTick] = useState<number>(0)
-  const [reportActionBusy, setReportActionBusy] = useState<string | null>(null)
   const [serverGovernanceLog, setServerGovernanceLog] = useState<any[] | null>(null)
   const [serverGovernanceReports, setServerGovernanceReports] = useState<any[] | null>(null)
-  const [serverMemberDirectory, setServerMemberDirectory] = useState<Array<{ id: string; name: string; photo?: string; role?: string }>>([])
-  const [memberDirectoryLoading, setMemberDirectoryLoading] = useState(false)
-  const [memberDirectoryUnavailable, setMemberDirectoryUnavailable] = useState(false)
-  const [memberDirectoryHasMore, setMemberDirectoryHasMore] = useState(false)
-  const memberDirectoryLengthRef = useRef(0)
-  const memberDirectoryLoadingRef = useRef(false)
-
-  const loadMemberDirectory = useCallback(async (append = false) => {
-    if (memberDirectoryLoadingRef.current) return
-    memberDirectoryLoadingRef.current = true
-    setMemberDirectoryLoading(true)
-    try {
-      const offset = append ? memberDirectoryLengthRef.current : 0
-      const response = await fetch(`/api/communities/${encodeURIComponent(community.id)}/members?limit=50&offset=${offset}`, { credentials: "include", cache: "no-store" })
-      const payload = await response.json().catch(() => null)
-      if (!response.ok || !payload?.ok || payload.durable !== true || !Array.isArray(payload.members)) throw new Error("DIRECTORY_UNAVAILABLE")
-      const rows = payload.members.filter((row: any) => row && typeof row.id === "string").map((row: any) => ({ id: String(row.id), name: String(row.name || "GreenHaven member").slice(0, 120), photo: typeof row.photo === "string" ? row.photo : undefined, role: typeof row.role === "string" ? row.role : "member" }))
-      setServerMemberDirectory((current) => {
-        let next = rows
-        if (append) {
-          const byId = new Map<string, (typeof rows)[number]>(current.map((row) => [row.id, row] as const))
-          for (const row of rows) byId.set(row.id, row)
-          next = [...byId.values()]
-        }
-        memberDirectoryLengthRef.current = next.length
-        return next
-      })
-      setMemberDirectoryHasMore(Boolean(payload.hasMore))
-      setMemberDirectoryUnavailable(false)
-    } catch {
-      setMemberDirectoryUnavailable(true)
-    } finally {
-      memberDirectoryLoadingRef.current = false
-      setMemberDirectoryLoading(false)
-    }
-  }, [community.id])
-
-  useEffect(() => {
-    if (tab !== "members") return
-    memberDirectoryLengthRef.current = 0
-    setServerMemberDirectory([])
-    setMemberDirectoryHasMore(false)
-    void loadMemberDirectory(false)
-  }, [tab, community.id, loadMemberDirectory])
 
   useEffect(() => {
     if (!isMod) {
@@ -524,30 +403,36 @@ export function PremiumCommunityHub({
     return () => { active = false }
   }, [community.id, isMod, safetyTick])
 
-  const updateReportStatus = async (reportId: string, status: "reviewing" | "resolved" | "dismissed") => {
-    if (reportActionBusy) return
-    setReportActionBusy(reportId)
-    try {
-      const persisted = await resolveCommunityReport(community.id, reportId, status, meId || undefined)
-      if (!persisted) throw new Error("MODERATION_PERSISTENCE_UNAVAILABLE")
-      setSafetyTick((tick) => tick + 1)
-      window.dispatchEvent(new CustomEvent("ghc:toast", {
-        detail: { message: status === "reviewing" ? "Report moved to review" : status === "resolved" ? "Report resolved" : "Report dismissed", type: "success" },
-      }))
-    } catch {
-      window.dispatchEvent(new CustomEvent("ghc:toast", {
-        detail: { message: "Could not save this moderation decision. The report remains unchanged.", type: "error" },
-      }))
-    } finally {
-      setReportActionBusy(null)
-    }
-  }
-
   const membersWithRoles = (() => {
-    if (serverMemberDirectory.length > 0) return serverMemberDirectory
-    // A local membership snapshot may identify the current viewer only. Never
-    // derive other people's display labels from opaque account IDs.
-    return memberPreview
+    if (memberPreview.length > 0) return memberPreview
+    const roster: Array<{ id: string; name: string; role?: string; photo?: string }> = []
+    const creator = (community as { createdBy?: string }).createdBy
+    if (creator) {
+      roster.push({
+        id: creator,
+        name: creator === "current-user" ? "You" : creator,
+        role: "owner",
+      })
+    }
+    const members = Array.isArray((community as { members?: string[] }).members)
+      ? ((community as { members?: string[] }).members as string[])
+      : []
+    for (const m of members) {
+      if (roster.some((r) => r.id === m)) continue
+      roster.push({
+        id: m,
+        name: m === "current-user" ? "You" : m.charAt(0).toUpperCase() + m.slice(1),
+        role: community.role && m === "current-user" ? community.role : "member",
+      })
+    }
+    if (community.isJoined && !roster.some((r) => r.id === "current-user")) {
+      roster.unshift({
+        id: "current-user",
+        name: "You",
+        role: community.role || "member",
+      })
+    }
+    return roster
   })()
 
   const memberIdsForSuggestions = Array.isArray((community as { members?: string[] }).members)
@@ -1185,22 +1070,23 @@ export function PremiumCommunityHub({
                 ) : null}
                 <div className="space-y-2">
                   {(renderedBoardPosts.length > 0
-                    ? sortCommunityBoardPosts(
-                        renderedBoardPosts
-                          .filter((p: any) => boardFilter === "all" || String(p.authorId || "") === String(viewerId))
-                          .filter((p: any) => {
-                            const q = boardQuery.trim().toLowerCase()
-                            return !q || String(p.body || p.excerpt || "").toLowerCase().includes(q) || String(p.authorName || p.author || "").toLowerCase().includes(q)
-                          }),
-                        boardSort,
-                      )
+                    ? [...renderedBoardPosts]
+                        .filter((p: any) => boardFilter === "all" || String(p.authorId || "") === String(viewerId))
+                        .filter((p: any) => {
+                          const q = boardQuery.trim().toLowerCase()
+                          return !q || String(p.body || p.excerpt || "").toLowerCase().includes(q) || String(p.authorName || p.author || "").toLowerCase().includes(q)
+                        })
+                        .sort((a: any, b: any) =>
+                          boardSort === "top" || boardSort === "hot"
+                            ? (b.likes || 0) - (a.likes || 0)
+                            : (b.createdAt || 0) - (a.createdAt || 0)
+                        )
                     : []
                   ).map((p: any) => {
                     const canonical = p.durable === true || canonicalBoardPosts.some((row) => String(row.id || "") === String(p.id))
                     if (canonical) return (
                       <CommunityCanonicalPostCard
                         key={p.id}
-                        communityId={community.id}
                         post={toCanonicalCommunityPost(p)}
                         isMod={isMod}
                         onPin={onPinPost}
@@ -1208,27 +1094,26 @@ export function PremiumCommunityHub({
                       />
                     )
                     return (
-                      <CommunityReadOnlyPostCard
-                        key={p.id}
-                        post={toCanonicalCommunityPost(p)}
-                        statusLabel={p.pinned ? "Archived · pinned · read-only" : "Archived · read-only"}
-                      />
+                    <div key={p.id} className="rounded-xl border border-border bg-card px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[11px] font-semibold text-foreground">{p.authorName || p.author}</p>
+                        {p.authorRole && p.authorRole !== "member" && (
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+                            {p.authorRole}
+                          </span>
+                        )}
+                        {p.pinned && (
+                          <span className="text-[9px] font-bold uppercase text-emerald-600">Pinned</span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-sm text-foreground whitespace-pre-wrap">{p.body || p.excerpt}</p>
+                      <div className="mt-3 border-t border-border/50 pt-2.5 text-[10px] text-muted-foreground">
+                        Archived community post · republish to enable current voting, reactions and sharing.
+                      </div>
+                    </div>
                     )
                   })}
                 </div>
-                {canonicalBoardNextCursor ? (
-                  <div className="mt-3 flex justify-center">
-                    <button
-                      type="button"
-                      onClick={() => void loadMoreCanonicalBoardPosts()}
-                      disabled={canonicalBoardLoadingMore}
-                      aria-label="Load more community discussions"
-                      className="min-h-10 rounded-full border border-border bg-background px-4 text-xs font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-wait disabled:opacity-60"
-                    >
-                      {canonicalBoardLoadingMore ? "Loading discussions…" : "Load more discussions"}
-                    </button>
-                  </div>
-                ) : null}
               </section>
             )}
 
@@ -1237,11 +1122,10 @@ export function PremiumCommunityHub({
                 <h2 className="mb-2 text-xs font-bold text-foreground">Sample posts</h2>
                 <div className="space-y-2">
                   {community.samplePosts!.slice(0, 3).map((p) => (
-                    <CommunityReadOnlyPostCard
-                      key={p.id}
-                      post={toCanonicalCommunityPost({ id: `sample_${p.id}`, authorName: p.author, content: p.excerpt, createdAt: 0, communityName: community.name })}
-                      statusLabel="Preview · join to participate"
-                    />
+                    <div key={p.id} className="rounded-xl border border-border bg-card px-3 py-2">
+                      <p className="text-[11px] font-semibold text-muted-foreground">{p.author}</p>
+                      <p className="mt-0.5 text-sm text-foreground">{p.excerpt}</p>
+                    </div>
                   ))}
                 </div>
               </section>
@@ -1402,7 +1286,7 @@ export function PremiumCommunityHub({
                 No announcements yet
               </div>
             ) : (
-              sortedAnnouncements.map((a) => (
+              (pinnedAnnouncements.length ? pinnedAnnouncements : announcements).map((a) => (
                 <AnnouncementCard key={a.id} announcement={a} />
               ))
             )}
@@ -1411,15 +1295,9 @@ export function PremiumCommunityHub({
 
         {tab === "discussion" && (
           <div className="space-y-3">
-            <div className="flex items-end justify-between gap-3 px-1 pt-1">
-              <div className="min-w-0">
-                <h2 className="text-sm font-bold tracking-tight text-foreground">Community discussions</h2>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">Board posts and replies, separate from realtime community chat.</p>
-              </div>
-              <span className="shrink-0 rounded-full border border-border/70 bg-card px-2.5 py-1 text-[10px] font-semibold tabular-nums text-muted-foreground">
-                {renderedBoardPosts.filter((post: any) => !post.hidden).length} posts
-              </span>
-            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Discussions are board posts — not the same as realtime chat.
+            </p>
             {community.isJoined && onPost ? (
               <div className="rounded-2xl border border-border bg-card p-3">
                 <label htmlFor="community-discussion-compose" className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
@@ -1466,7 +1344,7 @@ export function PremiumCommunityHub({
             {renderedBoardPosts.length === 0 ? (
               <p className="py-6 text-center text-xs text-muted-foreground">No discussions yet.</p>
             ) : (
-              <ul className="gh-community-post-list grid min-w-0 gap-4" aria-label="Community discussions">
+              <ul className="space-y-2" aria-label="Community discussions">
                 {[...renderedBoardPosts]
                   .filter((p: any) => !p.hidden)
                   .sort((a: any, b: any) => (Number(!!b.pinned) - Number(!!a.pinned)) || ((b.createdAt || 0) - (a.createdAt || 0)))
@@ -1475,9 +1353,8 @@ export function PremiumCommunityHub({
                     const open = !!expandedReplies[p.id]
                     const canonical = p.durable === true || canonicalBoardPosts.some((row) => String(row.id || "") === String(p.id))
                     if (canonical) return (
-                      <li key={p.id} className="gh-community-post-item min-w-0 list-none">
+                      <li key={p.id} className="list-none">
                         <CommunityCanonicalPostCard
-                          communityId={community.id}
                           post={toCanonicalCommunityPost(p)}
                           isMod={isMod}
                           onPin={onPinPost}
@@ -1486,80 +1363,104 @@ export function PremiumCommunityHub({
                       </li>
                     )
                     return (
-                      <li key={p.id} className="gh-community-post-item min-w-0 list-none">
-                        <CommunityReadOnlyPostCard
-                          post={toCanonicalCommunityPost(p)}
-                          statusLabel={p.pinned ? "Archived · pinned · read-only" : "Archived · read-only"}
+                    <li key={p.id} className="rounded-xl border border-border bg-card px-3 py-2.5">
+                      <button
+                        type="button"
+                        className="text-left text-[11px] font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                        onClick={() => {
+                          if (!p.authorId) return
+                          try {
+                            window.dispatchEvent(
+                              new CustomEvent("ghc:open-profile", {
+                                detail: { userId: p.authorId },
+                              })
+                            )
+                          } catch { /* */ }
+                        }}
+                      >
+                        {p.authorName || p.author || "Member"}
+                      </button>
+                      <p className="mt-1 text-sm text-foreground whitespace-pre-wrap">{p.body || p.excerpt}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground">Archived post · limited legacy interactions</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const linked = !String(p.id || "").startsWith("bpost_") && !String(p.id || "").startsWith("local_")
+                            if (linked) {
+                              window.dispatchEvent(new CustomEvent("ghc:navigate-tab", { detail: "home" }))
+                              window.dispatchEvent(new CustomEvent("ghc:open-post", { detail: { postId: String(p.id), action: "comment", source: "community" } }))
+                              return
+                            }
+                            setExpandedReplies((state) => ({ ...state, [p.id]: !state[p.id] }))
+                          }}
+                          className="min-h-9 rounded-full border border-border px-2.5 text-[11px] font-bold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                         >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const linked = !String(p.id || "").startsWith("bpost_") && !String(p.id || "").startsWith("local_")
-                                if (linked) {
-                                  window.dispatchEvent(new CustomEvent("ghc:navigate-tab", { detail: "home" }))
-                                  window.dispatchEvent(new CustomEvent("ghc:open-post", { detail: { postId: String(p.id), action: "comment", source: "community" } }))
-                                  return
+                          Comments {p.comments || replies.length || 0}
+                        </button>
+                        {isMod && onPinPost && !p.pinned ? (
+                          <button type="button" onClick={() => onPinPost(p.id)} className="min-h-9 rounded-full border border-border px-2.5 text-[11px] font-bold">
+                            Pin
+                          </button>
+                        ) : null}
+                        {isMod && onUnpinPost && p.pinned ? (
+                          <button type="button" onClick={() => onUnpinPost(p.id)} className="min-h-9 rounded-full border border-border px-2.5 text-[11px] font-bold">
+                            Unpin
+                          </button>
+                        ) : null}
+                        {isMod && onHidePost ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (await confirmDialog({ title: "Hide this discussion?", message: "It will be removed from the community board for members.", confirmLabel: "Hide discussion", danger: true })) onHidePost(p.id)
+                            }}
+                            className="min-h-9 rounded-full border border-destructive/40 px-2.5 text-[11px] font-bold text-destructive"
+                          >
+                            Hide
+                          </button>
+                        ) : null}
+                      </div>
+                      {open && (String(p.id || "").startsWith("bpost_") || String(p.id || "").startsWith("local_")) ? (
+                        <div className="mt-2 space-y-2 border-t border-border/60 pt-2">
+                          {replies.length === 0 ? (
+                            <p className="text-[11px] text-muted-foreground">No replies yet.</p>
+                          ) : (
+                            replies.map((r: any) => (
+                              <div key={r.id} className="rounded-lg bg-muted/40 px-2 py-1.5">
+                                <p className="text-[10px] font-semibold text-foreground">{r.authorName || "Member"}</p>
+                                <p className="text-[12px] text-foreground whitespace-pre-wrap">{r.body}</p>
+                              </div>
+                            ))
+                          )}
+                          {community.isJoined && onReplyToPost ? (
+                            <div className="flex gap-2">
+                              <input
+                                value={replyDrafts[p.id] || ""}
+                                onChange={(e) =>
+                                  setReplyDrafts((s) => ({ ...s, [p.id]: e.target.value }))
                                 }
-                                setExpandedReplies((state) => ({ ...state, [p.id]: !state[p.id] }))
-                              }}
-                              aria-expanded={open}
-                              className="min-h-9 rounded-full border border-border px-3 text-[11px] font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                            >
-                              Comments {p.comments || replies.length || 0}
-                            </button>
-                            {isMod && onPinPost && !p.pinned ? (
-                              <button type="button" onClick={() => onPinPost(p.id)} className="min-h-9 rounded-full border border-border px-3 text-[11px] font-semibold">Pin</button>
-                            ) : null}
-                            {isMod && onUnpinPost && p.pinned ? (
-                              <button type="button" onClick={() => onUnpinPost(p.id)} className="min-h-9 rounded-full border border-border px-3 text-[11px] font-semibold">Unpin</button>
-                            ) : null}
-                            {isMod && onHidePost ? (
+                                placeholder="Write a reply…"
+                                aria-label="Reply to discussion"
+                                className="min-h-10 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm"
+                              />
                               <button
                                 type="button"
-                                onClick={async () => {
-                                  if (await confirmDialog({ title: "Hide this discussion?", message: "It will be removed from the community board for members.", confirmLabel: "Hide discussion", danger: true })) onHidePost(p.id)
+                                disabled={!(replyDrafts[p.id] || "").trim()}
+                                onClick={() => {
+                                  const body = (replyDrafts[p.id] || "").trim()
+                                  if (!body) return
+                                  onReplyToPost(p.id, body)
+                                  setReplyDrafts((s) => ({ ...s, [p.id]: "" }))
                                 }}
-                                className="min-h-9 rounded-full border border-destructive/40 px-3 text-[11px] font-semibold text-destructive"
-                              >Hide</button>
-                            ) : null}
-                          </div>
-                          {open && (String(p.id || "").startsWith("bpost_") || String(p.id || "").startsWith("local_")) ? (
-                            <div className="mt-2 space-y-2 border-t border-border/60 pt-2">
-                              {replies.length === 0 ? (
-                                <p className="text-[11px] text-muted-foreground">No replies yet.</p>
-                              ) : replies.map((r: any) => (
-                                <div key={r.id} className="rounded-lg bg-muted/40 px-2 py-1.5">
-                                  <p className="text-[10px] font-semibold text-foreground">{r.authorName || "Member"}</p>
-                                  <p className="whitespace-pre-wrap text-[12px] text-foreground">{r.body}</p>
-                                </div>
-                              ))}
-                              {community.isJoined && onReplyToPost ? (
-                                <div className="flex gap-2">
-                                  <input
-                                    value={replyDrafts[p.id] || ""}
-                                    onChange={(e) => setReplyDrafts((state) => ({ ...state, [p.id]: e.target.value }))}
-                                    placeholder="Write a reply…"
-                                    aria-label="Reply to discussion"
-                                    className="min-h-10 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm"
-                                  />
-                                  <button
-                                    type="button"
-                                    disabled={!(replyDrafts[p.id] || "").trim()}
-                                    onClick={() => {
-                                      const body = (replyDrafts[p.id] || "").trim()
-                                      if (!body) return
-                                      onReplyToPost(p.id, body)
-                                      setReplyDrafts((state) => ({ ...state, [p.id]: "" }))
-                                    }}
-                                    className="min-h-10 rounded-xl bg-[var(--gh-green)] px-3 text-[11px] font-bold text-white disabled:opacity-50"
-                                  >Reply</button>
-                                </div>
-                              ) : null}
+                                className="min-h-10 rounded-xl bg-[var(--gh-green)] px-3 text-[11px] font-bold text-white disabled:opacity-50"
+                              >
+                                Reply
+                              </button>
                             </div>
                           ) : null}
-                        </CommunityReadOnlyPostCard>
-                      </li>
+                        </div>
+                      ) : null}
+                    </li>
                     )
                   })}
               </ul>
@@ -1685,11 +1586,7 @@ export function PremiumCommunityHub({
         {tab === "members" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-[11px] text-muted-foreground">Roles: Owner · Admin · Moderator · Member</p>
-                {memberDirectoryLoading ? <p className="mt-1 text-[10px] text-muted-foreground" role="status">Loading verified member directory…</p> : null}
-                {memberDirectoryUnavailable ? <p className="mt-1 text-[10px] text-amber-700 dark:text-amber-300" role="status">Live member directory is unavailable. Showing only the available membership snapshot; names and roles may be incomplete.</p> : null}
-              </div>
+              <p className="text-[11px] text-muted-foreground">Roles: Owner · Admin · Moderator · Member</p>
               {isMod && onInviteMember ? (
                 <button
                   type="button"
@@ -1845,12 +1742,6 @@ export function PremiumCommunityHub({
                 )
               })
             )}
-
-            {memberDirectoryHasMore ? (
-              <button type="button" disabled={memberDirectoryLoading} onClick={() => void loadMemberDirectory(true)} className="min-h-10 w-full rounded-xl border border-border bg-card px-3 text-xs font-semibold text-foreground disabled:opacity-50">
-                {memberDirectoryLoading ? "Loading members…" : "Load more members"}
-              </button>
-            ) : null}
 
             {community.isJoined ? (
               <CommunityPeopleYouMayKnow
@@ -2218,25 +2109,46 @@ export function PremiumCommunityHub({
                         <div className="mt-2 flex flex-wrap gap-2">
                           <button
                             type="button"
-                            disabled={reportActionBusy !== null}
-                            className="min-h-9 rounded-full border border-border px-3 text-[11px] font-bold disabled:cursor-wait disabled:opacity-50"
-                            onClick={() => void updateReportStatus(r.id, "reviewing")}
+                            className="min-h-9 rounded-full border border-border px-3 text-[11px] font-bold"
+                            onClick={() => {
+                              resolveCommunityReport(
+                                community.id,
+                                r.id,
+                                "reviewing",
+                                IdentityService.getCurrentUserId() || "mod"
+                              )
+                              setSafetyTick((t) => t + 1)
+                            }}
                           >
-                            {reportActionBusy === r.id ? "Saving…" : "Reviewing"}
+                            Reviewing
                           </button>
                           <button
                             type="button"
-                            disabled={reportActionBusy !== null}
-                            className="min-h-9 rounded-full bg-[var(--gh-green)] px-3 text-[11px] font-bold text-white disabled:cursor-wait disabled:opacity-50"
-                            onClick={() => void updateReportStatus(r.id, "resolved")}
+                            className="min-h-9 rounded-full bg-[var(--gh-green)] px-3 text-[11px] font-bold text-white"
+                            onClick={() => {
+                              resolveCommunityReport(
+                                community.id,
+                                r.id,
+                                "resolved",
+                                IdentityService.getCurrentUserId() || "mod"
+                              )
+                              setSafetyTick((t) => t + 1)
+                            }}
                           >
                             Resolve
                           </button>
                           <button
                             type="button"
-                            disabled={reportActionBusy !== null}
-                            className="min-h-9 rounded-full border border-border px-3 text-[11px] font-bold text-muted-foreground disabled:cursor-wait disabled:opacity-50"
-                            onClick={() => void updateReportStatus(r.id, "dismissed")}
+                            className="min-h-9 rounded-full border border-border px-3 text-[11px] font-bold text-muted-foreground"
+                            onClick={() => {
+                              resolveCommunityReport(
+                                community.id,
+                                r.id,
+                                "dismissed",
+                                IdentityService.getCurrentUserId() || "mod"
+                              )
+                              setSafetyTick((t) => t + 1)
+                            }}
                           >
                             Dismiss
                           </button>

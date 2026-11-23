@@ -6,7 +6,6 @@
 import { hasPrivilegedDatabase, readGhcServerEnv, type GhcServerEnv } from "./env"
 import { getProcessGhcStore } from "./store"
 import { buildCorrelationEnvelope } from "./correlation"
-import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
 export type GhcNotifEventType =
   | "GHC_SENT"
@@ -80,7 +79,7 @@ export async function recordGhcNotification(input: {
 
   if (isDb()) {
     const env = readGhcServerEnv()
-    const url = "rpc/ghc_record_notification_event"
+    const url = `${env.supabaseUrl!.replace(/\/$/, "")}/rest/v1/rpc/ghc_record_notification_event`
     try {
       const res = await fetch(url, {
         method: "POST",
@@ -148,7 +147,7 @@ export async function listGhcNotifications(
   const limit = Math.min(opts?.limit ?? 50, 100)
   if (isDb()) {
     const env = readGhcServerEnv()
-    const base = "ghc_economy_events"
+    const base = `${env.supabaseUrl!.replace(/\/$/, "")}/rest/v1/ghc_economy_events`
     const params = new URLSearchParams()
     params.set("user_id", `eq.${userId}`)
     params.set("order", "created_at.desc")
@@ -194,7 +193,7 @@ export async function markGhcNotificationRead(
 ): Promise<boolean> {
   if (isDb()) {
     const env = readGhcServerEnv()
-    const url = "ghc_economy_events?id=eq.${encodeURIComponent(notificationId)}&user_id=eq.${encodeURIComponent(userId)}"
+    const url = `${env.supabaseUrl!.replace(/\/$/, "")}/rest/v1/ghc_economy_events?id=eq.${encodeURIComponent(notificationId)}&user_id=eq.${encodeURIComponent(userId)}`
     try {
       const res = await fetch(url, {
         method: "PATCH",
@@ -221,7 +220,7 @@ export async function markGhcNotificationRead(
 export async function markAllGhcNotificationsRead(userId: string): Promise<number> {
   if (isDb()) {
     const env = readGhcServerEnv()
-    const url = "ghc_economy_events?user_id=eq.${encodeURIComponent(userId)}&read_at=is.null"
+    const url = `${env.supabaseUrl!.replace(/\/$/, "")}/rest/v1/ghc_economy_events?user_id=eq.${encodeURIComponent(userId)}&read_at=is.null`
     try {
       const res = await fetch(url, {
         method: "PATCH",
@@ -277,9 +276,6 @@ export async function notifyTransferCompleted(input: {
       counterpartyName: input.recipientName,
       role: "sent",
       open: "transaction",
-      transactionId: input.referenceId,
-      referenceId: input.referenceId,
-      deepLink: { open: "wallet", tab: "wallet", section: "transaction", transactionId: input.referenceId, referenceId: input.referenceId },
     },
   })
   await recordGhcNotification({
@@ -295,9 +291,6 @@ export async function notifyTransferCompleted(input: {
       counterpartyName: input.senderName,
       role: "received",
       open: "transaction",
-      transactionId: input.referenceId,
-      referenceId: input.referenceId,
-      deepLink: { open: "wallet", tab: "wallet", section: "transaction", transactionId: input.referenceId, referenceId: input.referenceId },
     },
   })
 }

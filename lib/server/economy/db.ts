@@ -4,7 +4,6 @@
  */
 
 import { readGhcServerEnv, hasPrivilegedDatabase, type GhcServerEnv } from "./env"
-import { supabaseRpc, supabaseRest, getServiceSupabaseConfig } from "@/lib/server/supabase/rest-client"
 import type { GhcTransferResult } from "@/lib/domains/economy-transfer-contract"
 import { mapTransferFailure } from "@/lib/domains/economy-transfer-contract"
 import type { GhcTransaction } from "@/lib/domains/economy-types"
@@ -75,22 +74,28 @@ export async function rpcExecuteTransfer(
     return { ok: false, error: mapTransferFailure("INVALID_TRANSFER_INPUT", "TRANSFER_FAILED") }
   }
 
+  const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_execute_transfer`
   try {
-    const rpcResult = await supabaseRpc('ghc_execute_transfer', {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
         p_sender_id: input.senderId,
         p_to_user_id: input.toUserId,
         p_amount: input.amount,
         p_reference_id: input.referenceId,
         p_note: input.note ?? null,
         p_request_id: input.requestId ?? null,
-      }, { timeoutMs: 12000 })
-    const res = {
-      ok: rpcResult.ok,
-      status: rpcResult.status,
-      json: async () => rpcResult.ok ? rpcResult.data : rpcResult.body,
-      text: async () => JSON.stringify(rpcResult.ok ? rpcResult.data : rpcResult.body),
-    }
-if (!res.ok) {
+      }),
+      signal: AbortSignal.timeout(12_000),
+    })
+
+    if (!res.ok) {
       // HTTP error bodies may contain SQL, schema, or provider internals; never
       // surface them through the domain error mapper. Domain errors are JSONB.
       return {
@@ -141,13 +146,17 @@ export async function rpcListTransactions(
     const { createdAt, id } = options.before
     params.set("or", `(created_at.lt.${createdAt},and(created_at.eq.${createdAt},id.lt.${id}))`)
   }
+  const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/ghc_transactions?${params.toString()}`
   try {
-    const restResult = await supabaseRest<Array<Record<string, unknown>>>(
-      `ghc_transactions?${params.toString()}`,
-      { method: "GET", timeoutMs: 8_000 },
-    )
-    if (!restResult.ok) return null
-    const rows = (Array.isArray(restResult.data) ? restResult.data : []) as Array<Record<string, unknown>>
+    const res = await fetch(url, {
+      headers: {
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      signal: AbortSignal.timeout(8_000),
+    })
+    if (!res.ok) return null
+    const rows = (await res.json()) as Array<Record<string, unknown>>
     if (!Array.isArray(rows) || rows.length > limit || rows.some((r) => !r || typeof r !== "object" ||
         !Number.isFinite(Number(r.amount)) || !Number.isFinite(new Date(String(r.created_at)).getTime()) ||
         !String(r.id || "").trim() || String(r.user_id || "") !== userId)) return null
@@ -185,15 +194,19 @@ export async function rpcWalletSnapshot(
   updatedAt: number
 } | null> {
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey || !userId?.trim() || userId.length > 160) return null
+  const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_wallet_snapshot`
   try {
-    const rpcResult = await supabaseRpc('ghc_wallet_snapshot', { p_user_id: userId }, { timeoutMs: 12000 })
-    const res = {
-      ok: rpcResult.ok,
-      status: rpcResult.status,
-      json: async () => rpcResult.ok ? rpcResult.data : rpcResult.body,
-      text: async () => JSON.stringify(rpcResult.ok ? rpcResult.data : rpcResult.body),
-    }
-if (!res.ok) return null
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ p_user_id: userId }),
+      signal: AbortSignal.timeout(12_000),
+    })
+    if (!res.ok) return null
     const data = (await res.json()) as Record<string, unknown>
     if (!data || typeof data !== "object" || Array.isArray(data)) return null
     // A malformed snapshot must never be rendered as a legitimate zero balance.
@@ -223,17 +236,20 @@ export async function rpcFindTransferByReference(
   env: GhcServerEnv = readGhcServerEnv()
 ): Promise<{ debit?: GhcTransaction; credit?: GhcTransaction } | null> {
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey || !referenceId?.trim() || referenceId.length > 160 || /[\r\n\u0000-\u001f\u007f]/.test(referenceId)) return null
-  const path =
-    "ghc_transactions" +
+  const url =
+    `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/ghc_transactions` +
     `?reference_id=eq.${encodeURIComponent(referenceId)}&status=eq.posted` +
     `&kind=in.(transfer_out,transfer_in)&limit=3`
   try {
-    const restResult = await supabaseRest<Array<Record<string, unknown>>>(path, {
-      method: "GET",
-      timeoutMs: 8_000,
+    const res = await fetch(url, {
+      headers: {
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      signal: AbortSignal.timeout(8_000),
     })
-    if (!restResult.ok) return null
-    const rows = (Array.isArray(restResult.data) ? restResult.data : []) as Array<Record<string, unknown>>
+    if (!res.ok) return null
+    const rows = (await res.json()) as Array<Record<string, unknown>>
     if (!Array.isArray(rows) || rows.length > 3 || rows.some((r) => !r || typeof r !== "object" ||
         String(r.reference_id || "") !== referenceId || r.status !== "posted" ||
         !["transfer_out", "transfer_in"].includes(String(r.kind)) || !Number.isFinite(Number(r.amount)) ||
@@ -266,11 +282,26 @@ export { hasPrivilegedDatabase }
 async function rpcJson(
   fn: string,
   body: Record<string, unknown>,
-  _env: GhcServerEnv = readGhcServerEnv()
+  env: GhcServerEnv = readGhcServerEnv()
 ): Promise<Record<string, unknown> | null> {
-  const result = await supabaseRpc<Record<string, unknown>>(fn, body, { timeoutMs: 8_000 })
-  if (!result.ok) return null
-  return result.data
+  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
+  const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/${fn}`
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8_000),
+    })
+    if (!res.ok) return null
+    return (await res.json()) as Record<string, unknown>
+  } catch {
+    return null
+  }
 }
 
 export async function rpcCreateTransferRequest(input: {
@@ -325,6 +356,7 @@ export async function rpcListTransferRequests(
   env: GhcServerEnv = readGhcServerEnv()
 ): Promise<Array<Record<string, unknown>> | null> {
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
+  const base = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/ghc_transfer_requests`
   const params = new URLSearchParams()
   params.set("order", "created_at.desc")
   params.set("limit", "100")
@@ -336,12 +368,15 @@ export async function rpcListTransferRequests(
     params.set("or", `(payer_id.eq.${userId},requester_id.eq.${userId})`)
   }
   try {
-    const restResult = await supabaseRest<Array<Record<string, unknown>>>(
-      `ghc_transfer_requests?${params}`,
-      { method: "GET", timeoutMs: 8_000 },
-    )
-    if (!restResult.ok) return null
-    return (Array.isArray(restResult.data) ? restResult.data : null) as Array<Record<string, unknown>> | null
+    const res = await fetch(`${base}?${params}`, {
+      headers: {
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      signal: AbortSignal.timeout(8_000),
+    })
+    if (!res.ok) return null
+    return (await res.json()) as Array<Record<string, unknown>>
   } catch {
     return null
   }
@@ -356,18 +391,22 @@ export async function rpcEnsureAccountCreatedAt(
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
     return { ok: false, error: "SERVER_UNAVAILABLE" }
   }
+  const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_ensure_account_created_at`
   try {
-    const rpcResult = await supabaseRpc('ghc_ensure_account_created_at', {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      body: JSON.stringify({
         p_user_id: userId,
         p_hint: hintMs != null ? new Date(hintMs).toISOString() : null,
-      }, { timeoutMs: 8000 })
-    const res = {
-      ok: rpcResult.ok,
-      status: rpcResult.status,
-      json: async () => rpcResult.ok ? rpcResult.data : rpcResult.body,
-      text: async () => JSON.stringify(rpcResult.ok ? rpcResult.data : rpcResult.body),
-    }
-if (!res.ok) {
+      }),
+      signal: AbortSignal.timeout(8_000),
+    })
+    if (!res.ok) {
       return { ok: false, error: "SERVER_UNAVAILABLE" }
     }
     const data = (await res.json()) as Record<string, unknown>
@@ -419,8 +458,16 @@ export async function rpcStagePending(
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
     return { ok: false, error: "SERVER_UNAVAILABLE" }
   }
+  const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_stage_pending`
   try {
-    const rpcResult = await supabaseRpc('ghc_stage_pending', {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      body: JSON.stringify({
         p_user_id: input.userId,
         p_amount: input.amount,
         p_reference_id: input.referenceId,
@@ -444,14 +491,10 @@ export async function rpcStagePending(
         p_target_id: input.targetId
           ? String(input.targetId).trim() || null
           : null,
-      }, { timeoutMs: 8000 })
-    const res = {
-      ok: rpcResult.ok,
-      status: rpcResult.status,
-      json: async () => rpcResult.ok ? rpcResult.data : rpcResult.body,
-      text: async () => JSON.stringify(rpcResult.ok ? rpcResult.data : rpcResult.body),
-    }
-if (!res.ok) {
+      }),
+      signal: AbortSignal.timeout(8_000),
+    })
+    if (!res.ok) {
       const body = await res.json().catch(() => null)
       const msg =
         body && typeof body === "object" && "message" in body
@@ -499,13 +542,18 @@ export async function rpcListMaturedDailyClaimHolds(
     order: "created_at.asc",
     limit: "100",
   })
+  const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/ghc_transactions?${params.toString()}`
   try {
-    const restResult = await supabaseRest<Array<Record<string, unknown>>>(
-      `ghc_transactions?${params.toString()}`,
-      { method: "GET", timeoutMs: 12_000 },
-    )
-    if (!restResult.ok) return null
-    const rows = (Array.isArray(restResult.data) ? restResult.data : []) as Array<Record<string, unknown>>
+    const res = await fetch(url, {
+      headers: {
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
+    })
+    if (!res.ok) return null
+    const rows = (await res.json()) as Array<Record<string, unknown>>
     return rows.map((row) => ({
       id: String(row.id),
       amount: Number(row.amount),
@@ -565,8 +613,16 @@ export async function rpcActivityStageReward(
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
     return { ok: false, error: "SERVER_UNAVAILABLE" }
   }
+  const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_activity_stage_reward`
   try {
-    const rpcResult = await supabaseRpc('ghc_activity_stage_reward', {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      body: JSON.stringify({
         p_user_id: input.userId,
         p_base_amount: input.baseAmount,
         p_day_key: input.dayKey,
@@ -598,14 +654,11 @@ export async function rpcActivityStageReward(
           input.stageAmount != null && Number.isFinite(input.stageAmount)
             ? Number(input.stageAmount)
             : null,
-      }, { timeoutMs: 8000 })
-    const res = {
-      ok: rpcResult.ok,
-      status: rpcResult.status,
-      json: async () => rpcResult.ok ? rpcResult.data : rpcResult.body,
-      text: async () => JSON.stringify(rpcResult.ok ? rpcResult.data : rpcResult.body),
-    }
-if (!res.ok) {
+      }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
+    })
+    if (!res.ok) {
       const body = await res.json().catch(() => null)
       const msg =
         body && typeof body === "object" && "message" in body
@@ -667,15 +720,19 @@ export async function rpcClaimPending(
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
     return { ok: false, error: "SERVER_UNAVAILABLE" }
   }
+  const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_claim_pending`
   try {
-    const rpcResult = await supabaseRpc('ghc_claim_pending', { p_user_id: userId, p_hold_id: holdId }, { timeoutMs: 8000 })
-    const res = {
-      ok: rpcResult.ok,
-      status: rpcResult.status,
-      json: async () => rpcResult.ok ? rpcResult.data : rpcResult.body,
-      text: async () => JSON.stringify(rpcResult.ok ? rpcResult.data : rpcResult.body),
-    }
-if (!res.ok) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      body: JSON.stringify({ p_user_id: userId, p_hold_id: holdId }),
+      signal: AbortSignal.timeout(8_000),
+    })
+    if (!res.ok) {
       return { ok: false, error: "SERVER_UNAVAILABLE" }
     }
     const data = (await res.json()) as Record<string, unknown>
@@ -725,15 +782,19 @@ export async function rpcEconomicPopulationStats(
     source: "unavailable",
   }
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return fallback
+  const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_economic_population_stats`
   try {
-    const rpcResult = await supabaseRpc('ghc_economic_population_stats', {}, { timeoutMs: 8000 })
-    const res = {
-      ok: rpcResult.ok,
-      status: rpcResult.status,
-      json: async () => rpcResult.ok ? rpcResult.data : rpcResult.body,
-      text: async () => JSON.stringify(rpcResult.ok ? rpcResult.data : rpcResult.body),
-    }
-if (!res.ok) return fallback
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      body: JSON.stringify({}),
+      signal: AbortSignal.timeout(8_000),
+    })
+    if (!res.ok) return fallback
     const data = (await res.json()) as Record<string, unknown>
     if (!data || data.ok === false) return fallback
     const eligible = Math.max(1, Math.floor(Number(data.eligibleEconomicUsers) || 1))
@@ -785,15 +846,19 @@ export async function rpcGetClaimStreak(
     error: "SERVER_UNAVAILABLE",
   }
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return empty
+  const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_get_claim_streak`
   try {
-    const rpcResult = await supabaseRpc('ghc_get_claim_streak', { p_user_id: userId }, { timeoutMs: 8000 })
-    const res = {
-      ok: rpcResult.ok,
-      status: rpcResult.status,
-      json: async () => rpcResult.ok ? rpcResult.data : rpcResult.body,
-      text: async () => JSON.stringify(rpcResult.ok ? rpcResult.data : rpcResult.body),
-    }
-if (!res.ok) return empty
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      body: JSON.stringify({ p_user_id: userId }),
+      signal: AbortSignal.timeout(8_000),
+    })
+    if (!res.ok) return empty
     const data = (await res.json()) as Record<string, unknown>
     if (!data || data.ok === false) {
       return { ...empty, error: String(data?.error || "FAILED") }
@@ -845,22 +910,26 @@ export async function rpcCommitClaimDay(
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
     return { ok: false, error: "SERVER_UNAVAILABLE" }
   }
+  const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_commit_claim_day`
   try {
-    const rpcResult = await supabaseRpc('ghc_commit_claim_day', {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      body: JSON.stringify({
         p_user_id: input.userId,
         p_claim_day_key: input.claimDayKey,
         p_cycle_day: input.cycleDay,
         p_completed_cycles: input.completedCycles,
         p_idempotency_key: input.idempotencyKey,
         p_economic_version: input.economicVersion || "1.2",
-      }, { timeoutMs: 12000 })
-    const res = {
-      ok: rpcResult.ok,
-      status: rpcResult.status,
-      json: async () => rpcResult.ok ? rpcResult.data : rpcResult.body,
-      text: async () => JSON.stringify(rpcResult.ok ? rpcResult.data : rpcResult.body),
-    }
-if (!res.ok) return { ok: false, error: "SERVER_UNAVAILABLE" }
+      }),
+      signal: AbortSignal.timeout(12_000),
+    })
+    if (!res.ok) return { ok: false, error: "SERVER_UNAVAILABLE" }
     const data = (await res.json()) as Record<string, unknown>
     if (!data || data.ok === false) {
       return { ok: false, error: String(data?.error || "COMMIT_FAILED") }
@@ -930,8 +999,16 @@ export async function rpcExecuteDailyClaimV12(
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
     return { ok: false, error: "SERVER_UNAVAILABLE" }
   }
+  const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_execute_daily_claim_v12`
   try {
-    const rpcResult = await supabaseRpc('ghc_execute_daily_claim_v12', {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      body: JSON.stringify({
         p_user_id: input.userId,
         p_claim_day_key: input.claimDayKey,
         p_cycle_day: input.cycleDay,
@@ -945,14 +1022,10 @@ export async function rpcExecuteDailyClaimV12(
         p_g: input.g,
         p_economic_version: input.economicVersion || "1.2",
         p_missed_day_reset: Boolean(input.missedDayReset),
-      }, { timeoutMs: 12000 })
-    const res = {
-      ok: rpcResult.ok,
-      status: rpcResult.status,
-      json: async () => rpcResult.ok ? rpcResult.data : rpcResult.body,
-      text: async () => JSON.stringify(rpcResult.ok ? rpcResult.data : rpcResult.body),
-    }
-if (!res.ok) {
+      }),
+      signal: AbortSignal.timeout(12_000),
+    })
+    if (!res.ok) {
       const text = await res.text().catch(() => "")
       return {
         ok: false,
@@ -1013,14 +1086,22 @@ export async function listOrphanTransferOuts(
     return { ok: false, orphans: [], error: "SERVER_UNAVAILABLE" }
   }
   try {
-    const rpcResult = await supabaseRpc<Record<string, unknown>>(
-      "ghc_list_orphan_transfer_outs",
-      { p_limit: limit },
-      { timeoutMs: 8_000 },
+    const res = await fetch(
+      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_list_orphan_transfer_outs`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: env.supabaseServiceRoleKey,
+          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        },
+        body: JSON.stringify({ p_limit: limit }),
+        signal: AbortSignal.timeout(8_000),
+      }
     )
-    const data = rpcResult.ok ? rpcResult.data : null
-    if (!rpcResult.ok || !data || data.ok !== true) {
-      return { ok: false, orphans: [], error: String((data && (data.error || data.message)) || "LIST_FAILED") }
+    const data = await res.json().catch(() => null)
+    if (!res.ok || !data?.ok) {
+      return { ok: false, orphans: [], error: String(data?.error || data?.message || "LIST_FAILED") }
     }
     return { ok: true, orphans: Array.isArray(data.orphans) ? data.orphans : [] }
   } catch {
@@ -1041,17 +1122,25 @@ export async function completeOrphanTransferIn(
     return { ok: false, error: "SERVER_UNAVAILABLE" }
   }
   try {
-    const rpcResult = await supabaseRpc<Record<string, unknown>>(
-      "ghc_complete_orphan_transfer_in",
+    const res = await fetch(
+      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_complete_orphan_transfer_in`,
       {
-        p_reference_id: referenceId,
-        p_operator_note: operatorNote.slice(0, 160),
-      },
-      { timeoutMs: 8_000 },
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: env.supabaseServiceRoleKey,
+          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        },
+        body: JSON.stringify({
+          p_reference_id: referenceId,
+          p_operator_note: operatorNote.slice(0, 160),
+        }),
+        signal: AbortSignal.timeout(8_000),
+      }
     )
-    const data = rpcResult.ok ? rpcResult.data : null
-    if (!rpcResult.ok || !data || data.ok !== true) {
-      return { ok: false, error: String((data && (data.error || data.message)) || "COMPLETE_FAILED") }
+    const data = await res.json().catch(() => null)
+    if (!res.ok || !data?.ok) {
+      return { ok: false, error: String(data?.error || data?.message || "COMPLETE_FAILED") }
     }
     return { ok: true, idempotent: Boolean(data.idempotent) }
   } catch {

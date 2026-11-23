@@ -31,23 +31,13 @@ export interface ProfileRelationshipIndex {
   readonly incomingRequests: ReadonlySet<string>
 }
 
-export const MAX_PROFILE_RELATIONSHIP_IDS = 50_000
-export const MAX_PROFILE_ID_LENGTH = 256
-export const DEFAULT_PROFILE_BATCH_LIMIT = 500
-
-function isSafeProfileId(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= MAX_PROFILE_ID_LENGTH && !/[\u0000-\u001f\u007f]/.test(value)
-}
-
 function toIdSet(values: readonly string[] | undefined): ReadonlySet<string> {
   const result = new Set<string>()
   for (const value of values || []) {
-    if (!isSafeProfileId(value)) continue
-    const id = value.trim()
-    if (!id) continue
-    result.add(id)
-    // Bound derived memory even if a malformed upstream graph is unexpectedly large.
-    if (result.size >= MAX_PROFILE_RELATIONSHIP_IDS) break
+    if (typeof value === "string") {
+      const id = value.trim()
+      if (id) result.add(id)
+    }
   }
   return result
 }
@@ -116,21 +106,15 @@ export function createProfileRelationshipIndexCache(
  * Batch hydration is keyed by normalized ID. Duplicate, empty and malformed IDs
  * are ignored, preventing duplicate work and ambiguous output entries.
  */
-export function uniqueProfileIds(
-  userIds: readonly unknown[],
-  limit = DEFAULT_PROFILE_BATCH_LIMIT,
-): string[] {
-  const safeLimit = Number.isSafeInteger(limit) ? Math.max(0, Math.min(limit, 5_000)) : DEFAULT_PROFILE_BATCH_LIMIT
+export function uniqueProfileIds(userIds: readonly unknown[]): string[] {
   const seen = new Set<string>()
   const result: string[] = []
-  if (safeLimit === 0) return result
   for (const value of userIds) {
-    if (!isSafeProfileId(value)) continue
+    if (typeof value !== "string") continue
     const id = value.trim()
     if (!id || seen.has(id)) continue
     seen.add(id)
     result.push(id)
-    if (result.length >= safeLimit) break
   }
   return result
 }

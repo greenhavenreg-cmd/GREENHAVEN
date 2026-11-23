@@ -4,7 +4,6 @@
  */
 
 import { hasPrivilegedDatabase, readGhcServerEnv, type GhcServerEnv } from "./env"
-import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 import {
   deriveGreenHavenId,
   GH_ID_REGEX,
@@ -99,7 +98,7 @@ async function rpcEnsure(
   env: GhcServerEnv = readGhcServerEnv()
 ): Promise<PublicIdentity | null> {
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
-  const url = "rpc/ghc_ensure_public_id"
+  const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_ensure_public_id`
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -139,7 +138,7 @@ async function rpcResolve(
   env: GhcServerEnv = readGhcServerEnv()
 ): Promise<PublicIdentity | null> {
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
-  const url = "rpc/ghc_resolve_public_id"
+  const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_resolve_public_id`
   try {
     const res = await fetch(url, {
       method: "POST",

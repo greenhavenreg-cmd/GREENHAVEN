@@ -12,4 +12,3 @@ export {
 
 export type { ConversationSummary } from "@/lib/domains/contracts/messaging"
 export { messagingEmptyState } from "@/lib/domains/contracts/messaging"
-export * from "@/lib/active-upgrades/chat"

@@ -28,7 +28,6 @@ import { appendVerifiedCompanyRevenueEvent } from "@/lib/server/revenue/revenue-
 import { attachLedgerCorrelation, buildCorrelationEnvelope } from "@/lib/server/economy/correlation"
 import { parseGhcSpendRpcResult } from "@/lib/server/economy/spend-rpc-contract"
 import { enforceUserMutationRateLimit } from "@/lib/server/security/user-rate-limit"
-import { notifyMarketplaceOrderPaid } from "@/lib/server/notifications/unified"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -165,7 +164,6 @@ export async function POST(
       order.status === "fulfilling" ||
       order.status === "completed")
   ) {
-    await notifyMarketplaceOrderPaid({ order, actorUserId: auth.userId, paymentMethod: "ghc" })
     return NextResponse.json({ ok: true, order, idempotent: true, recovered: true })
   }
 
@@ -208,9 +206,8 @@ export async function POST(
         verifiedAt: priorIntent.completedAt ? new Date(priorIntent.completedAt).toISOString() : "",
       })
       const refreshedOrder = await loadOrder(order.id)
-      await notifyMarketplaceOrderPaid({ order: refreshedOrder || order, actorUserId: auth.userId, paymentIntentId: priorIntent.id, paymentMethod: "pi" })
       if (isRevenueReconciliationPending(commission)) return reconciliationPendingResponse(refreshedOrder || order, commission)
-    return NextResponse.json({ ok: true, order: refreshedOrder || order, idempotent: true, recovered: true, commission, durableOrders: marketplaceOrdersDurable() }, { headers: { "Cache-Control": "no-store" } })
+      return NextResponse.json({ ok: true, order: refreshedOrder || order, idempotent: true, recovered: true, commission, durableOrders: marketplaceOrdersDurable() }, { headers: { "Cache-Control": "no-store" } })
     }
     return NextResponse.json({ ok: false, error: "PAYMENT_VERIFIED_RECONCILIATION_REQUIRED", retryable: true }, { status: 503, headers: { "Cache-Control": "no-store" } })
   }
@@ -358,7 +355,6 @@ export async function POST(
       paymentMethod: "ghc",
       buyerId: order.buyerId,
     })
-    await notifyMarketplaceOrderPaid({ order, actorUserId: auth.userId, paymentMethod: "ghc" })
     return NextResponse.json({
       ok: true,
       order: await loadOrder(order.id),
@@ -464,7 +460,6 @@ export async function POST(
       verifiedAt: intent.completedAt ? new Date(intent.completedAt).toISOString() : "",
     })
     const refreshedOrder = await loadOrder(order.id)
-    await notifyMarketplaceOrderPaid({ order: refreshedOrder || order, actorUserId: auth.userId, paymentIntentId: intent.id, paymentMethod: "pi" })
     if (isRevenueReconciliationPending(commission)) return reconciliationPendingResponse(refreshedOrder || order, commission)
     return NextResponse.json({
       ok: true,

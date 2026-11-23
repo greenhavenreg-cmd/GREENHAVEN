@@ -11,16 +11,11 @@
  * - Prefer Supabase table public.gh_pi_identities when service role is configured
  * - Fall back to process memory only when DB is unavailable (local/dev)
  *
- * Canonical identity IDs are immutable: lookup outages fail closed, and concurrent
- * first-time sign-ins use insert-only conflict handling rather than merge-upsert.
- * A deleted mapping must be restored only through verified account recovery; a
- * normal sign-in must never silently reassign or recreate an existing account.
  * No economics / payment changes.
  */
 
 import { randomUUID } from "node:crypto"
 import { readGhcServerEnv, hasPrivilegedDatabase } from "@/lib/server/economy/env"
-import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
 export type PiIdentityRecord = {
   /** GreenHaven canonical user id (stable) */
@@ -67,9 +62,8 @@ function isProductionRuntime(): boolean {
 /**
  * Allocate an internal GH identity independently from the external Pi UID.
  * The verified Pi UID remains the unique lookup key; this UUID is stable only
- * while its mapping row exists. Mapping deletion is an account-lifecycle operation;
- * if a mapping is absent, account recovery must verify the prior account anchor before
- * any new identity is provisioned. Do not treat an absent row as proof of a new user.
+ * while its mapping row exists. If an operator deliberately removes that row,
+ * the next verified sign-in creates a new GH identity.
  */
 function newGhUserId(_piAppUid: string): string {
   return randomUUID()
@@ -128,122 +122,123 @@ function rowToRecord(row: DbRow): PiIdentityRecord {
 
 async function dbSelectByPi(piAppUid: string): Promise<PiIdentityRecord | null> {
   const env = readGhcServerEnv()
-  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
-    throw new Error("PI_IDENTITY_DATABASE_UNAVAILABLE")
+  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
+  try {
+    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_pi_identities?pi_app_uid=eq.${encodeURIComponent(piAppUid)}&select=*&limit=1`
+    const res = await fetch(url, {
+      headers: {
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    })
+    if (!res.ok) {
+      if (res.status === 404 || res.status === 406) return null
+      console.error("[pi-identity] dbSelectByPi failed", res.status)
+      return null
+    }
+    const rows = (await res.json()) as DbRow[]
+    if (!Array.isArray(rows) || rows.length === 0) return null
+    return rowToRecord(rows[0])
+  } catch (err) {
+    console.error("[pi-identity] dbSelectByPi error", err instanceof Error ? err.message : "unknown")
+    return null
   }
-  const restResult = await supabaseRest(`gh_pi_identities?pi_app_uid=eq.${encodeURIComponent(piAppUid)}&select=*&limit=1`, { method: "GET", timeoutMs: 10000 })
-    const res = { ok: restResult.ok, status: restResult.status, json: async () => restResult.ok ? restResult.data : restResult.body, text: async () => JSON.stringify(restResult.ok ? restResult.data : restResult.body) }
-  if (!res.ok) {
-    console.error("[pi-identity] dbSelectByPi failed", res.status)
-    throw new Error("PI_IDENTITY_LOOKUP_FAILED")
-  }
-  const rows = (await res.json()) as DbRow[]
-  if (!Array.isArray(rows) || rows.length === 0) return null
-  return rowToRecord(rows[0])
 }
 
 async function dbSelectByGh(ghUserId: string): Promise<PiIdentityRecord | null> {
   const env = readGhcServerEnv()
-  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
-    throw new Error("PI_IDENTITY_DATABASE_UNAVAILABLE")
+  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
+  try {
+    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_pi_identities?gh_user_id=eq.${encodeURIComponent(ghUserId)}&select=*&limit=1`
+    const res = await fetch(url, {
+      headers: {
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    })
+    if (!res.ok) return null
+    const rows = (await res.json()) as DbRow[]
+    if (!Array.isArray(rows) || rows.length === 0) return null
+    return rowToRecord(rows[0])
+  } catch (err) {
+    console.error("[pi-identity] dbSelectByGh error", err instanceof Error ? err.message : "unknown")
+    return null
   }
-  const restResult = await supabaseRest(`gh_pi_identities?gh_user_id=eq.${encodeURIComponent(ghUserId)}&select=*&limit=1`, { method: "GET", timeoutMs: 10000 })
-    const res = { ok: restResult.ok, status: restResult.status, json: async () => restResult.ok ? restResult.data : restResult.body, text: async () => JSON.stringify(restResult.ok ? restResult.data : restResult.body) }
-  if (!res.ok) {
-    console.error("[pi-identity] dbSelectByGh failed", res.status)
-    throw new Error("PI_IDENTITY_LOOKUP_FAILED")
-  }
-  const rows = (await res.json()) as DbRow[]
-  if (!Array.isArray(rows) || rows.length === 0) return null
-  return rowToRecord(rows[0])
 }
 
-/** Update mutable profile/last-seen fields without ever changing the canonical GH identity. */
-async function dbUpdateExisting(rec: PiIdentityRecord): Promise<PiIdentityRecord> {
+async function dbUpsert(rec: PiIdentityRecord): Promise<PiIdentityRecord | null> {
   const env = readGhcServerEnv()
-  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
-    throw new Error("PI_IDENTITY_DATABASE_UNAVAILABLE")
+  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
+  const body = {
+    pi_app_uid: rec.piAppUid,
+    gh_user_id: rec.ghUserId,
+    pi_username: rec.piUsername,
+    onboarding_completed: rec.onboardingCompleted,
+    greenhaven_profile_id: rec.greenhavenProfileId ?? null,
+    updated_at: new Date().toISOString(),
+    last_seen_at: new Date(rec.lastSeenAt).toISOString(),
+    verified_at: new Date(rec.verifiedAt).toISOString(),
+    // created_at set only on insert via DB default; Prefer: resolution-merge keeps existing
   }
-  const result = await supabaseRest<DbRow[]>(`gh_pi_identities?pi_app_uid=eq.${encodeURIComponent(rec.piAppUid)}`, {
-    method: "PATCH",
-    headers: { Prefer: "return=representation" },
-    body: JSON.stringify({
-      pi_username: rec.piUsername,
-      updated_at: new Date().toISOString(),
-      last_seen_at: new Date(rec.lastSeenAt).toISOString(),
-      verified_at: new Date(rec.verifiedAt).toISOString(),
-    }),
-    timeoutMs: 10_000,
-  })
-  if (!result.ok) {
-    console.error("[pi-identity] dbUpdateExisting failed", result.status)
-    throw new Error("PI_IDENTITY_UPDATE_FAILED")
-  }
-  const rows = result.data
-  if (!Array.isArray(rows) || rows.length !== 1) {
-    throw new Error("PI_IDENTITY_MAPPING_DISAPPEARED")
-  }
-  const saved = rowToRecord(rows[0])
-  if (saved.ghUserId !== rec.ghUserId || saved.piAppUid !== rec.piAppUid) {
-    throw new Error("PI_IDENTITY_MAPPING_IMMUTABILITY_VIOLATION")
-  }
-  return saved
-}
-
-/** Insert-only identity creation. A concurrent winner is re-read, never overwritten. */
-async function dbInsertNew(rec: PiIdentityRecord): Promise<{ record: PiIdentityRecord; inserted: boolean }> {
-  const env = readGhcServerEnv()
-  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
-    throw new Error("PI_IDENTITY_DATABASE_UNAVAILABLE")
-  }
-  const result = await supabaseRest<DbRow[]>("gh_pi_identities", {
-    method: "POST",
-    headers: { Prefer: "resolution=ignore-duplicates,return=representation" },
-    body: JSON.stringify({
-      pi_app_uid: rec.piAppUid,
-      gh_user_id: rec.ghUserId,
-      pi_username: rec.piUsername,
-      onboarding_completed: rec.onboardingCompleted,
-      created_at: new Date(rec.createdAt).toISOString(),
-      updated_at: new Date().toISOString(),
-      last_seen_at: new Date(rec.lastSeenAt).toISOString(),
-      verified_at: new Date(rec.verifiedAt).toISOString(),
-      greenhaven_profile_id: rec.greenhavenProfileId ?? null,
-    }),
-    timeoutMs: 10_000,
-  })
-  if (!result.ok) {
-    console.error("[pi-identity] dbInsertNew failed", result.status)
-    throw new Error("PI_IDENTITY_INSERT_FAILED")
-  }
-  const rows = result.data
-  if (Array.isArray(rows) && rows.length === 1) {
-    const saved = rowToRecord(rows[0])
-    if (saved.ghUserId !== rec.ghUserId || saved.piAppUid !== rec.piAppUid) {
-      throw new Error("PI_IDENTITY_MAPPING_IMMUTABILITY_VIOLATION")
+  try {
+    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_pi_identities`
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        Prefer: "resolution=merge-duplicates,return=representation",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => "")
+      console.error("[pi-identity] dbUpsert failed", res.status, text.slice(0, 200))
+      return null
     }
-    return { record: saved, inserted: true }
+    const rows = (await res.json()) as DbRow[]
+    if (Array.isArray(rows) && rows[0]) return rowToRecord(rows[0])
+    // Some PostgREST configs return empty on merge; re-read
+    return dbSelectByPi(rec.piAppUid)
+  } catch (err) {
+    console.error("[pi-identity] dbUpsert error", err instanceof Error ? err.message : "unknown")
+    return null
   }
-  const concurrentWinner = await dbSelectByPi(rec.piAppUid)
-  if (!concurrentWinner) throw new Error("PI_IDENTITY_INSERT_CONFLICT_UNRESOLVED")
-  return { record: concurrentWinner, inserted: false }
 }
 
 async function dbMarkOnboarding(ghUserId: string): Promise<PiIdentityRecord | null> {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
   try {
-    const result = await supabaseRest<DbRow[]>(`gh_pi_identities?gh_user_id=eq.${encodeURIComponent(ghUserId)}`, {
+    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_pi_identities?gh_user_id=eq.${encodeURIComponent(ghUserId)}`
+    const res = await fetch(url, {
       method: "PATCH",
-      headers: { Prefer: "return=representation" },
-      body: JSON.stringify({ onboarding_completed: true, updated_at: new Date().toISOString() }),
-      timeoutMs: 10_000,
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        Prefer: "return=representation",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        onboarding_completed: true,
+        updated_at: new Date().toISOString(),
+        last_seen_at: new Date().toISOString(),
+      }),
+      cache: "no-store",
     })
-    if (!result.ok) {
-      console.error("[pi-identity] dbMarkOnboarding failed", result.status)
+    if (!res.ok) {
+      console.error("[pi-identity] dbMarkOnboarding failed", res.status)
       return null
     }
-    const rows = result.data
+    const rows = (await res.json()) as DbRow[]
     if (!Array.isArray(rows) || rows.length === 0) return null
     return rowToRecord(rows[0])
   } catch (err) {
@@ -263,16 +258,13 @@ export async function getByPiAppUid(piAppUid: string): Promise<PiIdentityRecord 
   const key = String(piAppUid || "").trim()
   if (!key) return null
   if (dbConfigured()) {
-    try {
-      const fromDb = await dbSelectByPi(key)
-      if (fromDb) memoryPut(fromDb)
+    const fromDb = await dbSelectByPi(key)
+    if (fromDb) {
+      memoryPut(fromDb)
       return fromDb
-    } catch (error) {
-      if (isProductionRuntime()) throw error
-      return memoryGetByPi(key)
     }
   }
-  return isProductionRuntime() ? null : memoryGetByPi(key)
+  return memoryGetByPi(key)
 }
 
 
@@ -293,27 +285,31 @@ export async function getByPiUsername(username: string): Promise<PiIdentityRecor
           pi_username: `ilike.${key}`,
           limit: "5",
         })
-        const res = await (async () => { const r = await supabaseRest(`gh_pi_identities?${params}`, { method: "GET", timeoutMs: 10000 }); return { ok: r.ok, status: r.status, json: async () => r.ok ? r.data : r.body, text: async () => JSON.stringify(r.ok ? r.data : r.body) }; })()
-        if (!res.ok) {
-          throw new Error("PI_IDENTITY_USERNAME_LOOKUP_FAILED")
+        const res = await fetch(`${base}/rest/v1/gh_pi_identities?${params}`, {
+          headers: {
+            apikey: env.supabaseServiceRoleKey,
+            Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+            Accept: "application/json",
+          },
+          cache: "no-store",
+          signal: AbortSignal.timeout(10_000),
+        })
+        if (res.ok) {
+          const rows = (await res.json()) as DbRow[]
+          if (Array.isArray(rows) && rows.length === 1) {
+            const rec = rowToRecord(rows[0])
+            memoryPut(rec)
+            return rec
+          }
+          // Ambiguous or empty — do not guess
+          if (Array.isArray(rows) && rows.length > 1) return null
         }
-        const rows = (await res.json()) as DbRow[]
-        if (Array.isArray(rows) && rows.length === 1) {
-          const rec = rowToRecord(rows[0])
-          memoryPut(rec)
-          return rec
-        }
-        // Ambiguous or empty — do not guess or use stale process cache.
-        return null
       }
-      throw new Error("PI_IDENTITY_DATABASE_UNAVAILABLE")
     } catch (err) {
       console.error("[pi-identity] getByPiUsername", err instanceof Error ? err.message : "unknown")
-      if (isProductionRuntime()) return null
     }
   }
-  if (isProductionRuntime()) return null
-  // Non-production only: exact case-insensitive match unique only.
+  // Memory fallback: exact case-insensitive match unique only
   const matches: PiIdentityRecord[] = []
   for (const rec of byPiUid.values()) {
     if (rec.piUsername && rec.piUsername.toLowerCase() === key.toLowerCase()) matches.push(rec)
@@ -325,16 +321,13 @@ export async function getByGhUserId(ghUserId: string): Promise<PiIdentityRecord 
   const key = String(ghUserId || "").trim()
   if (!key) return null
   if (dbConfigured()) {
-    try {
-      const fromDb = await dbSelectByGh(key)
-      if (fromDb) memoryPut(fromDb)
+    const fromDb = await dbSelectByGh(key)
+    if (fromDb) {
+      memoryPut(fromDb)
       return fromDb
-    } catch (error) {
-      if (isProductionRuntime()) throw error
-      return memoryGetByGh(key)
     }
   }
-  return isProductionRuntime() ? null : memoryGetByGh(key)
+  return memoryGetByGh(key)
 }
 
 /**
@@ -360,8 +353,7 @@ export async function findOrCreateFromVerifiedPi(input: {
       ? String(input.piUsername).trim()
       : null
 
-  // Durable path: a lookup error is not equivalent to an absent identity.
-  // Never mint or upsert a replacement canonical ID unless the lookup succeeded.
+  // Durable path
   if (dbConfigured()) {
     const existing = await dbSelectByPi(piAppUid)
     if (existing) {
@@ -371,13 +363,37 @@ export async function findOrCreateFromVerifiedPi(input: {
         lastSeenAt: now(),
         verifiedAt: now(),
       }
-      const saved = await dbUpdateExisting(updated)
+      const saved = await dbUpsert(updated)
+      if (!saved) {
+        const isProd =
+          process.env.VERCEL_ENV === "production" ||
+          process.env.NODE_ENV === "production"
+        if (isProd) {
+          console.error("[pi-identity] durable upsert failed; refusing memory identity in production")
+          throw new Error("IDENTITY_DURABILITY_UNAVAILABLE")
+        }
+        memoryPut(updated)
+        return { record: updated, isNew: false }
+      }
       memoryPut(saved)
       return { record: saved, isNew: false }
     }
 
+    // Detect rare conflict: another pi uid already owns this gh_user_id scheme
+    const ghUserId = newGhUserId(piAppUid)
+    const byGh = await dbSelectByGh(ghUserId)
+    if (byGh && byGh.piAppUid !== piAppUid) {
+      console.error("[pi-identity] IDENTITY_CONFLICT", {
+        piAppUid,
+        existingGhUserId: byGh.ghUserId,
+        existingPiAppUid: byGh.piAppUid,
+      })
+      // Do not auto-merge. Treat as new mapping under pi uid (unique PK).
+      // Caller may surface conflict if needed.
+    }
+
     const created: PiIdentityRecord = {
-      ghUserId: newGhUserId(piAppUid),
+      ghUserId,
       piAppUid,
       piUsername: username,
       onboardingCompleted: false,
@@ -386,9 +402,20 @@ export async function findOrCreateFromVerifiedPi(input: {
       verifiedAt: now(),
       greenhavenProfileId: null,
     }
-    const result = await dbInsertNew(created)
-    memoryPut(result.record)
-    return { record: result.record, isNew: result.inserted }
+    const saved = await dbUpsert(created)
+    if (!saved) {
+      const isProd =
+        process.env.VERCEL_ENV === "production" ||
+        process.env.NODE_ENV === "production"
+      if (isProd) {
+        console.error("[pi-identity] durable upsert failed; refusing memory identity in production")
+        throw new Error("IDENTITY_DURABILITY_UNAVAILABLE")
+      }
+      memoryPut(created)
+      return { record: created, isNew: true }
+    }
+    memoryPut(saved)
+    return { record: saved, isNew: true }
   }
 
   // Memory fallback — local/dev only. Production must use durable store.
@@ -475,21 +502,22 @@ export async function touchLastSeen(ghUserId: string): Promise<void> {
     const env = readGhcServerEnv()
     if (env.supabaseUrl && env.supabaseServiceRoleKey) {
       try {
-        const timestamp = new Date().toISOString()
-        const result = await supabaseRest(
-          `gh_pi_identities?gh_user_id=eq.${encodeURIComponent(key)}`,
-          {
-            method: "PATCH",
-            headers: { Prefer: "return=minimal" },
-            body: JSON.stringify({ last_seen_at: timestamp, updated_at: timestamp }),
-            timeoutMs: 5_000,
+        const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_pi_identities?gh_user_id=eq.${encodeURIComponent(key)}`
+        await fetch(url, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: env.supabaseServiceRoleKey,
+            Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
           },
-        )
-        if (!result.ok) {
-          console.warn("[pi-identity] touchLastSeen persistence failed", result.status)
-        }
+          body: JSON.stringify({
+            last_seen_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }),
+          cache: "no-store",
+        })
       } catch {
-        /* last-seen telemetry is non-critical; identity authorization remains durable */
+        /* non-fatal */
       }
     }
   }

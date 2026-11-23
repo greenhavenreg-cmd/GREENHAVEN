@@ -2,7 +2,6 @@
  * Reputation store — service-role RPCs only.
  */
 import { readGhcServerEnv } from "@/lib/server/economy/env"
-import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 import {
   isReputationEventType,
   pointsForEvent,
@@ -19,7 +18,19 @@ async function rpc(
     return { ok: false, error: "DB_UNAVAILABLE" }
   }
   try {
-    const res = await (async () => { const r = await supabaseRpc(fn, body, { timeoutMs: 15000 }); return { ok: r.ok, status: r.status, json: async () => r.ok ? r.data : r.body, text: async () => JSON.stringify(r.ok ? r.data : r.body) }; })()
+    const res = await fetch(
+      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/${fn}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: env.supabaseServiceRoleKey,
+          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
+      }
+    )
     const data = (await res.json().catch(() => null)) as Record<string, unknown> | null
     if (!res.ok) {
       return {

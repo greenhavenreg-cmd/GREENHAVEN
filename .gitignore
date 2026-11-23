@@ -1,33 +1,44 @@
-# Dependencies and framework output
+# dependencies
 node_modules/
+.pnp
+.pnp.*
+.yarn/
+
+# next.js / build output
 .next/
 out/
 build/
-dist/
+next-env.d.ts
 
-# Local tooling and caches
-.vercel/
-.turbo/
+# incremental build cache (TypeScript tsBuildInfoFile lives under .cache/)
 .cache/
+*.tsbuildinfo
+
+# testing
 coverage/
 playwright-report/
 test-results/
-*.tsbuildinfo
 
-# Environment and secrets
+# secrets — keep only the example template
 .env
 .env.*
 !.env.example
 
-# Logs and operating-system files
+# vercel
+.vercel
+
+# logs / debug
 *.log
 npm-debug.log*
 yarn-debug.log*
-pnpm-debug.log*
-.DS_Store
-Thumbs.db
+yarn-error.log*
 
-# Local archives and generated reports
-*.zip
-*.tar
-*.tar.gz
+# os / editor
+.DS_Store
+*.pem
+.idea/
+.vscode/
+
+# Local responsive/device acceptance evidence may contain private preview data
+artifacts/phase2-responsive/
+playwright/.auth/

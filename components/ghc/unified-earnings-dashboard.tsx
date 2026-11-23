@@ -1,7 +1,5 @@
 "use client"
 
-import { releaseReservedPi, emitWalletBalanceRefresh } from "@/lib/wallet/release-reserved-pi"
-
 /**
  * Phase 8 — Unified PI earnings & payout dashboard.
  * Server-authoritative: /api/economy/earnings/withdrawable + /api/economy/earnings
@@ -21,8 +19,6 @@ import {
   RefreshCw,
   Shield,
   Wallet,
-  Copy,
-  Check,
 } from "lucide-react"
 
 type Withdrawable = {
@@ -51,9 +47,6 @@ type Withdrawable = {
     hasMapping?: boolean
     uidMatchesAuthorization?: boolean
     error?: string
-    piWalletAddress?: string | null
-    walletAddressSource?: "platform_api" | "pi_sdk_scope" | "provider_payment" | null
-    walletAddressVerifiedAt?: string | null
   } | null
   error?: string
 }
@@ -176,7 +169,6 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
   const [walletAuthActive, setWalletAuthActive] = useState<boolean | null>(null)
   const [walletAuthLoading, setWalletAuthLoading] = useState(false)
   const [authorizingWallet, setAuthorizingWallet] = useState(false)
-  const [walletAddressCopied, setWalletAddressCopied] = useState(false)
   const [charityTotal, setCharityTotal] = useState<string | null>(null)
   const [charityCount, setCharityCount] = useState(0)
   const [crossFindings, setCrossFindings] = useState<string[]>([])
@@ -287,9 +279,6 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
           ok?: boolean
           authorizationActive?: boolean
           uidMatchesAuthorization?: boolean
-          piWalletAddress?: string | null
-          walletAddressSource?: "platform_api" | "pi_sdk_scope" | "provider_payment" | null
-          walletAddressVerifiedAt?: string | null
           error?: string
         } | null
         if (!signal?.aborted) {
@@ -352,28 +341,6 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
    * Wallet consent is collected only in the withdrawal sheet (explicit checkbox + genuine Pi
    * authentication). The dashboard never records authorization on its own.
    */
-
-  const [releaseBusy, setReleaseBusy] = useState(false)
-  const [releaseStatus, setReleaseStatus] = useState<string | null>(null)
-  const onReleaseReservedEarnings = async () => {
-    setReleaseBusy(true)
-    setReleaseStatus(null)
-    try {
-      const r = await releaseReservedPi()
-      if (r.ok && r.released > 0) {
-        setReleaseStatus(`${r.released} incomplete withdrawal(s) returned to Available.`)
-        emitWalletBalanceRefresh()
-      } else if (r.ok) {
-        setReleaseStatus(r.message || "Nothing eligible to release yet.")
-      } else {
-        setReleaseStatus(r.message)
-      }
-    } catch {
-      setReleaseStatus("Could not contact server.")
-    } finally {
-      setReleaseBusy(false)
-    }
-  }
   const openWithdrawSheet = useCallback(() => {
     try {
       window.dispatchEvent(new CustomEvent("ghc:open-pi-withdraw"))
@@ -575,67 +542,6 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
         </button>
       </div>
 
-      <div className="mx-4 mt-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3" data-pi-wallet-connection>
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold text-foreground">Connected Pi wallet</p>
-            <p className="mt-0.5 text-[10px] text-muted-foreground">
-              {snap.walletAuthorization?.walletAddressSource === "provider_payment"
-                ? "Pi provider confirmed this payout address"
-                : snap.walletAuthorization?.walletAddressSource === "platform_api"
-                  ? "Wallet address returned by Pi Platform API"
-                  : snap.walletAuthorization?.walletAddressSource === "pi_sdk_scope"
-                    ? "Wallet address reported by Pi SDK; provider match checked before payout"
-                    : snap.walletAuthorization?.authorizationActive === true
-                      ? "Wallet permission verified; Pi confirms the address at your first payout"
-                      : "Wallet address permission required"}
-            </p>
-          </div>
-          <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-bold ${snap.walletAuthorization?.walletAddressSource === "provider_payment" || snap.walletAuthorization?.walletAddressSource === "platform_api" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200" : snap.walletAuthorization?.walletAddressSource === "pi_sdk_scope" ? "bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-200" : "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"}`}>
-            {walletAuthLoading ? "Checking" : snap.walletAuthorization?.walletAddressSource === "provider_payment" ? "Provider-confirmed" : snap.walletAuthorization?.walletAddressSource === "platform_api" ? "Pi API" : snap.walletAuthorization?.walletAddressSource === "pi_sdk_scope" ? "Pi SDK" : snap.walletAuthorization?.authorizationActive === true ? "Permission verified" : "Reconnect"}
-          </span>
-        </div>
-        {snap.walletAuthorization?.piWalletAddress ? (
-          <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-background/80 px-2.5 py-2">
-            <div className="min-w-0">
-              <p className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">Pi wallet address</p>
-              <p className="mt-0.5 break-all font-mono text-[11px] font-semibold text-foreground" data-pi-wallet-address>
-                {`${snap.walletAuthorization.piWalletAddress.slice(0, 7)}…${snap.walletAuthorization.piWalletAddress.slice(-6)}`}
-              </p>
-            </div>
-            <button
-              type="button"
-              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-border/70 px-3 text-[10px] font-semibold text-foreground hover:bg-muted"
-              aria-label="Copy connected Pi wallet address"
-              onClick={async () => {
-                try {
-                  if (!navigator.clipboard?.writeText) throw new Error("CLIPBOARD_UNAVAILABLE")
-                  await navigator.clipboard.writeText(String(snap.walletAuthorization?.piWalletAddress || ""))
-                  setWalletAddressCopied(true)
-                } catch {
-                  setWalletAddressCopied(false)
-                }
-              }}
-            >
-              {walletAddressCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              {walletAddressCopied ? "Copied" : "Copy"}
-            </button>
-          </div>
-        ) : (
-          <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
-            Tap Withdraw and reconnect Pi with the wallet-address permission. GreenHaven binds the Pi-reported address to your server-verified Pi identity and checks the provider destination before any payout is submitted.
-          </p>
-        )}
-        {snap.walletAuthorization?.walletAddressVerifiedAt ? (
-          <p className="mt-1.5 text-[9px] text-muted-foreground">
-            Last verified: {new Date(snap.walletAuthorization.walletAddressVerifiedAt).toLocaleString()}
-          </p>
-        ) : null}
-        <p className="mt-2 text-[9px] leading-relaxed text-muted-foreground">
-          A2U payouts are addressed by Pi's app-specific user ID. This public address is reported by Pi for that same authenticated account; it is not a manually entered payout destination. GreenHaven checks the provider's actual `to_address` against it before submission and settlement.
-        </p>
-      </div>
-
       <div className="grid grid-cols-2 gap-2 px-4 py-3 sm:grid-cols-4">
         {[
           { label: "Available", value: available },
@@ -705,7 +611,6 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
         ) : null}
         {/* Single primary control — hide when compact (wallet rail already owns the CTA). */}
         {!compact ? (
-          <>
         <button
           type="button"
           onClick={() => {
@@ -720,22 +625,7 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
           aria-label="Withdraw to Pi wallet"
         >
           Withdraw
-        
         </button>
-        <button
-          type="button"
-          onClick={() => void onReleaseReservedEarnings()}
-          disabled={releaseBusy}
-          className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/10 px-4 text-[13px] font-bold text-amber-950 transition hover:bg-amber-500/15 disabled:opacity-60 dark:text-amber-50"
-          data-testid="wallet-release-reserved-cta"
-          aria-busy={releaseBusy}
-        >
-          {releaseBusy ? "Returning reserved π…" : "Return reserved π to available"}
-        </button>
-        {releaseStatus ? (
-          <p className="mt-2 text-center text-[11px] text-muted-foreground" role="status">{releaseStatus}</p>
-        ) : null}
-          </>
         ) : (
           <p className="text-center text-[11px] text-muted-foreground" data-compact-withdraw-hint>
             Use <span className="font-semibold text-foreground">Withdraw</span> on the Pi rail above — one path for amount, consent, PIN and submit.

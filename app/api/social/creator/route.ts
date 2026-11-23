@@ -5,7 +5,7 @@
  */
 import { NextResponse } from "next/server"
 import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
-import { checkDurableRateLimit, durableRateLimitCode, durableRateLimitStatus } from "@/lib/server/security/control-plane"
+import { checkRateLimit } from "@/lib/server/economy/rate-limit"
 import {
   getCreatorProfile,
   listCreatorPosts,
@@ -18,16 +18,12 @@ import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
-const NO_STORE = { "Cache-Control": "no-store, private", Vary: "Cookie, Authorization" }
-function reply(body: unknown, status = 200, headers: Record<string, string> = {}) {
-  return NextResponse.json(body, { status, headers: { ...NO_STORE, ...headers } })
-}
 
 export async function GET(request: Request) {
   const auth = await resolveAuthenticatedUser(request.headers)
-  if (!auth) return reply({ ok: false, error: "AUTH_REQUIRED" }, 401)
-  const rate = await checkDurableRateLimit(`creator-read:${auth.userId}`, 60, 60_000, { onUnavailable: "deny" })
-  if (!rate.ok) return reply({ ok: false, error: durableRateLimitCode(rate), retryAfterSec: rate.retryAfterSec }, durableRateLimitStatus(rate), { "Retry-After": String(rate.retryAfterSec) })
+  if (!auth) {
+    return NextResponse.json({ ok: false, error: "AUTH_REQUIRED" }, { status: 401 })
+  }
 
   const profile = await getCreatorProfile(auth.userId)
   const posts = await listCreatorPosts(auth.userId)
@@ -42,9 +38,9 @@ export async function GET(request: Request) {
   // fails, do not query an empty ID list and misreport post rewards as zero.
   const economy = posts.ok ? await getCreatorEconomySummary(auth.userId, postIds) : null
 
-  return reply({
+  return NextResponse.json({
     ok: true,
-    durable: profile.ok && posts.ok,
+    durable: profile.ok && profile.exists !== false,
     dataQuality: {
       complete: profile.ok && posts.ok && economy?.ok === true && rep.ok,
       sources: {
@@ -81,12 +77,17 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const auth = await resolveAuthenticatedUser(request.headers)
-  if (!auth) return reply({ ok: false, error: "AUTH_REQUIRED" }, 401)
-  const rl = await checkDurableRateLimit(`creator-write:${auth.userId}`, 20, 60_000, { onUnavailable: "deny" })
-  if (!rl.ok) return reply({ ok: false, error: durableRateLimitCode(rl), retryAfterSec: rl.retryAfterSec }, durableRateLimitStatus(rl), { "Retry-After": String(rl.retryAfterSec) })
+  if (!auth) {
+    return NextResponse.json({ ok: false, error: "AUTH_REQUIRED" }, { status: 401 })
+  }
+
+  const rl = checkRateLimit(`creator:${auth.userId}`, 20, 60_000)
+  if (!rl.ok) {
+    return NextResponse.json({ ok: false, error: "RATE_LIMITED" }, { status: 429 })
+  }
 
   const parsedBody = await readBoundedJson(request, 16 * 1024)
-  if (!parsedBody.ok) return reply({ ok: false, error: parsedBody.error }, parsedBody.error === "REQUEST_TOO_LARGE" ? 413 : 400)
+  if (!parsedBody.ok) return NextResponse.json({ ok: false, error: parsedBody.error }, { status: parsedBody.error === "REQUEST_TOO_LARGE" ? 413 : 400 })
   const body = parsedBody.value as {
     displayName?: string
     tagline?: string
@@ -105,10 +106,13 @@ export async function POST(request: Request) {
   })
 
   if (!result.ok) {
-    return reply({ ok: false, error: result.error }, result.error === "DB_UNAVAILABLE" ? 503 : 400)
+    return NextResponse.json(
+      { ok: false, error: result.error },
+      { status: result.error === "DB_UNAVAILABLE" ? 503 : 400 }
+    )
   }
 
-  return reply({
+  return NextResponse.json({
     ok: true,
     durable: true,
     userId: auth.userId,

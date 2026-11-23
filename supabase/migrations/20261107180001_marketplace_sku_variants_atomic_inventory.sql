@@ -1,4 +1,3 @@
--- REVIEW_REQUIRED: source hardening completed; must pass disposable PostgreSQL rehearsal and dependency checks before Testnet application.
 -- Phase 9.3: durable SKU variants and atomic per-variant inventory.
 -- Additive and service-role only. Existing non-variant listings retain the legacy stock path.
 
@@ -48,7 +47,7 @@ CREATE INDEX IF NOT EXISTS idx_gh_marketplace_orders_variant
 -- become inactive (never deleted), preserving order references and audit history.
 CREATE OR REPLACE FUNCTION public.gh_marketplace_variants_replace(
   p_listing_id text, p_seller_id text, p_variants jsonb
-) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   l public.gh_marketplace_listings%ROWTYPE;
   v jsonb;
@@ -58,13 +57,7 @@ DECLARE
   v_count integer := 0;
 BEGIN
   IF trim(coalesce(p_listing_id,'')) = '' OR trim(coalesce(p_seller_id,'')) = '' OR
-     jsonb_typeof(p_variants) IS DISTINCT FROM 'array' THEN
-    RETURN jsonb_build_object('ok',false,'error','INVALID_INPUT');
-  END IF;
-  -- Separate statement: plpgsql ends an IF condition at the first THEN, so a
-  -- CASE expression inside the condition is a syntax error. Reached only once
-  -- p_variants is known to be an array.
-  IF jsonb_array_length(p_variants) > 100 THEN
+     jsonb_typeof(p_variants) IS DISTINCT FROM 'array' OR CASE WHEN jsonb_typeof(p_variants)='array' THEN jsonb_array_length(p_variants) ELSE 101 END > 100 THEN
     RETURN jsonb_build_object('ok',false,'error','INVALID_INPUT');
   END IF;
   SELECT * INTO l FROM public.gh_marketplace_listings WHERE id = p_listing_id FOR UPDATE;
@@ -85,9 +78,6 @@ BEGIN
     v_price := CASE WHEN coalesce(v->>'price','') ~ '^([0-9]+)(\.[0-9]{1,8})?$' THEN (v->>'price')::numeric ELSE -1 END;
     v_currency := upper(trim(coalesce(v->>'currency',l.currency)));
     v_stock := CASE WHEN coalesce(v->>'stockOnHand','') ~ '^[0-9]{1,7}$' THEN (v->>'stockOnHand')::integer ELSE -1 END;
-    IF v ? 'active' AND jsonb_typeof(v->'active') IS DISTINCT FROM 'boolean' THEN
-      RETURN jsonb_build_object('ok',false,'error','INVALID_VARIANT');
-    END IF;
     IF v_id = '' OR length(v_id) > 80 OR v_sku = '' OR length(v_sku) > 64 OR
        v_label = '' OR length(v_label) > 120 OR v_id ~ '[[:cntrl:]]' OR v_sku ~ '[[:cntrl:]]' OR v_label ~ '[[:cntrl:]]' OR v_price < 0 OR v_price > 1000000 OR
        v_stock < 0 OR v_stock > 1000000 OR v_currency NOT IN ('GHC','PI') OR
@@ -153,7 +143,7 @@ END $$;
 -- prevents a brief active-listing window in which the legacy stock RPC could
 -- create an unbound order before the first SKU rows are installed.
 CREATE OR REPLACE FUNCTION public.gh_marketplace_listing_upsert_with_variants(p_row jsonb,p_variants jsonb)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   listing_result jsonb;
   variant_result jsonb;
@@ -174,7 +164,7 @@ EXCEPTION WHEN SQLSTATE 'P0001' THEN
 END $$;
 
 CREATE OR REPLACE FUNCTION public.gh_marketplace_variants_list(p_listing_id text)
-RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT coalesce(jsonb_agg(jsonb_build_object(
     'id',id,'sku',sku,'label',label,'price',price,'currency',currency,
     'stockOnHand',stock_on_hand,'stockReserved',stock_reserved,
@@ -186,21 +176,14 @@ $$;
 -- Variant-aware inventory release/commit. A cancellation releases only the hold;
 -- payment verification commits units by reducing on-hand and reserved together.
 CREATE OR REPLACE FUNCTION public.gh_marketplace_order_stock_transition()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
-DECLARE v_variant_id text;
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF OLD.status IS DISTINCT FROM NEW.status AND NEW.status='cancelled' AND coalesce(OLD.stock_reserved,0)>0 THEN
     IF OLD.variant_id IS NOT NULL THEN
       -- Lock listing before variant to match reservation/maintenance lock order.
       PERFORM 1 FROM public.gh_marketplace_listings WHERE id=OLD.listing_id FOR UPDATE;
-      UPDATE public.gh_marketplace_variants
-         SET stock_reserved=stock_reserved-OLD.stock_reserved,updated_at=now()
-       WHERE id=OLD.variant_id AND listing_id=OLD.listing_id
-         AND stock_reserved>=OLD.stock_reserved
-       RETURNING id INTO v_variant_id;
-      IF v_variant_id IS NULL THEN
-        RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='VARIANT_RESERVATION_INVARIANT_VIOLATION';
-      END IF;
+      UPDATE public.gh_marketplace_variants SET stock_reserved=greatest(0,stock_reserved-OLD.stock_reserved),updated_at=now()
+       WHERE id=OLD.variant_id;
       UPDATE public.gh_marketplace_listings SET
         availability=(SELECT coalesce(sum(stock_on_hand-stock_reserved),0)::integer FROM public.gh_marketplace_variants WHERE listing_id=OLD.listing_id AND active=true),
         status=CASE WHEN status IN ('active','sold_out') THEN CASE WHEN (SELECT coalesce(sum(stock_on_hand-stock_reserved),0) FROM public.gh_marketplace_variants WHERE listing_id=OLD.listing_id AND active=true)<=0 THEN 'sold_out' ELSE 'active' END ELSE status END,
@@ -213,18 +196,10 @@ BEGIN
     NEW.audit:=coalesce(NEW.audit,'[]'::jsonb)||jsonb_build_array(jsonb_build_object('at',(extract(epoch from now())*1000)::bigint,'action','STOCK_RESERVATION_RELEASED','detail','order_cancelled'));
   ELSIF OLD.status IS DISTINCT FROM NEW.status AND NEW.status='payment_verified' AND coalesce(OLD.stock_reserved,0)>0 THEN
     IF OLD.variant_id IS NOT NULL THEN
-      -- Commit only an existing reservation. Never clamp counters to zero: that
-      -- would conceal a double transition or corrupted inventory state.
+      -- Lock listing before variant to match reservation/maintenance lock order.
       PERFORM 1 FROM public.gh_marketplace_listings WHERE id=OLD.listing_id FOR UPDATE;
-      UPDATE public.gh_marketplace_variants
-         SET stock_reserved=stock_reserved-OLD.stock_reserved,
-             stock_on_hand=stock_on_hand-OLD.stock_reserved,updated_at=now()
-       WHERE id=OLD.variant_id AND listing_id=OLD.listing_id
-         AND stock_reserved>=OLD.stock_reserved AND stock_on_hand>=OLD.stock_reserved
-       RETURNING id INTO v_variant_id;
-      IF v_variant_id IS NULL THEN
-        RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='VARIANT_STOCK_COMMIT_INVARIANT_VIOLATION';
-      END IF;
+      UPDATE public.gh_marketplace_variants SET stock_reserved=greatest(0,stock_reserved-OLD.stock_reserved),
+        stock_on_hand=greatest(0,stock_on_hand-OLD.stock_reserved),updated_at=now() WHERE id=OLD.variant_id;
       UPDATE public.gh_marketplace_listings SET
         availability=(SELECT coalesce(sum(stock_on_hand-stock_reserved),0)::integer FROM public.gh_marketplace_variants WHERE listing_id=OLD.listing_id AND active=true),
         status=CASE WHEN status IN ('active','sold_out') THEN CASE WHEN (SELECT coalesce(sum(stock_on_hand-stock_reserved),0) FROM public.gh_marketplace_variants WHERE listing_id=OLD.listing_id AND active=true)<=0 THEN 'sold_out' ELSE 'active' END ELSE status END,
@@ -237,7 +212,7 @@ END $$;
 
 CREATE OR REPLACE FUNCTION public.gh_marketplace_order_create_variant_reserved(
   p_row jsonb, p_idempotency_key text, p_variant_id text
-) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_id text:=trim(coalesce(p_row->>'id',''));
   v_listing_id text:=trim(coalesce(p_row->>'listingId',''));
@@ -257,7 +232,7 @@ BEGIN
   PERFORM public.gh_marketplace_release_expired_reservations();
   SELECT * INTO existing FROM public.gh_marketplace_orders WHERE buyer_id=v_buyer AND client_request_id=v_key;
   IF FOUND THEN
-    IF existing.listing_id<>v_listing_id OR existing.quantity<>v_qty OR existing.variant_id IS DISTINCT FROM p_variant_id THEN
+    IF existing.listing_id<>v_listing_id OR existing.quantity<>v_qty OR existing.variant_id<>p_variant_id THEN
       RETURN jsonb_build_object('ok',false,'error','IDEMPOTENCY_CONFLICT');
     END IF;
     RETURN jsonb_build_object('ok',true,'idempotent',true,'order',public.gh_marketplace_order_get(existing.id));
@@ -298,25 +273,10 @@ END $$;
 
 -- The legacy reservation RPC must never bypass variant stock for a listing that
 -- has active SKUs. Preserve its old behavior only for non-variant listings.
-DO $$
-BEGIN
-  IF to_regprocedure('public.gh_marketplace_order_create_reserved(jsonb,text)') IS NOT NULL
-     AND to_regprocedure('public.gh_marketplace_order_create_reserved_pre_variant(jsonb,text)') IS NULL THEN
-    ALTER FUNCTION public.gh_marketplace_order_create_reserved(jsonb,text)
-      RENAME TO gh_marketplace_order_create_reserved_pre_variant;
-  ELSIF to_regprocedure('public.gh_marketplace_order_create_reserved(jsonb,text)') IS NULL
-        AND to_regprocedure('public.gh_marketplace_order_create_reserved_pre_variant(jsonb,text)') IS NOT NULL THEN
-    NULL; -- already renamed by an earlier idempotent application
-  ELSIF to_regprocedure('public.gh_marketplace_order_create_reserved(jsonb,text)') IS NOT NULL
-        AND to_regprocedure('public.gh_marketplace_order_create_reserved_pre_variant(jsonb,text)') IS NOT NULL THEN
-    NULL; -- full re-run: original already preserved; the wrapper is replaced below
-  ELSE
-    RAISE EXCEPTION 'MARKETPLACE_RESERVED_RPC_RENAME_STATE_CONFLICT';
-  END IF;
-END;
-$$;
+ALTER FUNCTION public.gh_marketplace_order_create_reserved(jsonb,text)
+  RENAME TO gh_marketplace_order_create_reserved_pre_variant;
 CREATE OR REPLACE FUNCTION public.gh_marketplace_order_create_reserved(p_row jsonb,p_idempotency_key text)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_listing_id text:=trim(coalesce(p_row->>'listingId',''));
   v_buyer text:=trim(coalesce(p_row->>'buyerId',''));
@@ -335,7 +295,7 @@ END $$;
 
 -- Expose immutable purchased-variant snapshot to the order reader.
 CREATE OR REPLACE FUNCTION public.gh_marketplace_order_get(p_id text)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE r public.gh_marketplace_orders%ROWTYPE;
 BEGIN
   SELECT * INTO r FROM public.gh_marketplace_orders WHERE id=trim(coalesce(p_id,''));
@@ -361,7 +321,7 @@ BEGIN
 END $$;
 
 CREATE OR REPLACE FUNCTION public.gh_marketplace_listing_get(p_id text)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE r public.gh_marketplace_listings%ROWTYPE;
 BEGIN
   SELECT * INTO r FROM public.gh_marketplace_listings WHERE id=p_id;
@@ -373,7 +333,7 @@ BEGIN
 END $$;
 
 CREATE OR REPLACE FUNCTION public.gh_marketplace_orders_list_for_user(p_user_id text)
-RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT coalesce(jsonb_agg(row_to_json(x)::jsonb ORDER BY x."createdAt" DESC),'[]'::jsonb)
   FROM (
     SELECT id,listing_id AS "listingId",listing_title AS "listingTitle",buyer_id AS "buyerId",seller_id AS "sellerId",
@@ -397,16 +357,13 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog,
   ) x;
 $$;
 
-REVOKE ALL ON FUNCTION public.gh_marketplace_order_stock_transition() FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON FUNCTION public.gh_marketplace_order_get(text) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.gh_marketplace_listing_get(text) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.gh_marketplace_variants_replace(text,text,jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.gh_marketplace_variants_replace(text,text,jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.gh_marketplace_listing_upsert_with_variants(jsonb,jsonb) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.gh_marketplace_variants_list(text) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.gh_marketplace_order_create_variant_reserved(jsonb,text,text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.gh_marketplace_variants_list(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.gh_marketplace_order_create_variant_reserved(jsonb,text,text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.gh_marketplace_order_create_reserved_pre_variant(jsonb,text) FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON FUNCTION public.gh_marketplace_order_create_reserved(jsonb,text) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.gh_marketplace_orders_list_for_user(text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.gh_marketplace_order_create_reserved(jsonb,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.gh_marketplace_orders_list_for_user(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.gh_marketplace_variants_replace(text,text,jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION public.gh_marketplace_listing_upsert_with_variants(jsonb,jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION public.gh_marketplace_variants_list(text) TO service_role;

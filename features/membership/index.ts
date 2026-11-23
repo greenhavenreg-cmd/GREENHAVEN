@@ -5,4 +5,3 @@ export {
   type MembershipTierId,
   type MembershipStatus,
 } from "@/lib/domains/membership-domain"
-export * from "@/lib/active-upgrades/membership"

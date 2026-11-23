@@ -580,7 +580,6 @@ export function OwnPostCard({
 }) {
   return (
     <EnhancedPostCard
-      surface="profile"
       post={post}
       isLiked={isLiked}
       isSaved={isSaved}

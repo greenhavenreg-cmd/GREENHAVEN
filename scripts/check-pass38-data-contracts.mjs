@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { readProjectDoc } from "./lib/read-project-doc.mjs"
 const read = (p) => readFileSync(join(process.cwd(), p), "utf8")
 const pkg = JSON.parse(read("package.json"))
 const feed = read("lib/social/map-remote-feed-posts.ts")
@@ -21,8 +20,8 @@ const checks = [
   ["community recommendations are bounded", marketplace.includes("Math.min(10") && marketplace.includes("a.id.localeCompare(b.id)")],
   ["marketplace screen uses extracted helpers", screen.includes("@/lib/marketplace/discovery-presentation")],
   ["financial and persistence execution stay outside presentation helpers", !/payment|wallet|ledger|authorization|executeSpend|supabase/i.test(feed + marketplace)],
-  ["canonical six-item navigation remains documented", read("docs/PROJECT_TRUTH.md").includes("Home · Discover · Messages · Communities · Cart · Profile")],
-  ["release documentation records migration preservation", readProjectDoc("docs/release-0.260.0-pass38.md").includes("170") && readProjectDoc("docs/release-0.260.0-pass38.md").includes("No Supabase migration SQL")],
+  ["canonical five-item navigation remains documented", read("docs/PROJECT_TRUTH.md").includes("Home · Messages · Communities · Cart · Profile")],
+  ["release documentation records migration preservation", read("docs/release-0.260.0-pass38.md").includes("170") && read("docs/release-0.260.0-pass38.md").includes("No Supabase migration SQL")],
 ]
 let failures = 0
 for (const [label, ok] of checks) { console.log(`${ok ? "PASS" : "FAIL"} ${label}`); if (!ok) failures++ }

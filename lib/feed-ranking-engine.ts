@@ -4,7 +4,6 @@
 import type { Post, Profile, FeedFilter, PostEngagementMetrics, PostVisibilityReason } from "@/lib/ghc-types"
 import { inspirationBoost } from "@/lib/feed-profile-experience"
 import { isExcludedFromPublicFeed } from "@/lib/feed/essential-controls"
-import { compareFeedOrderDesc, containsWholeInterest, extractHashtags, matchPostInterests } from "@/lib/feed/phase5-feed-primitives"
 
 export interface RankedPost {
   post: Post
@@ -41,8 +40,12 @@ export interface FeedContext {
   excludedTopics?: string[]
 }
 
-// Extract hashtags from content through the shared Unicode-aware helper.
-export { extractHashtags } from "@/lib/feed/phase5-feed-primitives"
+// Extract hashtags from content
+export function extractHashtags(content: string): string[] {
+  const regex = /#(\w+)/g
+  const matches = content.match(regex) || []
+  return matches.map((tag) => tag.toLowerCase())
+}
 
 // Extract mentions from content
 export function extractMentions(content: string): string[] {
@@ -77,8 +80,8 @@ export function getPostTopicSet(post: Post): Set<string> {
   const supplied = Array.isArray(post.hashtags) ? post.hashtags : []
   const extracted = extractHashtags(String(post.content || ""))
   return new Set([...supplied, ...extracted]
-    .map((value) => String(value || "").replace(/^#/, "").normalize("NFKC").trim().toLocaleLowerCase())
-    .filter((value) => /^[\p{L}\p{N}][\p{L}\p{N}\p{M}_]{1,31}$/u.test(value)))
+    .map((value) => String(value || "").replace(/^#/, "").trim().toLowerCase())
+    .filter((value) => /^[\p{L}\p{N}_]{2,32}$/u.test(value)))
 }
 
 function matchesTopicControls(post: Post, context: FeedContext): boolean {
@@ -90,7 +93,9 @@ function matchesTopicControls(post: Post, context: FeedContext): boolean {
 }
 
 function compareRankedPosts(a: RankedPost, b: RankedPost): number {
-  return (b.score - a.score) || compareFeedOrderDesc(a.post, b.post)
+  return (b.score - a.score)
+    || ((b.post.createdAt || 0) - (a.post.createdAt || 0))
+    || String(b.post.id).localeCompare(String(a.post.id))
 }
 
 // Generate link preview (simulated - in production would fetch OG tags)
@@ -178,18 +183,17 @@ function matchesLocationLane(post: Post, context: FeedContext): boolean {
 
 function intentionBoost(post: Post, bias: FeedIntentionBias | undefined): { score: number; hit: boolean } {
   if (!bias || bias === "balanced") return { score: 0, hit: false }
-  const text = `${post.content || ""} ${(post.hashtags || []).join(" ")}`
-  const hasAnyWholeTerm = (terms: string[]) => terms.some((term) => containsWholeInterest(text, term))
+  const text = `${post.content || ""} ${(post.hashtags || []).join(" ")}`.toLowerCase()
   if (bias === "professional") {
-    const hit = hasAnyWholeTerm(["work", "career", "job", "startup", "business", "tech", "mentor", "hire", "portfolio", "project"])
+    const hit = /work|career|job|startup|business|tech|mentor|hire|portfolio|project/.test(text)
     return { score: hit ? 22 : -4, hit }
   }
   if (bias === "dating") {
-    const hit = hasAnyWholeTerm(["date", "relationship", "single", "love", "romance", "partner"])
+    const hit = /date|relationship|single|love|romance|partner/.test(text)
     return { score: hit ? 18 : -3, hit }
   }
-  // Friendship
-  const hit = hasAnyWholeTerm(["friend", "hobby", "community", "hangout", "game", "music", "travel", "sport"])
+  // friendship
+  const hit = /friend|hobby|community|hangout|game|music|travel|sport/.test(text)
   return { score: hit ? 20 : -2, hit }
 }
 
@@ -246,11 +250,22 @@ export function rankForYouFeed(posts: Post[], context: FeedContext): RankedPost[
       }
 
       // 4. Shared interests
-      const matchedInterests = matchPostInterests(post.content || "", post.hashtags, context.userInterests || [], 3)
-      if (matchedInterests.length > 0) {
-        score += matchedInterests.length * 18
+      const postHashtags = post.hashtags || extractHashtags(post.content || "")
+      const interestMatches = postHashtags.filter((tag) =>
+        context.userInterests.some(
+          (interest) =>
+            interest.toLowerCase().includes(tag.toLowerCase()) ||
+            tag.toLowerCase().includes(interest.toLowerCase())
+        )
+      ).length
+      const contentInterest = context.userInterests.filter((i) =>
+        (post.content || "").toLowerCase().includes(i.toLowerCase())
+      ).length
+      const totalInterest = interestMatches + contentInterest
+      if (totalInterest > 0) {
+        score += totalInterest * 18
         reason = {
-          reason: `Matches your interests: ${matchedInterests.slice(0, 2).join(", ")}`,
+          reason: `Shared interests${postHashtags[0] ? ` · #${postHashtags[0].replace(/^#/, "")}` : ""}`,
           category: "interest",
           shortLabel: "Interests",
         }
@@ -260,12 +275,18 @@ export function rankForYouFeed(posts: Post[], context: FeedContext): RankedPost[
       const contribution = calculateContributionScore(post)
       score += Math.min(contribution, 40)
       if (contribution >= 12 && (reason.category === "personalization" || reason.category === "trending")) {
-        // Counts alone do not prove velocity. Reserve “trending” for an
-        // explicit upstream trend signal; otherwise explain the measured input.
         reason = {
           reason: "Active discussion and saves — quality signal",
           category: "contribution",
           shortLabel: "Quality",
+        }
+        if ((post as any)._trendingBoost || (post.likes || 0) + (post.comments?.length || 0) > 12) {
+          // soft label when engagement is high — not a ranking lie
+          reason = {
+            reason: "Rising engagement in your network",
+            category: "trending",
+            shortLabel: "Trending",
+          }
         }
       }
 

@@ -6,7 +6,6 @@
 
 import { readGhcServerEnv, hasPrivilegedDatabase } from "@/lib/server/economy/env"
 import { sanitizeBusinessIdentityPayload, sanitizeProfessionalIdentityPayload } from "@/lib/profile/professional-identity"
-import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
 export type ServerProfileRecord = {
   ghUserId: string
@@ -73,41 +72,6 @@ function isPersistableMediaUrl(url: string): boolean {
 
 function filterPersistableUrls(urls: string[], max: number): string[] {
   return urls.filter(isPersistableMediaUrl).slice(0, max)
-}
-
-
-const REQUIRED_ONBOARDING_GENDERS = new Set(["male", "female", "non-binary"])
-const REQUIRED_ONBOARDING_MODES = new Set(["friendship", "dating", "networking"])
-const REQUIRED_CONNECTION_INTENTS = new Set([
-  "friendship", "dating", "networking", "business", "collaboration",
-  "communities", "mentorship",
-])
-
-/** Server-side registration gate. Returns field keys only; never returns profile values. */
-export function getOnboardingProfileGaps(
-  profile: ServerProfileRecord | null | undefined
-): string[] {
-  if (!profile) return ["profile"]
-  const gaps: string[] = []
-  if (!profile.displayName || profile.displayName.trim().length < 2) gaps.push("displayName")
-  if (profile.age == null || !Number.isInteger(profile.age) || profile.age < 18 || profile.age > 120) gaps.push("age")
-  if (!profile.gender || !REQUIRED_ONBOARDING_GENDERS.has(profile.gender.trim().toLowerCase())) gaps.push("gender")
-  if (!profile.city?.trim()) gaps.push("city")
-  if (!profile.country?.trim()) gaps.push("country")
-  if (!profile.primaryMode || !REQUIRED_ONBOARDING_MODES.has(profile.primaryMode.trim().toLowerCase())) gaps.push("primaryMode")
-  const intents = Array.isArray(profile.connectionIntents)
-    ? profile.connectionIntents.map((value) => value.trim().toLowerCase()).filter((value) => REQUIRED_CONNECTION_INTENTS.has(value))
-    : []
-  if (intents.length < 1) gaps.push("connectionIntents")
-  const interests = Array.isArray(profile.interests)
-    ? profile.interests.map((value) => value.trim()).filter(Boolean)
-    : []
-  if (new Set(interests.map((value) => value.toLowerCase())).size < 3) gaps.push("interests")
-  const photos = Array.isArray(profile.photos)
-    ? profile.photos.filter((value) => typeof value === "string" && isPersistableMediaUrl(value) && !/placeholder/i.test(value))
-    : []
-  if (photos.length < 1) gaps.push("photos")
-  return gaps
 }
 
 function asStringArray(v: unknown, max: number): string[] {
@@ -316,8 +280,15 @@ async function dbSelect(ghUserId: string): Promise<ServerProfileRecord | null> {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
   try {
-    const restResult = await supabaseRest(`gh_user_profiles?gh_user_id=eq.${encodeURIComponent(ghUserId)}&select=*&limit=1`, { method: "GET", timeoutMs: 10000 })
-    const res = { ok: restResult.ok, status: restResult.status, json: async () => restResult.ok ? restResult.data : restResult.body, text: async () => JSON.stringify(restResult.ok ? restResult.data : restResult.body) }
+    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_user_profiles?gh_user_id=eq.${encodeURIComponent(ghUserId)}&select=*&limit=1`
+    const res = await fetch(url, {
+      headers: {
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    })
     if (!res.ok) return null
     const rows = (await res.json()) as DbRow[]
     if (!Array.isArray(rows) || !rows[0]) return null
@@ -355,8 +326,19 @@ async function dbUpsert(rec: ServerProfileRecord): Promise<ServerProfileRecord |
     updated_at: new Date(rec.updatedAt).toISOString(),
   }
   try {
-    const restResult = await supabaseRest(`gh_user_profiles?on_conflict=gh_user_id`, { method: "POST", body: JSON.stringify(body), timeoutMs: 10000 })
-    const res = { ok: restResult.ok, status: restResult.status, json: async () => restResult.ok ? restResult.data : restResult.body, text: async () => JSON.stringify(restResult.ok ? restResult.data : restResult.body) }
+    const url = `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_user_profiles?on_conflict=gh_user_id`
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        Prefer: "resolution=merge-duplicates,return=representation",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    })
     if (!res.ok) {
       console.error("[profile-store] upsert failed", res.status)
       return null
@@ -388,9 +370,6 @@ export async function getServerProfile(
       mem.set(key, fromDb)
       return fromDb
     }
-    // In production, a database read failure must never fall back to stale
-    // process memory for an identity or onboarding decision.
-    if (isProd()) return null
   }
   return mem.get(key) || null
 }
@@ -459,9 +438,9 @@ export function serverProfileToClientPartial(
     hometown: rec.hometown || "",
     education: rec.education || "",
     status: rec.status || "",
-    age: rec.age,
-    gender: rec.gender || "",
-    primaryMode: rec.primaryMode || "",
+    age: rec.age ?? 18,
+    gender: rec.gender || "prefer-not-to-say",
+    primaryMode: rec.primaryMode || "social",
     interests: rec.interests,
     connectionIntents: rec.connectionIntents,
     skills: rec.skills,

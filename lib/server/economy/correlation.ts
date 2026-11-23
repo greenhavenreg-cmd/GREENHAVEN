@@ -5,7 +5,6 @@
  * Notifications and Creator/Profile surfaces resolve the same durable object.
  */
 import { readGhcServerEnv } from "./env"
-import { supabaseRpc } from "@/lib/server/supabase/rest-client"
 
 export type GhCorrelationKind =
   | "social" | "community" | "marketplace" | "membership"
@@ -58,12 +57,14 @@ export async function attachLedgerCorrelation(input: {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey || !input.userId || !input.referenceId) return false
   try {
-    const result = await supabaseRpc("ghc_attach_transaction_correlation", {
-      p_user_id: input.userId,
-      p_reference_id: input.referenceId,
-      p_correlation: input.envelope,
-    }, { timeoutMs: 10_000 })
-    if (!result.ok) return false
-    return (result.data as { ok?: boolean } | null)?.ok === true
+    const res = await fetch(`${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_attach_transaction_correlation`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: env.supabaseServiceRoleKey, Authorization: `Bearer ${env.supabaseServiceRoleKey}` },
+      body: JSON.stringify({ p_user_id: input.userId, p_reference_id: input.referenceId, p_correlation: input.envelope }),
+      cache: "no-store",
+    })
+    if (!res.ok) return false
+    const data = await res.json().catch(() => null) as { ok?: boolean } | null
+    return data?.ok === true
   } catch { return false }
 }

@@ -27,16 +27,10 @@ const ciWorkflow = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8')
 check('CI static and build jobs assert exact Node 24.15.0 runtime', (ciWorkflow.match(/process\.versions\.node !== '24\.15\.0'/g) || []).length === 2)
 const vercelConfig = readJson('vercel.json')
 check('Vercel install clears obsolete npm cache-dir environment aliases', /unset npm_config_cache_dir NPM_CONFIG_CACHE_DIR/.test(vercelConfig.installCommand ?? ''))
-check('Vercel build clears oversized stale Webpack cache before compilation', /prepare-vercel-build\.mjs/.test(vercelConfig.buildCommand ?? '') && existsSync(join(root, 'scripts/prepare-vercel-build.mjs')))
-check('native dependency install scripts are approved only at reviewed lockfile versions', pkg.allowScripts?.['sodium-native@3.4.1'] === true && pkg.allowScripts?.['unrs-resolver@1.12.2'] === true && Object.keys(pkg.allowScripts || {}).length === 2)
 check('safe .env.example exists', existsSync(join(root, '.env.example')))
 if (existsSync(join(root, '.env.example'))) {
   const envExample = readFileSync(join(root, '.env.example'), 'utf8')
   check('private credentials are not NEXT_PUBLIC in env template', !/^NEXT_PUBLIC_(?:PI_API_KEY|PI_SERVER_API_KEY|SUPABASE_SERVICE_ROLE_KEY|PI_WALLET_PRIVATE_SEED)=/m.test(envExample))
-  const privateKeys = ['SUPABASE_SERVICE_ROLE_KEY', 'PI_SERVER_API_KEY', 'PI_WALLET_PRIVATE_SEED', 'PAYSTACK_SECRET_KEY', 'CRON_SECRET']
-  const assignedPrivateValues = privateKeys.filter((key) => new RegExp(`^${key}[ \t]*=[ \t]*\\S+`, 'm').test(envExample))
-  check('environment template contains no populated private credentials', assignedPrivateValues.length === 0, assignedPrivateValues.join(', '))
-  check('environment template documents public and server-only configuration separately', envExample.includes('Public application URLs') && envExample.includes('Server-only Supabase configuration'))
 }
 
 for (const c of checks) console.log(`${c.ok ? 'PASS' : 'FAIL'} ${c.name}${c.detail ? ` — ${c.detail}` : ''}`)

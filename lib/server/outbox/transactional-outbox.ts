@@ -5,7 +5,6 @@
  * SECURITY DEFINER transaction; this module must never enqueue after a write.
  */
 import { hasPrivilegedDatabase, readGhcServerEnv } from "@/lib/server/economy/env"
-import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
 export type OutboxEvent = {
   event_id: string
@@ -30,7 +29,17 @@ async function rpc<T>(name: string, body: Record<string, unknown>): Promise<RpcR
     return { ok: false, code: "OUTBOX_DATABASE_UNAVAILABLE" }
   }
   try {
-    const response = await (async () => { const r = await supabaseRpc(name, body, { timeoutMs: 12000 }); return { ok: r.ok, status: r.status, json: async () => r.ok ? r.data : r.body, text: async () => JSON.stringify(r.ok ? r.data : r.body) }; })()
+    const response = await fetch(`${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/${name}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
+    })
     if (!response.ok) return { ok: false, code: `OUTBOX_RPC_${response.status}` }
     return { ok: true, data: (await response.json()) as T }
   } catch {

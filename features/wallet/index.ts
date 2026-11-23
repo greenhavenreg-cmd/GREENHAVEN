@@ -4,4 +4,3 @@
  */
 export { PremiumWalletScreen } from "./wallet-screen"
 export { PremiumWalletScreen as default } from "./wallet-screen"
-export * from "@/lib/active-upgrades/wallet"

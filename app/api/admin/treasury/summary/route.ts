@@ -4,10 +4,10 @@
  * Reports only evidence-backed cashback reconciliation and A2U exceptions. It does
  * not infer seller liabilities, GHC balances, or payout completion from missing data.
  */
+import { timingSafeEqual } from "node:crypto"
 import { NextResponse } from "next/server"
-import { operatorDiagnosticsAuthorized } from "@/lib/server/security/operator-key"
 import { reconcileCashbackPeriod } from "@/lib/server/revenue/cashback-attribution"
-import { inspectPiIncompleteServerPayments, listOpenA2uReviews, listStuckA2uJobs } from "@/lib/server/payments/a2u-orchestration"
+import { listOpenA2uReviews, listStuckA2uJobs } from "@/lib/server/payments/a2u-orchestration"
 import { getTreasuryFinancialReport, getMembershipReconciliationReport, listTreasuryCases } from "@/lib/server/revenue/treasury-operations"
 
 export const runtime = "nodejs"
@@ -19,7 +19,14 @@ function reply(body: unknown, status = 200) {
 }
 
 function authorized(request: Request): boolean {
-  return operatorDiagnosticsAuthorized(request)
+  const expectedRaw = String(
+    process.env.GHC_OPERATOR_RECONCILE_KEY || process.env.GHC_ADMIN_API_KEY || process.env.GHC_A2U_ADMIN_KEY || "",
+  ).trim()
+  if (Buffer.byteLength(expectedRaw, "utf8") < 32) return false
+  const expected = Buffer.from(expectedRaw, "utf8")
+  const supplied = Buffer.from(String(request.headers.get("x-ghc-operator-key") || ""), "utf8")
+  if (expected.length !== supplied.length) return false
+  try { return timingSafeEqual(expected, supplied) } catch { return false }
 }
 
 function utcQuarterWindow(now: Date): { startsAt: string; endsAt: string } {
@@ -49,11 +56,10 @@ export async function GET(request: Request) {
   if (!window) return reply({ ok: false, error: "INVALID_REPORTING_WINDOW" }, 400)
   const olderThanMinutes = Math.min(24 * 60, Math.max(5, Number(url.searchParams.get("olderThanMinutes") || 30) || 30))
 
-  const [cashback, reviews, stuck, providerIncomplete, financialReport, operatorCases, membershipReconciliation] = await Promise.all([
+  const [cashback, reviews, stuck, financialReport, operatorCases, membershipReconciliation] = await Promise.all([
     reconcileCashbackPeriod(window),
     listOpenA2uReviews(50).catch(() => null),
     listStuckA2uJobs(olderThanMinutes).catch(() => null),
-    inspectPiIncompleteServerPayments().catch(() => ({ ok: false as const, state: "provider_unavailable" as const })),
     getTreasuryFinancialReport(window.startsAt, window.endsAt).catch(() => null),
     listTreasuryCases(100).catch(() => null),
     getMembershipReconciliationReport(100).catch(() => null),
@@ -63,13 +69,9 @@ export async function GET(request: Request) {
   const stuckItems = stuck?.ok === true && Array.isArray(stuck.cashback) && Array.isArray(stuck.seller) ? stuck : null
   const caseItems = operatorCases?.ok === true && Array.isArray(operatorCases.items) ? operatorCases.items as Array<{ status?: string }> : null
   const openCaseCount = caseItems?.filter((item) => item.status === "open" || item.status === "investigating").length || 0
-  const providerIncompleteCount = providerIncomplete.ok && Array.isArray(providerIncomplete.items)
-    ? providerIncomplete.items.length
-    : 0
   const exceptionCount = (reviewItems?.length || 0)
     + (stuckItems?.cashback?.length || 0)
-    + (stuckItems?.seller?.length || 0)
-    + providerIncompleteCount + openCaseCount
+    + (stuckItems?.seller?.length || 0) + openCaseCount
   const cashbackHealthy = cashback.ok === true && cashback.liabilityCoverageOk !== false
   const exceptionsAvailable = reviewItems !== null && stuckItems !== null && operatorCases?.ok === true
   const status = !cashback.ok || !exceptionsAvailable || financialReport?.ok !== true
@@ -94,7 +96,6 @@ export async function GET(request: Request) {
       available: exceptionsAvailable,
       openA2uReviews: reviewItems,
       stuckA2uJobs: stuckItems,
-      piProviderIncomplete: providerIncomplete,
       count: exceptionsAvailable ? exceptionCount : null,
       openOperatorCases: caseItems ? openCaseCount : null,
     },
@@ -103,7 +104,6 @@ export async function GET(request: Request) {
       cashbackLiabilityAndPayouts: cashback.ok ? "reconciled" : "unavailable",
       sellerPayables: financialReport?.ok ? "payout_requests_and_unallocated_completed_orders_reported; not_full_balance_sheet" : "unavailable",
       generalEarningsReservations: financialReport?.ok ? "pi_payout_reservations_and_settlements_reported" : "unavailable",
-      piA2uProviderInspection: providerIncomplete.state,
       bankSettlements: "not_included",
       ghcUtilityLedger: "separate_asset_not_included",
       communityMemberships: membershipReconciliation?.ok === true ? "completed_payment_intents_compared_with_canonical_entitlement_links;_read_only" : "unavailable",

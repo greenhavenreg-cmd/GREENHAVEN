@@ -1,7 +1,5 @@
 "use client"
 
-import { emitRewardClaimed, emitDailyRewardClaimed } from "@/lib/rewards/claim-events"
-
 import { apiRequest } from "@/lib/client/api-request"
 
 
@@ -43,7 +41,6 @@ import { getProductMessage } from "@/lib/i18n/product"
 import { useSectionRefresh } from "@/hooks/use-section-refresh"
 import { useAccountFilterState } from "@/hooks/use-account-filter-state"
 import { FilterSummary } from "./filtering/filter-summary"
-import { FilterPanel } from "./filtering/filter-panel"
 import { FilterResultState } from "./filtering/filter-result-state"
 import { matchesFilterQuery } from "@/lib/filtering/filter-utils"
 import { matchesFilterDateRange } from "@/lib/filtering/filter-contract"
@@ -224,9 +221,6 @@ export function RewardsCentreScreen({
   const [serverAchievements, setServerAchievements] = useState<UnlockedAchievementRow[]>(
     []
   )
-  // Bind hydrated achievement rows to the account that produced them. This
-  // prevents a prior account's unlocks flashing during an account switch.
-  const serverAchievementsOwnerRef = useRef<string | null>(null)
   const [serverEconomy, setServerEconomy] = useState<{
     balance: number | null
     pending: number | null
@@ -294,7 +288,7 @@ export function RewardsCentreScreen({
       // become completed only when the same account has a durable server unlock.
       // Only durable server unlocks are presented as achievements. Browser-local
       // progress can guide a journey, but it is not proof of an unlocked milestone.
-      const achievements = (serverAchievementsOwnerRef.current === userId ? serverAchievements : []).filter((row) => Boolean(row?.id))
+      const achievements = serverAchievements.filter((row) => Boolean(row?.id))
       const durableMissionIds = new Set(achievements.map((row) => row.id)) as Set<string>
       const challenges = engine.getChallengeCards(signals).map((card) => {
         const missionCode = missionCodeForChallenge(card.challenge.id)
@@ -509,7 +503,6 @@ export function RewardsCentreScreen({
   // Hydrate durable achievements (does not mint; display only)
   useEffect(() => {
     let cancelled = false
-    serverAchievementsOwnerRef.current = null
     setServerAchievements([])
     setAchievementsHydrating(true)
     void fetchServerAchievements()
@@ -526,13 +519,9 @@ export function RewardsCentreScreen({
           unlockedAt: a.unlockedAt,
         })) as UnlockedAchievementRow[] : []
         setServerAchievements(rows)
-        serverAchievementsOwnerRef.current = userId
       })
       .catch(() => {
-        if (!cancelled) {
-          serverAchievementsOwnerRef.current = null
-          setServerAchievements([])
-        }
+        if (!cancelled) setServerAchievements([])
       })
       .finally(() => {
         if (!cancelled) setAchievementsHydrating(false)
@@ -606,7 +595,7 @@ export function RewardsCentreScreen({
         (historyStatus === "expired" && status === "expired") ||
         (historyStatus === "failed" && status === "blocked")
       const matchesDate = matchesFilterDateRange(row.createdAt, { from: historyFrom || null, to: historyTo || null })
-      const matchesSearch = matchesFilterQuery(query, row.id, row.reason, row.sourceEvent, row.ruleId, row.referenceId)
+      const matchesSearch = matchesFilterQuery(query, row.reason, row.sourceEvent, row.ruleId, row.referenceId)
       return matchesStatus && matchesDate && matchesSearch
     }).sort((a, b) => b.createdAt - a.createdAt)
   }, [snapshot.rewards, historyQuery, historyStatus, historyFrom, historyTo])
@@ -617,7 +606,7 @@ export function RewardsCentreScreen({
     return rows
       .filter((row) => historyStatus === "all" || row.status === historyStatus)
       .filter((row) => matchesFilterDateRange(row.createdAt, { from: historyFrom || null, to: historyTo || null }))
-      .filter((row) => matchesFilterQuery(query, row.id, row.reason, row.sourceEvent, row.referenceId))
+      .filter((row) => matchesFilterQuery(query, row.reason, row.sourceEvent, row.referenceId))
       .sort((a, b) => b.createdAt - a.createdAt)
   }, [serverRewardTransactions, historyQuery, historyStatus, historyFrom, historyTo])
 
@@ -650,31 +639,14 @@ export function RewardsCentreScreen({
 
   useEffect(() => {
     const tabHandler = (e: Event) => {
-      const detail = (e as CustomEvent<{ tab?: Tab; rewardId?: string; claimId?: string; transactionId?: string; referenceId?: string }>).detail || {}
-      const next = detail.tab
-      if (next === "opportunities" || next === "challenges" || next === "history" || next === "achievements") setTab(next)
-      const target = String(detail.rewardId || detail.claimId || detail.transactionId || detail.referenceId || "").trim()
-      if (target) {
-        setTab("history")
-        setHistoryQuery(target)
-        window.setTimeout(() => {
-          const rows = Array.from(document.querySelectorAll<HTMLElement>("[data-reward-target]"))
-          const row = rows.find((element) => element.dataset.rewardTarget === target || element.dataset.rewardReference === target)
-          row?.scrollIntoView({ behavior: "smooth", block: "center" })
-        }, 260)
+      const next = (e as CustomEvent<{ tab?: Tab }>).detail?.tab
+      if (next === "opportunities" || next === "challenges" || next === "history" || next === "achievements") {
+        setTab(next)
       }
     }
     window.addEventListener("ghc:open-rewards-tab", tabHandler)
-    try {
-      const saved = window.sessionStorage.getItem("ghc.notification.rewards-target")
-      if (saved) {
-        window.sessionStorage.removeItem("ghc.notification.rewards-target")
-        const target = JSON.parse(saved) as { tab?: Tab; rewardId?: string; claimId?: string; transactionId?: string; referenceId?: string }
-        tabHandler(new CustomEvent("ghc:open-rewards-tab", { detail: target }))
-      }
-    } catch { /* the delayed event remains the fallback */ }
     return () => window.removeEventListener("ghc:open-rewards-tab", tabHandler)
-  }, [setHistoryQuery])
+  }, [])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -744,7 +716,7 @@ const claimPendingReward = useCallback(
           return
         }
         if (claimed) {
-          emitRewardClaimed({ source: "rewards-centre" }); setClaimedFlash(rewardId)
+          setClaimedFlash(rewardId)
           ghc.addToast?.("The server confirmed the claim. Refreshing the wallet ledger…", "success")
           try {
             window.dispatchEvent(new CustomEvent("ghc:wallet-refresh", { detail: { reason: "reward-claimed" } }))
@@ -770,7 +742,7 @@ const claimPendingReward = useCallback(
   )
 
   return (
-    <div className="gh-world-rewards gh-rewards-shell flex h-full min-w-0 max-w-full min-h-0 flex-col bg-background text-foreground" data-gh-module="rewards" role="region" aria-label={msg("rewardsTitle")}>
+    <div className="gh-world-rewards gh-rewards-shell flex h-full min-w-0 max-w-full min-h-0 flex-col bg-background text-foreground" role="region" aria-label={msg("rewardsTitle")}>
 
       <header className="flex shrink-0 items-center gap-2 border-b border-border/50 bg-card/95 px-2.5 py-1 backdrop-blur-md">
         <button
@@ -831,7 +803,7 @@ const claimPendingReward = useCallback(
           onOpenWallet={onOpenWallet}
         />
 
-        <section className="gh-rewards-balance-panel mx-3 mt-3 rounded-[1.25rem] border border-border/60 bg-card px-3.5 py-3 shadow-sm" aria-labelledby="rewards-balance-summary-title">
+        <section className="mx-3 mt-3 rounded-[1.25rem] border border-border/60 bg-card px-3.5 py-3 shadow-sm" aria-labelledby="rewards-balance-summary-title">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p id="rewards-balance-summary-title" className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">Rewards at a glance</p>
@@ -1217,18 +1189,13 @@ const claimPendingReward = useCallback(
 
           {tab === "history" && (
             <>
-              <FilterPanel
-                title="Filter reward history"
-                description="Search server-confirmed reward entries by source, status and date. Results remain read-only and ledger-authoritative."
-                resultCount={filteredServerRewardTransactions.length}
-                activeCount={Number(Boolean(historyQuery.trim())) + Number(historyStatus !== "all") + Number(Boolean(historyFrom)) + Number(Boolean(historyTo))}
-                persistentContent={<label className="flex min-w-0 items-center gap-2 rounded-xl border border-border bg-background px-3">
-                  <Search size={15} className="shrink-0 text-muted-foreground" aria-hidden="true" />
-                  <input id="rewards-history-search" type="search" value={historyQuery} onChange={(event) => setHistoryQuery(event.target.value)} placeholder="Search reason, activity or reference" className="h-10 min-w-0 flex-1 bg-transparent text-[12px] outline-none placeholder:text-muted-foreground/70" />
-                  {historyQuery ? <button type="button" onClick={() => setHistoryQuery("")} className="rounded-full p-1 text-muted-foreground hover:bg-muted" aria-label="Clear search"><X size={14} /></button> : null}
-                </label>}
-              >
               <div className="rounded-[1.25rem] border border-border/60 bg-card p-3 shadow-[var(--gh-card-shadow)]">
+                <label htmlFor="rewards-history-search" className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Search reward ledger</label>
+                <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3">
+                  <Search size={15} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <input id="rewards-history-search" value={historyQuery} onChange={(event) => setHistoryQuery(event.target.value)} placeholder="Search reason, activity or reference" className="h-10 min-w-0 flex-1 bg-transparent text-[12px] outline-none placeholder:text-muted-foreground/70" />
+                  {historyQuery ? <button type="button" onClick={() => setHistoryQuery("")} className="rounded-full p-1 text-muted-foreground hover:bg-muted" aria-label="Clear search"><X size={14} /></button> : null}
+                </div>
                 <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Filter reward transaction status">
                   {(["all", "posted", "pending", "reversed", "expired", "failed"] as const).map((value) => (
                     <button key={value} type="button" onClick={() => setHistoryStatus(value)} aria-pressed={historyStatus === value} className={`min-h-8 rounded-full px-3 text-[10px] font-bold capitalize transition ${historyStatus === value ? "bg-[var(--gh-green)] text-white" : "border border-border bg-background text-muted-foreground hover:text-foreground"}`}>{value === "all" ? "All" : value.replace(/_/g, " ")}</button>
@@ -1243,15 +1210,14 @@ const claimPendingReward = useCallback(
                   ...(historyStatus !== "all" ? [{ id: "status", label: `Status: ${historyStatus}`, onRemove: () => setHistoryStatus("all") }] : []),
                   ...(historyFrom ? [{ id: "from", label: `From: ${historyFrom}`, onRemove: () => setHistoryFrom("") }] : []),
                   ...(historyTo ? [{ id: "to", label: `To: ${historyTo}`, onRemove: () => setHistoryTo("") }] : []),
-                ]} onClearAll={() => { setHistoryQuery(""); setHistoryStatus("all"); setHistoryFrom(""); setHistoryTo("") }} ariaLabel="Active reward filters" />
+                ]} onClearAll={() => { setHistoryQuery(""); setHistoryStatus("all"); setHistoryFrom(""); setHistoryTo("") }} />
                 <p className="mt-2 text-[10px] text-muted-foreground" role="status" aria-live="polite">{serverHistoryStatus === "ready" ? `${filteredServerRewardTransactions.length} server ledger entr${filteredServerRewardTransactions.length === 1 ? "y" : "ies"} loaded · newest first${serverHistoryHasMore ? " · older entries available" : ""}` : serverHistoryStatus === "loading_more" ? `Loading older ledger entries · ${filteredServerRewardTransactions.length} already loaded` : serverHistoryStatus === "loading" ? "Synchronizing account ledger…" : serverRewardTransactions !== null ? `Could not refresh ledger · showing ${filteredServerRewardTransactions.length} previously loaded server entr${filteredServerRewardTransactions.length === 1 ? "y" : "ies"}` : "Server ledger unavailable · showing local activity only where available"}</p>
               </div>
-              </FilterPanel>
               {serverRewardTransactions === null && serverHistoryStatus === "loading" ? <FilterResultState state="loading" description="Synchronizing your server-confirmed reward ledger…" /> : null}
               {serverRewardTransactions === null && serverHistoryStatus === "unavailable" ? <FilterResultState state="error" title="Reward ledger unavailable" description="The server-confirmed ledger could not be loaded. Your wallet balance remains separate from this history view." onRetry={() => setTick((value) => value + 1)} /> : null}
               {serverRewardTransactions !== null ? (
                 filteredServerRewardTransactions.length ? filteredServerRewardTransactions.map((row) => (
-                  <article key={row.id} data-reward-target={row.id} data-reward-reference={row.referenceId || ""} className="rounded-[1.25rem] border border-border/60 bg-card px-3.5 py-3 shadow-[var(--gh-card-shadow)]">
+                  <article key={row.id} className="rounded-[1.25rem] border border-border/60 bg-card px-3.5 py-3 shadow-[var(--gh-card-shadow)]">
                     <div className="flex items-start gap-3">
                       <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${row.status === "posted" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : row.status === "pending" ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-muted text-muted-foreground"}`}><GhcCoinIcon size={17} /></span>
                       <div className="min-w-0 flex-1">

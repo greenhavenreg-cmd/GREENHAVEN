@@ -39,7 +39,6 @@ export function createPostDomain(deps: {
     },
 
     async createPost(input: {
-      id?: string
       content: string
       visibility?: NonNullable<Post["visibility"]>
       images?: string[]
@@ -75,7 +74,7 @@ export function createPostDomain(deps: {
           const profile = deps.getProfile()
           const visibility = (i.visibility || "public") as NonNullable<Post["visibility"]>
           const post: Post = {
-            id: input.id && /^post_[a-z0-9_-]{6,80}$/i.test(input.id) ? input.id : genId("post"),
+            id: genId("post"),
             authorId: actorId,
             authorName: profile.displayName || "You",
             authorPhoto: profile.photos?.[0] || "/placeholder.svg?width=40&height=40",

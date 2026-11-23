@@ -11,7 +11,6 @@ import { GhcCoinIcon } from "@/components/ghc/ghc-coin-icon"
 import { ASSET_POLICY } from "@/lib/asset-separation"
 import { formatGhc } from "./wallet-format"
 import { formatPiAmount } from "@/lib/wallet/pi-amount"
-import { releaseReservedPi, emitWalletBalanceRefresh, humanizeReleaseReservedError } from "@/lib/wallet/release-reserved-pi"
 
 export type WalletAssetRail = "pi" | "ghc"
 
@@ -71,8 +70,6 @@ export function WalletBalanceCard({
     reason: string
     unlockCondition: string
   }>>([])
-  const [reconcilingRequestId, setReconcilingRequestId] = useState<string | null>(null)
-  const [reconcileMsg, setReconcileMsg] = useState<string | null>(null)
   const lastPiFetchRef = useRef(0)
   const [walletOnline, setWalletOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine !== false,
@@ -184,107 +181,52 @@ export function WalletBalanceCard({
   }, [refreshPi])
 
   const releaseReserved = useCallback(async () => {
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      setReleaseMsg("You are offline. Reserved π is unchanged; reconnect to return incomplete reservations.")
-      return
-    }
     setReleasing(true)
     setReleaseMsg(null)
-    setReconcileMsg(null)
     try {
-      const result = await releaseReservedPi()
-      if (result.ok) {
-        setReleaseMsg(
-          result.released
-            ? `${result.released} incomplete withdrawal${result.released === 1 ? "" : "s"} returned to Available. ${result.message || ""}`.trim()
-            : result.message || "No incomplete reservation could be released yet. Details below — reserved π was not force-cleared."
-        )
-        setReleaseItems(
-          Array.isArray(result.items)
-            ? result.items
-                .filter((item) => typeof item.requestId === "string")
-                .map((item) => ({
-                  requestId: String(item.requestId),
-                  status: String(item.status || "unknown"),
-                  grossAtomic: item.grossAtomic ?? "—",
-                  reason: String(item.reason || "See unlock condition."),
-                  unlockCondition: String(item.unlockCondition || "Server will unlock when safe."),
-                }))
-            : []
-        )
-        emitWalletBalanceRefresh()
+      const res = await fetch("/api/economy/earnings/withdrawals/cancel", {
+        method: "POST", credentials: "include", cache: "no-store", headers: { Accept: "application/json" },
+      })
+      const body = (await res.json().catch(() => null)) as {
+        ok?: boolean
+        released?: number
+        message?: string
+        items?: Array<{ requestId?: string; status?: string; grossAtomic?: number | string; reason?: string; unlockCondition?: string }>
+      } | null
+      if (res.ok && body?.ok) {
+        setReleaseMsg(body.released
+          ? `${body.released} withdrawal request${body.released === 1 ? " was" : "s were"} safely released back to Available. ${body.message || ""}`.trim()
+          : body.message || "The server found no request that could be safely released immediately. Detailed reasons require the latest Phase 3 recovery migration; no active reservation was force-released.")
+        setReleaseItems(Array.isArray(body.items) ? body.items.filter((item) =>
+          typeof item.requestId === "string" && typeof item.reason === "string" && typeof item.unlockCondition === "string"
+        ).map((item) => ({
+          requestId: item.requestId!,
+          status: String(item.status || "unknown"),
+          grossAtomic: item.grossAtomic ?? "—",
+          reason: item.reason!,
+          unlockCondition: item.unlockCondition!,
+        })) : [])
         void refreshPi()
+        window.dispatchEvent(new CustomEvent("ghc:earnings-refresh"))
       } else {
-        setReleaseMsg(result.message || humanizeReleaseReservedError(result.error))
-        if (result.items?.length) {
-          setReleaseItems(
-            result.items
-              .filter((item) => typeof item.requestId === "string")
-              .map((item) => ({
-                requestId: String(item.requestId),
-                status: String(item.status || "unknown"),
-                grossAtomic: item.grossAtomic ?? "—",
-                reason: String(item.reason || "See unlock condition."),
-                unlockCondition: String(item.unlockCondition || "Server will unlock when safe."),
-              }))
-          )
-        } else {
-          setReleaseItems([])
-        }
+        const code = (body as { error?: string; retryAfterSec?: number } | null)?.error
+        const retry = (body as { retryAfterSec?: number } | null)?.retryAfterSec
+        const reason =
+          res.status === 401 || code === "AUTH_REQUIRED" ? "Your session has expired. Sign in again, then retry."
+          : res.status === 429 ? `Too many checks. Wait${retry ? ` ${retry} seconds` : " a moment"} and retry.`
+          : code === "PAYOUT_RECOVERY_MIGRATION_PENDING" ? "Reservation recovery is not enabled on the server yet. Your reserved Pi is safe and unchanged; support has been flagged by this check."
+          : code === "RESERVATION_RELEASE_REJECTED" ? "The server declined to release a reservation because its ledger record did not match. Nothing was changed; operator review is required."
+          : "Couldn't verify the reservation state, so no funds were changed. Try again shortly."
+        setReleaseMsg(code ? `${reason} (ref: ${code})` : reason)
+        setReleaseItems([])
       }
     } catch {
-      setReleaseMsg("Network error while checking reserved π. Nothing was changed on the server.")
+      setReleaseMsg("Couldn't verify the reservation state, so no funds were changed. Check your connection and retry.")
       setReleaseItems([])
     } finally {
       setReleasing(false)
     }
   }, [refreshPi])
-
-  const reconcilePiRequest = useCallback(async (requestId: string) => {
-    if (!requestId || reconcilingRequestId) return
-    setReconcilingRequestId(requestId)
-    setReconcileMsg(null)
-    try {
-      const res = await fetch("/api/economy/earnings/withdrawals/process", {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-        headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId }),
-        signal: AbortSignal.timeout(90_000),
-      })
-      const body = (await res.json().catch(() => null)) as {
-        ok?: boolean
-        status?: string
-        error?: string
-        diagnosticCode?: string
-      } | null
-      if (body?.ok && body.status === "paid") {
-        setReleaseItems((items) => items.filter((item) => item.requestId !== requestId))
-        setReconcileMsg(`Pi confirmed and settled withdrawal ${requestId.slice(0, 8)}. Your wallet is refreshing.`)
-      } else if (body?.error === "PI_UNCERTAIN_REQUEST_REQUIRES_OPERATOR_RECONCILIATION") {
-        setReconcileMsg(`Pi returned no exact incomplete payment for ${requestId.slice(0, 8)}. No replacement transfer was created and the reservation remains protected; operator reconciliation is required.`)
-      } else if (body?.error === "UNRELATED_INCOMPLETE_A2U_REQUIRES_OPERATOR_REVIEW") {
-        setReconcileMsg("A different incomplete Pi App-to-User payment is blocking this request. It has been flagged for operator review; no payment was cancelled or duplicated.")
-      } else if (body?.error === "PI_EARNINGS_EXECUTION_UNCERTAIN") {
-        setReconcileMsg(`Pi could not confirm the provider outcome. Your reservation remains protected. Reference: ${body.diagnosticCode || "PI_PROVIDER_UNCERTAIN"}`)
-      } else if (body?.error === "PI_PAYOUT_WALLET_ADDRESS_MISMATCH" || body?.error === "PI_PROVIDER_WALLET_ADDRESS_UNAVAILABLE") {
-        setReconcileMsg("Pi's actual payment destination could not be confirmed against your connected wallet. The payout was not submitted and has been flagged for operator review.")
-      } else if (body?.error === "PI_WALLET_ADDRESS_CHANGED_SINCE_REQUEST") {
-        setReconcileMsg("Your connected Pi wallet changed after this request was reserved. The request remains protected and must be reconciled before a new withdrawal can be created.")
-      } else if (body?.error === "WALLET_AUTHORIZATION_REQUIRED" || body?.error === "PI_WALLET_ADDRESS_VERIFICATION_REQUIRED" || body?.error === "PI_WALLET_ADDRESS_REVERIFICATION_REQUIRED") {
-        setReconcileMsg("Reconnect Pi in the Withdraw sheet and approve the wallet-address permission before checking this payout.")
-      } else {
-        setReconcileMsg("The existing payout could not be reconciled. No reservation was released and no replacement payment was created.")
-      }
-      void refreshPi()
-      window.dispatchEvent(new CustomEvent("ghc:earnings-refresh"))
-    } catch {
-      setReconcileMsg("Could not reach Pi's payout status check. Your reservation remains unchanged; try again when the connection is stable.")
-    } finally {
-      setReconcilingRequestId(null)
-    }
-  }, [reconcilingRequestId, refreshPi])
 
   const mask = (n: number) => (balanceVisible ? formatGhc(n) : "••••")
   const maskPi = (n: number) =>
@@ -487,16 +429,16 @@ export function WalletBalanceCard({
             {showReserved ? (
               <div className="mt-2 space-y-2 text-[11px] leading-relaxed text-violet-100/90">
                 <p>
-                  <strong>Reserved {maskPi(reservedAmount)}</strong> is held for incomplete withdrawal requests; it has not disappeared, but it is not spendable while those requests remain active and not spendable while a request is unresolved. The Return action is limited to requests that never started provider execution. Processing or uncertain requests stay reserved until Pi's authoritative outcome is reconciled.
+                  <strong>Reserved {maskPi(reservedAmount)}</strong> is held against Pi withdrawal requests; it has not disappeared, but it is not spendable while those requests remain active. It returns to Available if the payout is cancelled, or is settled once Pi confirms the payment.
                 </p>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <button
                     type="button"
                     onClick={() => void releaseReserved()}
-                    disabled={releasing} aria-busy={releasing}
+                    disabled={releasing}
                     className="font-bold underline underline-offset-2 disabled:opacity-50"
                   >
-                    {releasing ? "Returning reserved π…" : "Return reserved π to available"}
+                    {releasing ? "Checking requests…" : "Check for releasable requests"}
                   </button>
                   {releaseMsg ? <span role="status">{releaseMsg}</span> : null}
                 </div>
@@ -507,23 +449,12 @@ export function WalletBalanceCard({
                         <p className="font-semibold">{item.status.replaceAll("_", " ").toUpperCase()} · {item.requestId.slice(0, 8)}</p>
                         <p className="mt-0.5">{item.reason}</p>
                         <p className="mt-1"><strong>When it unlocks:</strong> {item.unlockCondition}</p>
-                        {item.status.toLowerCase() === "uncertain" ? (
-                          <button
-                            type="button"
-                            onClick={() => void reconcilePiRequest(item.requestId)}
-                            disabled={Boolean(reconcilingRequestId)}
-                            className="mt-2 rounded-full border border-violet-200/30 bg-violet-200/10 px-3 py-1.5 text-[10px] font-bold text-violet-100 disabled:opacity-50"
-                          >
-                            {reconcilingRequestId === item.requestId ? "Checking exact Pi payment…" : "Reconcile this Pi payout"}
-                          </button>
-                        ) : null}
                       </li>
                     ))}
                   </ul>
                 ) : null}
-                {reconcileMsg ? <p className="rounded-lg border border-white/10 bg-black/20 p-2 text-[10px] leading-relaxed text-violet-100" role="status">{reconcileMsg}</p> : null}
                 <p className="text-[10px] leading-relaxed text-violet-100/60">
-                  Safety rule: this action can release only a never-started request with no Pi payment ID, transaction ID, provider receipt/verification, execution start, lease token/expiry or provider attempt. A processing/uncertain request may have reached Pi before its payment ID was saved, so a missing ID alone is not proof that no payment exists. Those funds remain reserved until authoritative provider reconciliation. A timeout alone never releases or forfeits your earned balance.
+                  Safety rule: unstarted requests can be released immediately. Processing or uncertain requests remain reserved only while Pi's outcome is unresolved; this control cannot force-release them. The server releases them after authoritative cancellation with no transaction, or settles them after verified payment. A timeout alone never forfeits your earned balance.
                 </p>
               </div>
             ) : null}

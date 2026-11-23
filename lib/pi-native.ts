@@ -19,43 +19,9 @@ function getPi(): Record<string, unknown> | null {
   return w.Pi && typeof w.Pi === "object" ? w.Pi : null
 }
 
-/**
- * Best-effort host detection for choosing the Pi SDK sign-in path. This is
- * only a UX hint; it never authenticates a user or grants payment authority.
- * Pi Browser can expose its user-agent before the SDK bridge is initialized.
- */
+/** True when window.Pi is injected (typical Pi Browser). */
 export function isPiBrowserRuntime(): boolean {
-  if (getPi()) return true
-  if (typeof window === "undefined") return false
-  // Common Pi webview / bridge globals (vary by SDK generation)
-  const w = window as unknown as Record<string, unknown>
-  if (w.PiApp || w.PiNetwork || w.__PI_BROWSER__ || w.piNetwork || w.PiSDK || w.__pi_sdk__) return true
-  // Sticky client marker after a successful bridge probe in this session
-  try {
-    if (typeof sessionStorage !== "undefined" && sessionStorage.getItem("ghc.piBrowser") === "1") return true
-  } catch { /* private mode */ }
-  if (typeof navigator === "undefined") return false
-  const ua = String(navigator.userAgent || "")
-  if (/PiBrowser|Pi\s*Network|minepi|Pi\s*Browser|PiWebView|Pi\/|\bPiOS\b|PiApp/i.test(ua)) return true
-  // Android WebView packaging sometimes omits "PiBrowser" but includes host app markers
-  if (/wv\)/i.test(ua) && /pi\.network|minepi\.com|app\.minepi/i.test(ua)) return true
-  try {
-    const ref = String(document.referrer || "")
-    if (/minepi\.com|pi\.app|pinet\.com|app\.minepi/i.test(ref)) return true
-  } catch { /* */ }
-  // Hostname when served inside Pi sandbox domains
-  try {
-    const host = String(window.location?.hostname || "")
-    if (/\.minepi\.com$|\.pi\.app$|pinet\.com$/i.test(host)) return true
-  } catch { /* */ }
-  return false
-}
-
-/** Record that the Pi bridge was observed so subsequent auth screens stay in soft-connect mode. */
-export function markPiBrowserRuntime(): void {
-  try {
-    if (typeof sessionStorage !== "undefined") sessionStorage.setItem("ghc.piBrowser", "1")
-  } catch { /* */ }
+  return Boolean(getPi())
 }
 
 export function canOpenShareDialog(): boolean {

@@ -70,7 +70,6 @@ import { PiCashbackSummary } from "@/components/ghc/pi-cashback-summary"
 import { UnifiedEarningsDashboard } from "@/components/ghc/unified-earnings-dashboard"
 import { PiWithdrawSheet } from "@/components/ghc/pi-withdraw-sheet"
 import { FilterSummary } from "@/components/ghc/filtering/filter-summary"
-import { FilterPanel } from "@/components/ghc/filtering/filter-panel"
 import { matchesFilterQuery } from "@/lib/filtering/filter-utils"
 import { WalletWithdrawalPinCard } from "@/components/ghc/wallet-withdrawal-pin-card"
 import { normalizePiTransactionIntent, paymentPurposeLabel, type PiTransactionProjection } from "@/lib/domains/pi-transaction-normalizer"
@@ -202,7 +201,7 @@ function navigateSettingsSection(section: string) {
   }
 }
 
-export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onBack: () => void; initialNotificationTarget?: Record<string, unknown> | null }) {
+export function PremiumWalletScreen({ onBack }: { onBack: () => void }) {
   const { addToast } = useGHCShell()
   const regional = useRegionalContext()
   const workflowText = (key: Parameters<typeof getWorkflowMessage>[0]) => getWorkflowMessage(key, regional.locale)
@@ -254,13 +253,6 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
   const [piWithdrawOpen, setPiWithdrawOpen] = useState(false)
   const [piWithdrawAvailable, setPiWithdrawAvailable] = useState<number | null>(null)
   const [piWithdrawUser, setPiWithdrawUser] = useState<string | null>(null)
-  // Never carry a prior account's cached withdrawable snapshot into a new sheet session.
-  // The child sheet keeps only values hydrated during its current open session.
-  const openPiWithdraw = useCallback(() => {
-    setPiWithdrawAvailable(null)
-    setPiWithdrawUser(null)
-    setPiWithdrawOpen(true)
-  }, [])
 
   useEffect(() => {
     if (!piWithdrawOpen) return
@@ -268,8 +260,12 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
     const controller = new AbortController()
     const timeout = window.setTimeout(() => controller.abort(), 8_000)
 
-    // A fresh server snapshot is required for each open session. The sheet handles
-    // temporary null hydration without showing a stale value from a previous session.
+    // Clear prior sheet/account snapshot before hydration so a previous account cannot
+    // leak into this open. PiWithdrawSheet keeps a sticky max so Max · 0.00 π does not
+    // flash while this read-only snapshot reloads. Quote/withdraw APIs stay authoritative.
+    setPiWithdrawAvailable(null)
+    setPiWithdrawUser(null)
+
     ;(async () => {
       try {
         const res = await fetch("/api/economy/earnings/withdrawable", {
@@ -282,23 +278,16 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
           ok?: boolean
           available?: number
           withdrawable?: number
-          availableAtomic?: number
-          withdrawableAtomic?: number
           linkedPiUsername?: string | null
           walletAuthorization?: { mappedUsername?: string | null }
         } | null
         if (cancelled || controller.signal.aborted || !res.ok || body?.ok !== true) return
-        const scale = 10_000_000
-        let avail: number | null = null
-        if (typeof body.withdrawable === "number" && Number.isFinite(body.withdrawable) && body.withdrawable >= 0) {
-          avail = body.withdrawable
-        } else if (typeof body.available === "number" && Number.isFinite(body.available) && body.available >= 0) {
-          avail = body.available
-        } else if (typeof body.withdrawableAtomic === "number" && Number.isFinite(body.withdrawableAtomic) && body.withdrawableAtomic >= 0) {
-          avail = body.withdrawableAtomic / scale
-        } else if (typeof body.availableAtomic === "number" && Number.isFinite(body.availableAtomic) && body.availableAtomic >= 0) {
-          avail = body.availableAtomic / scale
-        }
+        const avail =
+          typeof body.withdrawable === "number" && Number.isFinite(body.withdrawable) && body.withdrawable >= 0
+            ? body.withdrawable
+            : typeof body.available === "number" && Number.isFinite(body.available) && body.available >= 0
+              ? body.available
+              : null
         if (avail !== null) setPiWithdrawAvailable(avail)
         const un =
           typeof body.linkedPiUsername === "string" && body.linkedPiUsername.trim()
@@ -321,9 +310,10 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
   }, [piWithdrawOpen])
 
   useEffect(() => {
-    window.addEventListener("ghc:open-pi-withdraw", openPiWithdraw)
-    return () => window.removeEventListener("ghc:open-pi-withdraw", openPiWithdraw)
-  }, [openPiWithdraw])
+    const open = () => setPiWithdrawOpen(true)
+    window.addEventListener("ghc:open-pi-withdraw", open)
+    return () => window.removeEventListener("ghc:open-pi-withdraw", open)
+  }, [])
 
 
 
@@ -377,7 +367,6 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
     paymentId?: string
   }
   const [piIntents, setPiIntents] = useState<PiIntentRow[]>([])
-  const [piStatusFilter, setPiStatusFilter] = useState<"all" | "pending" | "completed" | "failed">("all")
   const [selectedPiIntent, setSelectedPiIntent] = useState<PiIntentRow | null>(null)
   const [piIntentsLoading, setPiIntentsLoading] = useState(false)
   const [piIntentsError, setPiIntentsError] = useState<string | null>(null)
@@ -485,9 +474,8 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
     // Reconcile the authoritative ledger periodically so matured 48-hour holds
     // become visible and can be retried without logout or manual navigation.
     const refreshInterval = window.setInterval(() => {
-      // Pause background polling to cut battery/network load; still event-driven via ghc:wallet-refresh.
-      if (document.visibilityState === "visible" && navigator.onLine !== false) void refreshAuthoritativeWallet()
-    }, 90_000)
+      if (document.visibilityState === "visible" && navigator.onLine) void refreshAuthoritativeWallet()
+    }, 60_000)
     return () => {
       cancelled = true
       window.clearInterval(refreshInterval)
@@ -617,9 +605,10 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
     const searchable = piIntents.filter((i) => {
       if (q && !matchesFilterQuery(q, i.purpose, i.productId, i.productLabel, i.referenceId, i.id, i.paymentId, i.status)) return false
       const status = String(i.status || "").toLowerCase()
-      if (piStatusFilter === "pending" && !["created", "approval_pending", "approved", "user_submitted", "completion_pending", "incomplete"].includes(status)) return false
-      if (piStatusFilter === "completed" && !["completed", "fulfilled"].includes(status)) return false
-      if (piStatusFilter === "failed" && !["failed", "cancelled", "rejected"].includes(status)) return false
+      if (txFilter === "pending" && !["created", "approval_pending", "approved", "user_submitted", "completion_pending", "incomplete"].includes(status)) return false
+      if (txFilter === "earned" && !["creator_earning", "reward_payout", "refund"].includes(String(i.purpose || "").toLowerCase())) return false
+      if (txFilter === "spent" && ["failed", "cancelled", "refunded"].includes(status)) return false
+      if (txFilter === "sent" || txFilter === "received") return false
       return true
     })
     const now = Date.now()
@@ -633,35 +622,11 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
             : 0
     if (startMs <= 0) return searchable
     return searchable.filter((i) => (i.createdAt || 0) >= startMs)
-  }, [piIntents, txDateRange, query, piStatusFilter])
+  }, [piIntents, txDateRange, query, txFilter])
 
   const [showRequestsPanel, setShowRequestsPanel] = useState(false)
   const [showFullHistory, setShowFullHistory] = useState(false)
   const [historyRail, setHistoryRail] = useState<"ghc" | "pi">("ghc")
-  useEffect(() => {
-    const applyWalletTarget = (detail: Record<string, unknown>) => {
-      const paymentIntentId = String(detail.paymentIntentId || "").trim()
-      const target = paymentIntentId || String(detail.transactionId || detail.referenceId || detail.payoutRequestId || detail.requestId || "").trim()
-      setTab("activity")
-      setShowFullHistory(true)
-      setTxFilter("all")
-      setTxDateRange("all")
-      setAssetRail(paymentIntentId ? "pi" : "ghc")
-      setHistoryRail(paymentIntentId ? "pi" : "ghc")
-      setQuery(target)
-      if (detail.openRequests || detail.section === "transfer-request") setShowRequestsPanel(true)
-      window.setTimeout(() => {
-        document.getElementById("ghc-wallet-activity")?.scrollIntoView({ behavior: "smooth", block: "start" })
-      }, 180)
-    }
-    if (initialNotificationTarget) applyWalletTarget(initialNotificationTarget)
-    const onOpenWalletTarget = (event: Event) => {
-      const detail = (event as CustomEvent<Record<string, unknown>>).detail || {}
-      applyWalletTarget(detail)
-    }
-    window.addEventListener("ghc:open-wallet-transaction", onOpenWalletTarget as EventListener)
-    return () => window.removeEventListener("ghc:open-wallet-transaction", onOpenWalletTarget as EventListener)
-  }, [initialNotificationTarget])
   // Phase 5: deep-link from Rewards "Open Wallet · Withdraw Pi" (and similar).
   useEffect(() => {
     let focus: string | null = null
@@ -670,26 +635,10 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
       if (focus) sessionStorage.removeItem("ghc.wallet.focus")
     } catch { /* */ }
     if (!focus) return
-    // Ecosystem ACTIVE services: wallet | ghc | pi-payments
-    if (focus === "ghc") {
-      setAssetRail("ghc")
-      setHistoryRail("ghc")
-      return
-    }
-    if (focus === "wallet") {
-      setAssetRail("ghc")
-      setHistoryRail("ghc")
-      return
-    }
-    // Default and explicit Pi payment tooling focus
     setAssetRail("pi")
     setHistoryRail("pi")
     const targetId =
-      focus === "pi" || focus === "pi-payments" || focus === "gh-pi-earnings-tools" || focus.startsWith("gh-")
-        ? focus === "pi" || focus === "pi-payments"
-          ? "gh-pi-earnings-tools"
-          : focus
-        : "gh-pi-earnings-tools"
+      focus === "gh-pi-earnings-tools" || focus.startsWith("gh-") ? focus : "gh-pi-earnings-tools"
     const timer = window.setTimeout(() => {
       try {
         document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -1364,7 +1313,7 @@ const lowBalance = balance === 0 && displayPending === 0
   }
 
   return (
-    <div className="gh-wallet-shell gh-world-wallet flex h-full min-h-0 flex-col bg-background text-foreground" data-gh-module="wallet" role="region" aria-label="GHC wallet">
+    <div className="gh-wallet-shell gh-world-wallet flex h-full min-h-0 flex-col bg-background text-foreground" role="region" aria-label="GHC wallet">
       <WalletHeader
         onBack={onBack}
         onRefresh={() => void refresh()}
@@ -1384,7 +1333,7 @@ const lowBalance = balance === 0 && displayPending === 0
       ) : null}
 
 
-      <div className="gh-premium-wallet-content gh-wallet-scroll-region min-h-0 flex-1 overflow-y-auto pb-[var(--gh-screen-bottom-inset)] scrollbar-hide [-webkit-overflow-scrolling:touch]">
+      <div className="gh-premium-wallet-content min-h-0 flex-1 overflow-y-auto pb-[var(--gh-screen-bottom-inset)] scrollbar-hide [-webkit-overflow-scrolling:touch]">
         {showAuthorityBanner && (
           <div className="mx-3 mt-2 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-900 dark:bg-amber-950/40">
             <AlertCircle size={14} className="mt-0.5 shrink-0 text-amber-700" />
@@ -1435,7 +1384,7 @@ const lowBalance = balance === 0 && displayPending === 0
                 onSend={() => {
                   if (assetRail === "pi") {
                     setSendEducate(null)
-                    openPiWithdraw()
+                    setPiWithdrawOpen(true)
                     try {
                       window.dispatchEvent(new CustomEvent("ghc:wallet-pi-focus", { detail: { action: "withdraw" } }))
                     } catch { /* */ }
@@ -1841,16 +1790,6 @@ const lowBalance = balance === 0 && displayPending === 0
               </div>
               {assetRail === "ghc" && (
               <>
-              <FilterPanel
-                title="Filter GHC activity"
-                description="Refine server-confirmed GHC utility records by direction, status, date and reference."
-                resultCount={filteredTxs.length}
-                activeCount={Number(txFilter !== "all") + Number(txDateRange !== "all") + Number(Boolean(query.trim()))}
-                persistentContent={<label className="relative block">
-                  <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                  <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search description, reference or transaction ID…" className="min-h-10 w-full rounded-xl border border-border bg-card py-2 pl-9 pr-3 text-sm outline-none ring-emerald-500/30 focus-visible:ring-2" aria-label="Search GHC transactions by description or reference" />
-                </label>}
-              >
               <section className="grid grid-cols-3 gap-2 rounded-2xl border border-border/70 bg-card p-3 shadow-sm" aria-label="Filtered GHC statement summary">
                 <div className="min-w-0">
                   <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Money in</p>
@@ -1902,6 +1841,21 @@ const lowBalance = balance === 0 && displayPending === 0
                   </button>
                 ))}
               </div>
+              <div className="relative">
+                <Search
+                  size={14}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search description, reference or transaction ID…"
+                  className="min-h-11 w-full rounded-2xl border border-border bg-card py-2.5 pl-9 pr-3 text-sm outline-none ring-emerald-500/30 focus-visible:ring-2"
+                  aria-label="Search GHC transactions by description or reference"
+                />
+              </div>
               <FilterSummary
                 items={[
                   ...(txFilter !== "all" ? [{ id: "type", label: `Type: ${txFilter}`, onRemove: () => setTxFilter("all") }] : []),
@@ -1916,7 +1870,6 @@ const lowBalance = balance === 0 && displayPending === 0
                   {filteredTxs.length} {filteredTxs.length === 1 ? "transaction" : "transactions"} shown
                 </p>
               </div>
-              </FilterPanel>
 
               {refreshing && filteredTxs.length === 0 ? (
                 <div className="space-y-2 rounded-2xl border border-border bg-card p-3" role="status" aria-label="Loading transactions">
@@ -1973,33 +1926,6 @@ const lowBalance = balance === 0 && displayPending === 0
                       </button>
                     </div>
                   </div>
-                  <FilterPanel
-                    title="Filter Pi payment records"
-                    description="Search provider references and filter by payment lifecycle. This view reads stored intents; it never retries or submits a payment."
-                    resultCount={filteredPiIntents.length}
-                    activeCount={Number(piStatusFilter !== "all") + Number(txDateRange !== "all") + Number(Boolean(query.trim()))}
-                    persistentContent={<label className="relative block">
-                      <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden />
-                      <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search purpose, product or provider reference…" aria-label="Search Pi payment records" className="min-h-10 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40" />
-                    </label>}
-                  >
-                    <div className="flex flex-wrap gap-1.5" role="group" aria-label="Pi payment status filter">
-                      {(["all", "pending", "completed", "failed"] as const).map((status) => (
-                        <button key={status} type="button" aria-pressed={piStatusFilter === status} onClick={() => setPiStatusFilter(status)} className={`min-h-9 rounded-full px-3 text-[10px] font-bold capitalize transition ${piStatusFilter === status ? "bg-violet-700 text-white" : "border border-border bg-background text-muted-foreground hover:text-foreground"}`}>
-                          {status === "all" ? "All statuses" : status}
-                        </button>
-                      ))}
-                    </div>
-                    <FilterSummary
-                      items={[
-                        ...(piStatusFilter !== "all" ? [{ id: "status", label: `Status: ${piStatusFilter}`, onRemove: () => setPiStatusFilter("all") }] : []),
-                        ...(txDateRange !== "all" ? [{ id: "date", label: `Date: ${txDateRange}`, onRemove: () => setTxDateRange("all") }] : []),
-                        ...(query.trim() ? [{ id: "query", label: `Search: ${query.trim()}`, onRemove: () => setQuery("") }] : []),
-                      ]}
-                      onClearAll={() => { setPiStatusFilter("all"); setTxDateRange("all"); setQuery("") }}
-                      ariaLabel="Active Pi payment filters"
-                    />
-                  </FilterPanel>
                   {!piIntentsLoading && !piIntentsError && serverReconciliation && (
                     <div className="rounded-2xl border border-border bg-card p-3" aria-label="Server payment reconciliation">
                       <div className="flex items-center justify-between gap-2">
@@ -2680,7 +2606,7 @@ const lowBalance = balance === 0 && displayPending === 0
                 {(piIntents || []).length === 0 ? (
                   <p className="py-10 text-center text-sm text-muted-foreground">No π payment intents for this account.</p>
                 ) : (
-                  (piIntents || []).filter((intent: any) => !query.trim() || `${intent.id || ""} ${intent.referenceId || ""} ${intent.paymentId || ""} ${intent.purpose || ""} ${intent.status || ""}`.toLowerCase().includes(query.trim().toLowerCase())).map((intent: any) => (
+                  (piIntents || []).map((intent: any) => (
                     <button
                       key={intent.id}
                       type="button"
