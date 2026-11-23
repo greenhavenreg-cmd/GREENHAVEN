@@ -244,4 +244,4 @@ The active source package is now `gh-connect@0.338.85`. Run #296 prevents incomp
 
 ## Current package identity — RUN339 (2026-11-19)
 
-The current source derivative package identity is `gh-connect@0.338.101`, based on the user-supplied RUN370 archive through local RUN339–RUN372 maintenance derivatives. This line is a current identity pointer; the historical audit findings and dates above remain unchanged.
+The current source derivative package identity is `gh-connect@0.338.102`, based on the user-supplied RUN370 archive through local RUN339–RUN373 maintenance derivatives. This line is a current identity pointer; the historical audit findings and dates above remain unchanged.

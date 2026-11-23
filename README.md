@@ -1,10 +1,14 @@
 # GreenHaven
 
-**Current source version:** `0.338.101` (RUN339 optional ecosystem provider isolation derivative of user-supplied RUN370)
+**Current source version:** `0.338.102` (RUN373 Pi Sandbox frame-classification correction on the RUN372 identity-principal source)
 
 Production status: **NOT APPROVED** — supported Node 24.15.0 dependency-backed typecheck/lint/build, browser/device, live database/provider and operator acceptance remain outstanding.
 
 This repository is the canonical GreenHaven source tree. See `docs/SOURCE_OF_TRUTH.md` and `docs/CURRENT_BUILD_CONTEXT.md` before implementation or release work.
+
+## Pi authentication frame-routing correction — 2026-11-23 / Run 373
+
+Pi auth diagnostics showed `app-cdn.minepi.com` being incorrectly treated as the Pi Developer Sandbox wrapper. RUN373 now requires the exact `sandbox.minepi.com` referrer, Testnet mode and iframe framing before skipping the App Studio parent-credentials handshake. The app-cdn bridge host follows the parent-credentials path instead. Server-side Pi token verification remains mandatory. See `docs/UPGRADE-WORKLOG-0.338.102.md`.
 
 ## Identity principal consolidation — 2026-11-23 / Run 372
 
@@ -14,7 +18,7 @@ The app now uses one canonical GreenHaven account principal resolved from the du
 
 Audited Pi payment intents and recovery, GHC ledger and wallet, membership purchases/renewals, marketplace checkout and payouts, and Pi withdrawal/A2U controls. Repaired legacy regression checks so they validate the current dedicated withdrawal-sheet flow and archived implementation records; superseded stale operator enablement instructions. No financial execution, ledger/route/RPC change, migration, deployment or Mainnet action was performed. Targeted gates pass; live Testnet/provider and Node 24.15.x build acceptance remain outstanding. See `docs/RUN340-PAYMENTS-AUDIT-AND-MAINTENANCE-2026-11-23.md`.
 
-## Latest maintenance — 0.338.101 / RUN372 canonical identity principal consolidation
+## Previous maintenance — 0.338.101 / RUN372 canonical identity principal consolidation
 
 Optional providers are now required to pass the canonical ecosystem release gate before dynamic import or initialization. Coming Soon/unknown providers are not invoked; provider errors are contained. Startup prefetch warms released core surfaces only, and realtime startup is best-effort. See `docs/RUN339-OPTIONAL-ECOSYSTEM-PROVIDER-ISOLATION-2026-11-19.md`.
 

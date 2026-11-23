@@ -5,12 +5,14 @@ import assert from 'node:assert/strict'
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 const runtime = read('lib/pi-runtime.ts')
+const framePolicy = read('lib/pi-frame-classification.ts')
 const context = read('contexts/pi-auth-context.tsx')
 const screen = read('components/auth-loading-screen.tsx')
 const route = read('app/api/auth/pi/route.ts')
 const piAdapter = read('lib/pi.ts')
 const checks = [
-  ['Sandbox frame recognition requires Testnet mode, iframe and trusted Sandbox referrer', /export function isPiSandboxFrame\(\)[\s\S]*?getPiSandbox\(\)[\s\S]*?window\.self !== window\.top[\s\S]*?referrerHost === "sandbox\.minepi\.com"/.test(runtime)],
+  ['Sandbox frame recognition requires Testnet mode, iframe and the exact trusted Sandbox referrer', /export function isPiSandboxFrame\(\)[\s\S]*?getPiSandbox\(\)[\s\S]*?window\.self !== window\.top[\s\S]*?isTrustedPiSandboxReferrerHost\(referrerHost\)/.test(runtime) && /referrerHost\.trim\(\)\.toLowerCase\(\) === "sandbox\.minepi\.com"/.test(framePolicy)],
+  ['Pi SDK bridge host app-cdn.minepi.com is not trusted as a Developer Sandbox referrer', /isTrustedPiSandboxReferrerHost[\s\S]*?sandbox\.minepi\.com/.test(runtime) && !/referrerHost\s*===\s*"app-cdn\.minepi\.com"/.test(runtime)],
   ['Sandbox warning and diagnostic report share the same frame evidence', /getPiSandboxLaunchHint[\s\S]*?isPiSandboxFrame\(\) \|\| isWindowFramed\(\)/.test(runtime) && /sandboxFrame=\$\{snap\.sandboxFrame\}/.test(runtime)],
   ['Runtime report exposes origin, referrer host and frame state without credentials', /origin: typeof window !== "undefined" \? window\.location\.origin : null/.test(runtime) && /referrerHost: getReferrerHost\(\)/.test(runtime) && /inIframe: typeof window !== "undefined" \? isWindowFramed\(\) : false/.test(runtime)],
   ['Sandbox bootstrap initializes SDK but waits for explicit user action before authenticate', /if \(isPiSandboxFrame\(\)\) \{[\s\S]*?ensurePiInitialized\(\)\.then[\s\S]*?Pi Sandbox is ready\. Tap Sign in with Pi[\s\S]*?return \(\) => \{ cancelled = true \}/.test(context)],

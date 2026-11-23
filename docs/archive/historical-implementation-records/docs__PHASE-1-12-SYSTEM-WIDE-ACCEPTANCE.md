@@ -320,7 +320,7 @@ The current source baseline includes a shared accessible active-filter summary a
 The shared application header is slimmer; hidden duplicate header controls are inert; Marketplace and Community content use improved responsive spacing; active-tab scroll reset resolves the actual scroll owner; and global keyboard shortcuts avoid editable controls, modal workflows and IME composition. The dedicated UI/navigation audit passes 31/31. The independent Marketplace/Community security contract passes 42/42. These source checks do not replace Node 24.15.0 typecheck/build or browser/device, database and provider acceptance. No financial authority or production state changed.
 
 
-## Current source baseline metadata — RUN339
+## Current source baseline metadata — RUN373
 
-Current source baseline for this consolidated report: `0.338.101`
-Current audit status (v0.338.101): RUN372 canonical identity-principal consolidation source-only candidate; production remains NOT APPROVED. Full Node.js 24.15.0 dependency-backed typecheck, lint, production build and browser/device acceptance remain required.
+Current source baseline for this consolidated report: `0.338.102`
+Current audit status (v0.338.102): RUN373 Pi Sandbox frame-classification correction on the RUN372 canonical identity-principal source-only candidate; production remains NOT APPROVED. Full Node.js 24.15.0 dependency-backed typecheck, lint, production build and browser/device acceptance remain required.

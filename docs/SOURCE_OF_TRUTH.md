@@ -1,13 +1,17 @@
-# GreenHaven source authority — 0.338.101 RUN372 identity-principal consolidation (2026-11-23)
+# GreenHaven source authority — 0.338.102 RUN373 Pi Sandbox frame-classification correction (2026-11-23)
 
-**Current source version:** `0.338.101`
-**Current user-provided archive:** `GREENHAVEN-0_338_99-RUN370-PI-AUTH-REJECTION-DIAGNOSTICS-2026-11-19.zip`
-**Current local working derivative:** RUN372 canonical identity-principal consolidation, derived through RUN339 optional-provider isolation, RUN340 payment maintenance and RUN341 identity maintenance; source-only, not pushed or deployed.
-**Package identity:** `gh-connect@0.338.101` (user-facing brand: GREENHAVEN).
+**Current source version:** `0.338.102`
+**Current user-provided archive:** `GREENHAVEN-0_338_101-RUN372-IDENTITY-PRINCIPAL-2026-11-23.zip`
+**Current local working derivative:** RUN373 Pi Sandbox frame-classification correction on top of the user-provided RUN372 archive; source-only, not pushed or deployed.
+**Package identity:** `gh-connect@0.338.102` (user-facing brand: GREENHAVEN).
 
-The RUN370 archive supplied on 2026-11-19 is the authoritative baseline for this task. RUN339 is a local implementation derivative of that archive and does not supersede it as the user's uploaded source. Preserve the existing architecture, canonical ecosystem access-control helper, and dedicated Events and Charity release checks.
+The RUN372 archive supplied on 2026-11-23 is the authoritative baseline for this task. RUN373 is a narrowly scoped local source derivative and does not replace the uploaded archive. Preserve the established architecture, financial authority boundaries, canonical ecosystem access-control helper, and dedicated Events and Charity release checks.
 
 The RUN331/RUN332/RUN364 notes below are historical implementation records only and do not override the user-supplied RUN370 baseline or RUN339 changes.
+
+## RUN373 Pi authentication frame-routing correction
+
+The exact-host Sandbox classification and regression results are recorded in `docs/UPGRADE-WORKLOG-0.338.102.md`. The uploaded RUN372 archive remains the authoritative parent; RUN373 is a source-only derivative.
 
 ## RUN364 full-project audit and gate repair
 

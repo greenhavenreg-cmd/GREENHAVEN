@@ -16,7 +16,7 @@ const checks = [
   ['App Studio bridge requires durable mapping and session plus cookie round-trip', /b\.durable === true && b\.sessionDurable === true/.test(auth) && /session\.identity\?\.serverVerified === true && session\.session\?\.ghUserId === ghUserId/.test(auth)],
   ['production App Studio auth fails closed without durable bridge', /if \(!bridged && !allowLocalAuthFallback\(\)\)/.test(auth)],
   ['Pi last-seen persistence uses bounded central Supabase REST client', /supabaseRest\([\s\S]*?gh_pi_identities\?gh_user_id=eq\.[\s\S]*?timeoutMs: 5_000/.test(store) && !/await fetch\(url/.test(store)],
-  ['Pi sandbox iframe detection recognizes the app CDN host', /referrerHost === "app-cdn\.minepi\.com"/.test(runtime)],
+  ['Pi Sandbox iframe detection trusts only the exact Developer Sandbox host, not the SDK CDN host', /isTrustedPiSandboxReferrerHost[\s\S]*?sandbox\.minepi\.com/.test(runtime) && !/referrerHost === "app-cdn\.minepi\.com"/.test(runtime)],
   ['identity regression check is registered in prebuild and static verification', pkg.scripts['prebuild:checks'].includes('check-run341-identity-audit.mjs') && pkg.scripts['verify:static'].includes('check-run341-identity-audit.mjs')],
   ['identity runtime regression is registered in prebuild and static verification', pkg.scripts['prebuild:checks'].includes('test-run341-identity-lifecycle.mjs') && pkg.scripts['verify:static'].includes('test-run341-identity-lifecycle.mjs')],
 ]

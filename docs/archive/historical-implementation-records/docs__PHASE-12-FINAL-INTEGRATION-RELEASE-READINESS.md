@@ -360,8 +360,8 @@ The in-memory transaction coordinator now executes registered operations, requir
 Thirty targeted responsive presentation rules and component hooks were added across the active product surfaces. This pass does not claim visual acceptance: Android, Pi Browser, tablet and desktop screenshot/interaction checks remain outstanding. Financial and entitlement authority is unchanged.
 
 
-## Current release baseline metadata — RUN339
+## Current release baseline metadata — RUN373
 
-Release: `0.338.101`
-**Current source baseline:** `0.338.101`
-Production release remains **NOT APPROVED for production**. RUN339 is a source-only derivative of the user-provided RUN370 archive. Full Node.js 24.15.0 dependency-backed typecheck, lint, Next.js production build and browser/device acceptance remain outstanding.
+Release: `0.338.102`
+**Current source baseline:** `0.338.102`
+Production release remains **NOT APPROVED for production**. RUN373 is a source-only Pi Sandbox frame-classification correction on the RUN372 identity-principal derivative of the user-provided source archive. Full Node.js 24.15.0 dependency-backed typecheck, lint, Next.js production build and browser/device acceptance remain outstanding.

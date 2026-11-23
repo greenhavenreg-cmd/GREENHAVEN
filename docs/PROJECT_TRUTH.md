@@ -1,6 +1,8 @@
-# Current project truth — 0.338.101 RUN372 (2026-11-23)
+# Current project truth — 0.338.102 RUN373 (2026-11-23)
 
-- User-designated source baseline remains the RUN339 optional-provider-isolation archive. RUN340 payment maintenance and RUN341 identity audit are retained as local source-only derivatives; RUN372 builds on RUN341. No derivative has been pushed or deployed.
+- User-designated source baseline is `GREENHAVEN-0_338_101-RUN372-IDENTITY-PRINCIPAL-2026-11-23.zip`. RUN373 is a local source-only derivative of that archive; no derivative has been pushed or deployed.
+- RUN373 verification: RUN353 17/17; RUN373 source 9/9 and executable host-policy 10/10; RUN370 7/7; RUN343 8/8; RUN344 10/10; RUN372 9/9; RUN341 11/11; full `npm run verify:static` exit 0.
+- RUN373 fixes Pi frame classification: only an iframe whose exact referrer host is `sandbox.minepi.com` is treated as the Developer Sandbox. `app-cdn.minepi.com` is a Pi SDK/bridge host and no longer bypasses the App Studio parent-credentials handshake.
 - RUN372 establishes one canonical GreenHaven account principal (`userId`) from the durable server-verified Pi→GreenHaven mapping. The Pi UID is retained only as the authentication-provider subject and a transitional legacy lookup alias; it is not allowed to become a GreenHaven account ID before mapping verification.
 - Pi SDK identity alone now remains unbound (`current-user` local placeholder). Profile hydration cannot promote an unverified Pi subject into an account. `server_verified` requires both a Pi UID and a non-placeholder canonical account ID. Account switches clear prior account-bound credentials and state.
 - Existing `gh_pi_identities`, `gh_sessions`, wallet, ledger, marketplace, membership and community records continue using their established canonical GreenHaven user key. No mass identity rewrite or database migration is included. Transitional Pi UID aliases are not authorization evidence and must not be used by server-side financial ownership checks.
@@ -8,10 +10,10 @@
 - Node 22.16.0 is available in this workspace; the project requires Node `^24.15.0`. Dependency-backed typecheck, lint and production build are not claimed. Live Testnet two-account, cross-device and IDOR acceptance remain outstanding. Production remains NOT APPROVED.
 - No database writes, migrations, wallet/payment operations, GitHub push, Vercel deployment or Mainnet actions were performed.
 
-**Current source version:** `0.338.101`  
-**Package identity:** `gh-connect@0.338.101`  
+**Current source version:** `0.338.102`  
+**Package identity:** `gh-connect@0.338.102`  
 **User-designated source archive:** RUN339 optional-provider-isolation archive  
-**Current local working derivative:** RUN372 identity-principal consolidation on top of RUN341; not pushed or deployed.  
+**Current local working derivative:** RUN373 Pi Sandbox frame-classification correction on top of RUN372; not pushed or deployed.  
 **Current status:** **NOT APPROVED** for production.
 
 ## Historical RUN364 and earlier records

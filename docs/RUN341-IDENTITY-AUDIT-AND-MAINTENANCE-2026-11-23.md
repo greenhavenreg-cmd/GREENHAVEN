@@ -84,3 +84,8 @@ Two existing checks asserted that the external Pi UID must outrank the canonical
 4. Sign out and revoke sessions; verify the old cookie is rejected and the new session remains isolated.
 5. Repeat on a second device/browser and verify profile, connections, messaging, wallet identity and account-security surfaces all resolve to the same canonical `ghUserId` without exposing private identity fields.
 6. Run two-user ownership/IDOR checks on profile, connections, messaging, verification and session management before any release approval.
+
+
+### RUN373 superseding correction (2026-11-23)
+
+The earlier RUN341 acceptance of `app-cdn.minepi.com` as a Sandbox referrer was incorrect. RUN373 supersedes that specific decision: `app-cdn.minepi.com` is not sufficient evidence of the Developer Sandbox wrapper and must not suppress the App Studio parent-credentials handshake. Only the exact `sandbox.minepi.com` referrer, together with Testnet mode and iframe framing, qualifies. The historical finding above is retained as an audit record, not current executable policy.

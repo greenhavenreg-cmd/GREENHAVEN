@@ -1,9 +1,9 @@
-# CURRENT BUILD CONTEXT — 0.338.101 RUN372 (2026-11-23)
+# CURRENT BUILD CONTEXT — 0.338.102 RUN373 (2026-11-23)
 
-- **User-designated source baseline:** RUN339 optional-provider-isolation archive. RUN340 is the payment audit derivative; RUN341 is the identity audit derivative. Both are local source-only candidates, not pushed or deployed.
-- **Latest work:** RUN341 identity audit and surgical fixes: canonical GH ID/Pi UID separation, account-switch token/state isolation, durable App Studio session round-trip, corrected last-seen persistence and Pi sandbox iframe host recognition.
-- **Verification:** RUN341 identity contract 11/11; lifecycle runtime 24 assertions; full `npm run verify:static` PASS. RUN340 payment maintenance and its targeted checks are retained.
-- **Outstanding:** full Node 24.15.x dependency-backed typecheck/lint/build, live Testnet multi-account/device acceptance and browser/device tests. Workspace runtime Node 22.16.0, dependencies absent. Production remains NOT APPROVED. See `docs/RUN341-IDENTITY-AUDIT-AND-MAINTENANCE-2026-11-23.md` and `docs/RUN340-PAYMENTS-AUDIT-AND-MAINTENANCE-2026-11-23.md`.
+- **User-designated source baseline:** `GREENHAVEN-0_338_101-RUN372-IDENTITY-PRINCIPAL-2026-11-23.zip`. RUN373 is a source-only correction derived directly from that archive; no GitHub push or Vercel deployment has occurred.
+- **Latest work:** RUN373 corrects Pi auth frame routing. Only an iframe with the exact `sandbox.minepi.com` referrer in Testnet mode uses the Developer Sandbox path; `app-cdn.minepi.com` no longer suppresses the App Studio parent-credentials handshake. RUN372 canonical identity-principal protections remain intact.
+- **Verification:** RUN353 17/17; RUN373 source 9/9 and executable host policy 10/10; RUN370 7/7; RUN343 8/8; RUN344 10/10; RUN372 9/9; RUN341 11/11; full `npm run verify:static` exit 0.
+- **Outstanding:** full Node.js 24.15.0 dependency-backed typecheck/lint/build, live Pi Browser Testnet sign-in, multi-account/device acceptance and browser/device tests. Workspace runtime Node 22.16.0, dependencies absent. Production remains NOT APPROVED. See `docs/UPGRADE-WORKLOG-0.338.102.md`.
 
 ## Historical build context — 0.338.99
 
@@ -67,3 +67,10 @@ GitHub Actions on 0.338.98 confirmed typecheck and lint passed and all 362 prebu
 ## 0.338.101 RUN372 — canonical identity principal consolidation
 
 The Pi UID is an authentication-provider subject, not a second GreenHaven account ID. The browser now retains the local placeholder until the server returns a durable, verified Pi-to-GreenHaven mapping; profile hydration and SDK-only login cannot promote the Pi UID into an account principal. Server verification requires a Pi UID and a non-placeholder canonical GreenHaven user ID. Account switches reset prior account-bound state. Existing database keys and financial records are intentionally unchanged pending a complete Testnet data/schema inventory; Pi UID aliases are compatibility lookups only and never financial authorization evidence. No migration, database mutation, payout, deployment or Mainnet action was performed.
+
+
+## 0.338.102 RUN373 — Pi Sandbox frame-classification correction
+
+The latest Pi auth diagnostics showed `referrerHost=app-cdn.minepi.com` while the runtime reported `sandboxFrame=true`. RUN353's documented trust boundary identifies the exact `sandbox.minepi.com` host as the Developer Sandbox wrapper. RUN373 removes `app-cdn.minepi.com` from Sandbox-frame recognition and factors the exact-host rule into `isTrustedPiSandboxReferrerHost()`. This restores the normal parent-credentials handshake for non-Sandbox Pi-hosted frames while retaining the dedicated SDK authentication path for the confirmed Developer Sandbox. Server-side `/api/auth/pi` verification remains mandatory. The source regression explicitly prohibits reintroducing `app-cdn.minepi.com` as a trusted Sandbox referrer.
+
+This is a source-only Testnet-targeted correction. It does not change environment variables, portal configuration, database schema/data, identity mappings, financial records, Pi payment scopes, or Mainnet behavior. Targeted regression checks are run locally; full Node 24.15.0 typecheck/lint/build and live Pi Browser Testnet acceptance remain outstanding. No GitHub push or Vercel deployment occurred.

@@ -14,6 +14,8 @@
 import { getPiClientId, resolvePiSandbox } from "@/lib/pi-env"
 import { PI_NETWORK_CONFIG } from "@/lib/system-config"
 import { onIncompletePaymentFound } from "@/lib/pi-incomplete-payment"
+import { isTrustedPiSandboxReferrerHost } from "@/lib/pi-frame-classification"
+export { isTrustedPiSandboxReferrerHost } from "@/lib/pi-frame-classification"
 
 export type PiNetworkMode = "sandbox" | "mainnet"
 
@@ -90,14 +92,11 @@ export function isPiSandboxFrame(): boolean {
   let framed = false
   try { framed = window.self !== window.top } catch { framed = true }
   const referrerHost = getReferrerHost()
-  // Pi's Developer Sandbox wraps the registered app on this host. The referrer
-  // is corroborating evidence; framing remains required so a copied referrer
-  // cannot make a top-level Vercel page appear authorised.
-  return framed && (
-    referrerHost === "sandbox.minepi.com" ||
-    referrerHost.endsWith(".sandbox.minepi.com") ||
-    referrerHost === "app-cdn.minepi.com"
-  )
+  // Keep this exact-host check aligned with RUN353. app-cdn.minepi.com is a Pi
+  // SDK/bridge host, not proof that the page is inside the Developer Sandbox.
+  // Misclassifying it skips the App Studio parent-credentials handshake and
+  // sends the user down Pi.authenticate(), which can fail before our API runs.
+  return framed && isTrustedPiSandboxReferrerHost(referrerHost)
 }
 
 function isWindowFramed(): boolean {
