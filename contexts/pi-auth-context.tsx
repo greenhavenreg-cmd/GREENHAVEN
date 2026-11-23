@@ -20,7 +20,7 @@ import {
   piAuthenticateOfficial,
   reportPiAuthDiagnostic,
   getPiSandboxLaunchHint,
-  isPiSandboxFrame,
+  isPiDirectAuthFrame,
 } from "@/lib/pi-runtime";
 import {
   INITIAL_AUTH_LIFECYCLE,
@@ -352,7 +352,10 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       // Pi Developer Sandbox is not the legacy App Studio parent bridge. Skip
       // the 4-second postMessage probe there so a user's Retry tap can reach the
       // already-initialized Pi.authenticate call without an intervening await.
-      const sandboxFrame = isPiSandboxFrame()
+      // RUN374: the Pi app CDN frame (app-cdn.minepi.com) is not the Sandbox but
+      // never answered the parent-credentials probe in field diagnostics, so it
+      // also authenticates directly. Server verification stays mandatory.
+      const sandboxFrame = isPiDirectAuthFrame()
       const parentCredentials = sandboxFrame ? null : await requestParentCredentials();
       if (parentCredentials?.accessToken) {
         setAuthMessage("Authenticated via App Studio...");
@@ -1020,7 +1023,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // User explicitly logged out: do not silently sign back in on reload.
     if (readSignedOutFlag()) {
-      if (isPiSandboxFrame()) {
+      if (isPiDirectAuthFrame()) {
         let cancelled = false
         setHasError(false)
         setAuthMessage("Preparing Pi Sandbox sign-in…")
@@ -1045,7 +1048,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       return undefined;
     }
     let cancelled = false;
-    if (isPiSandboxFrame()) {
+    if (isPiDirectAuthFrame()) {
       setAuthMessage("Preparing Pi Sandbox sign-in…")
       void ensurePiInitialized().then(() => {
         if (cancelled) return

@@ -30,3 +30,17 @@ The RUN372 runtime accepted `app-cdn.minepi.com` as evidence that the applicatio
 
 ## Safety boundary
 No environment variables or Pi Developer Portal settings changed. No Supabase schema/data, migrations, sessions, wallets, ledger, payouts, payments, GitHub push, Vercel deployment or Mainnet actions occurred. Live Testnet acceptance is still required to confirm the fix in Pi Browser.
+
+## RUN374 addendum — field-evidence build (same version, 0.338.102)
+RUN373 was deployed (`sandboxFrame=false`) and Pi still rejected `Pi.authenticate()` with a generic "Authentication failed." in about 0.4s, with and without a user tap. The `app-cdn.minepi.com` misclassification was therefore not the root cause.
+
+Changes:
+1. `app-cdn.minepi.com` is a separate `app_cdn` frame kind via the exact-host `isPiAppCdnReferrerHost()`. It is never treated as the Developer Sandbox.
+2. Sandbox and app-cdn frames skip the 4s parent-credentials probe, which never answered in field logs. They pre-initialize the SDK and wait for a tap. Server verification at `/api/auth/pi` is unchanged.
+3. New `PI_AUTH_FRAME_CONTEXT` diagnostic before each authenticate call: init sandbox flag, frame kind, referrer host, ancestor hosts and Pi SDK method names.
+4. Rejections now record `rejectionShape` (own property names and value types only, never values).
+5. The copyable report adds `appCdnFrame` and `ancestorHosts`.
+
+Not changed: `Pi.init({ sandbox })` is still resolved by `getPiSandbox()`. Setting it to false would point Testnet at Mainnet. No env vars, Supabase, payments or Mainnet were touched.
+
+Validation: RUN373 9/9, RUN374 source 9/9, RUN374 host tests 9/9, `npm run verify:static` exit 0. Node 22 only; typecheck, lint and build were not run. Live Pi Browser Testnet test required.

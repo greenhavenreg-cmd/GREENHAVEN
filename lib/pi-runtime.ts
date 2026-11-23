@@ -14,8 +14,8 @@
 import { getPiClientId, resolvePiSandbox } from "@/lib/pi-env"
 import { PI_NETWORK_CONFIG } from "@/lib/system-config"
 import { onIncompletePaymentFound } from "@/lib/pi-incomplete-payment"
-import { isTrustedPiSandboxReferrerHost } from "@/lib/pi-frame-classification"
-export { isTrustedPiSandboxReferrerHost } from "@/lib/pi-frame-classification"
+import { isTrustedPiSandboxReferrerHost, isPiAppCdnReferrerHost } from "@/lib/pi-frame-classification"
+export { isTrustedPiSandboxReferrerHost, isPiAppCdnReferrerHost } from "@/lib/pi-frame-classification"
 
 export type PiNetworkMode = "sandbox" | "mainnet"
 
@@ -33,13 +33,15 @@ export type PiRuntimeSnapshot = {
   referrerHost: string
   inIframe: boolean
   sandboxFrame: boolean
+  appCdnFrame: boolean
+  ancestorHosts: string
 }
 
 
 /** Emit stable, token-free Pi auth diagnostics for field troubleshooting. */
 export function reportPiAuthDiagnostic(
   code: string,
-  details: { stage?: string; status?: number; sandbox?: boolean; hasPi?: boolean; hasAccessToken?: boolean; errorName?: string; errorShape?: string; reasonClass?: string; reason?: string; sdkErrorCode?: string; sdkErrorStatus?: number; sdkErrorFields?: string; inIframe?: boolean; userActivationActive?: boolean } = {},
+  details: { stage?: string; status?: number; sandbox?: boolean; hasPi?: boolean; hasAccessToken?: boolean; errorName?: string; errorShape?: string; reasonClass?: string; reason?: string; sdkErrorCode?: string; sdkErrorStatus?: number; sdkErrorFields?: string; inIframe?: boolean; userActivationActive?: boolean; frameKind?: string; referrerHost?: string; ancestorHosts?: string; piMethods?: string; rejectionShape?: string; initSandbox?: boolean } = {},
 ): void {
   const safeCode = /^[A-Z0-9_]{3,64}$/.test(code) ? code : "PI_AUTH_DIAGNOSTIC_INVALID"
   const safeDetails = {
@@ -58,6 +60,13 @@ export function reportPiAuthDiagnostic(
     sdkErrorFields: typeof details.sdkErrorFields === "string" ? details.sdkErrorFields.slice(0, 120) : undefined,
     inIframe: typeof details.inIframe === "boolean" ? details.inIframe : undefined,
     userActivationActive: typeof details.userActivationActive === "boolean" ? details.userActivationActive : undefined,
+    // RUN374 field evidence: host names and identifier names only; never values, tokens or URLs with paths.
+    frameKind: details.frameKind && /^[a-z_]{1,24}$/.test(details.frameKind) ? details.frameKind : undefined,
+    referrerHost: details.referrerHost && /^[a-z0-9.\-]{1,80}$/.test(details.referrerHost) ? details.referrerHost : undefined,
+    ancestorHosts: typeof details.ancestorHosts === "string" && /^[a-z0-9.\-,]{0,200}$/.test(details.ancestorHosts) ? details.ancestorHosts : undefined,
+    piMethods: typeof details.piMethods === "string" && /^[A-Za-z0-9_$,]{0,200}$/.test(details.piMethods) ? details.piMethods : undefined,
+    rejectionShape: typeof details.rejectionShape === "string" && /^[A-Za-z0-9_$:,]{0,200}$/.test(details.rejectionShape) ? details.rejectionShape : undefined,
+    initSandbox: typeof details.initSandbox === "boolean" ? details.initSandbox : undefined,
   }
   // Never include tokens, usernames, Pi UIDs, cookies, request bodies, or raw errors.
   console.info("[GH_PI_AUTH_DIAGNOSTIC]", { code: safeCode, ...safeDetails })
@@ -97,6 +106,61 @@ export function isPiSandboxFrame(): boolean {
   // Misclassifying it skips the App Studio parent-credentials handshake and
   // sends the user down Pi.authenticate(), which can fail before our API runs.
   return framed && isTrustedPiSandboxReferrerHost(referrerHost)
+}
+
+/** RUN374: framed by the Pi app CDN. Distinct from, and never treated as, the Developer Sandbox. */
+export function isPiAppCdnFrame(): boolean {
+  if (typeof window === "undefined") return false
+  let framed = false
+  try { framed = window.self !== window.top } catch { framed = true }
+  return framed && isPiAppCdnReferrerHost(getReferrerHost())
+}
+
+/** Frames with no App Studio parent-credentials responder: authenticate directly. */
+export function isPiDirectAuthFrame(): boolean {
+  return isPiSandboxFrame() || isPiAppCdnFrame()
+}
+
+function getFrameKind(): string {
+  if (isPiSandboxFrame()) return "sandbox"
+  if (isPiAppCdnFrame()) return "app_cdn"
+  return isWindowFramed() ? "other_frame" : "top_level"
+}
+
+/** Hostnames of ancestor frames where the browser exposes them (hosts only, no paths). */
+function getAncestorHosts(): string {
+  try {
+    const list = (window.location as Location & { ancestorOrigins?: ArrayLike<string> }).ancestorOrigins
+    if (!list) return "unavailable"
+    const hosts: string[] = []
+    for (let i = 0; i < list.length && i < 4; i++) {
+      try { hosts.push(new URL(list[i]).hostname.toLowerCase()) } catch { hosts.push("unparseable") }
+    }
+    return hosts.join(",") || "none"
+  } catch { return "unavailable" }
+}
+
+/** Names (not values) of the functions the Pi SDK exposes, to detect a wrong/partial SDK. */
+function getPiMethodNames(): string {
+  const Pi = getWindowPi()
+  if (!Pi) return ""
+  try {
+    return Object.keys(Pi).filter((k) => /^[A-Za-z0-9_$]{1,32}$/.test(k) && typeof Pi[k] === "function").sort().slice(0, 12).join(",")
+  } catch { return "" }
+}
+
+/** Own property names and value types of a rejection (including non-enumerable). Never values. */
+export function getPiRejectionShape(err: unknown): string {
+  if (err === null || err === undefined) return "nullish"
+  if (typeof err !== "object") return `primitive:${typeof err}`
+  try {
+    const o = err as Record<string, unknown>
+    const ctor = (Object.getPrototypeOf(err) as { constructor?: { name?: string } } | null)?.constructor?.name
+    const names = Object.getOwnPropertyNames(err).filter((k) => /^[A-Za-z0-9_$]{1,32}$/.test(k)).slice(0, 12)
+    const parts = names.map((k) => `${k}:${o[k] === null ? "null" : typeof o[k]}`)
+    const head = ctor && /^[A-Za-z0-9_$]{1,32}$/.test(ctor) ? ctor : "Object"
+    return [head, ...parts].join(",").slice(0, 200)
+  } catch { return "unreadable" }
 }
 
 function isWindowFramed(): boolean {
@@ -188,7 +252,7 @@ export function buildPiAuthDiagnosticReport(): string {
     `GH Pi auth diagnostics ${new Date().toISOString()}`,
     `host=${snap.hostname} origin=${snap.origin || "none"} mode=${snap.mode} sandbox=${snap.sandbox}`,
     `clientIdConfigured=${snap.clientIdConfigured} hasWindowPi=${snap.hasWindowPi} hasInit=${snap.hasInit} hasAuthenticate=${snap.hasAuthenticate} initialized=${snap.initialized}`,
-    `inIframe=${snap.inIframe} referrerHost=${referrerHost} sandboxFrame=${snap.sandboxFrame}`,
+    `inIframe=${snap.inIframe} referrerHost=${referrerHost} sandboxFrame=${snap.sandboxFrame} appCdnFrame=${snap.appCdnFrame} ancestorHosts=${snap.ancestorHosts}`,
     ...history.map((e) => JSON.stringify(e)),
   ].join("\n")
 }
@@ -246,6 +310,8 @@ export function getPiRuntimeSnapshot(): PiRuntimeSnapshot {
     referrerHost: getReferrerHost(),
     inIframe: typeof window !== "undefined" ? isWindowFramed() : false,
     sandboxFrame: isPiSandboxFrame(),
+    appCdnFrame: isPiAppCdnFrame(),
+    ancestorHosts: typeof window !== "undefined" ? getAncestorHosts() : "unavailable",
   }
 }
 
@@ -386,6 +452,15 @@ export async function piAuthenticateOfficial(
   }>
 
   const authenticate = Pi.authenticate as PiAuthFn
+  reportPiAuthDiagnostic("PI_AUTH_FRAME_CONTEXT", {
+    stage: "pi_authenticate",
+    sandbox: getPiSandbox(),
+    initSandbox: getPiSandbox(),
+    frameKind: getFrameKind(),
+    referrerHost: getReferrerHost(),
+    ancestorHosts: getAncestorHosts(),
+    piMethods: getPiMethodNames(),
+  })
   reportPiAuthDiagnostic("PI_AUTH_INVOKE_CONTEXT", {
     stage: "pi_authenticate",
     sandbox: getPiSandbox(),
@@ -438,6 +513,7 @@ export async function piAuthenticateOfficial(
       sdkErrorCode: metadata.code,
       sdkErrorStatus: metadata.status,
       sdkErrorFields: metadata.fields,
+      rejectionShape: getPiRejectionShape(err),
       inIframe: isWindowFramed(),
     })
     // The Pi bridge often rejects with a plain string/object. Wrap it so callers
