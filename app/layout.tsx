@@ -3,7 +3,12 @@ import type { Metadata, Viewport } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { AppWrapper } from "@/components/app-wrapper"
+import { buildPiSdkEarlyLoaderScript } from "@/lib/pi-sdk-early-loader"
+import { PUBLIC_PREFIX_ROUTES } from "@/lib/routing/public-route-policy"
+import { PI_NETWORK_CONFIG } from "@/lib/system-config"
 import "./globals.css"
+
+const PI_SDK_EARLY_LOADER = buildPiSdkEarlyLoaderScript(PI_NETWORK_CONFIG.SDK_URL, PUBLIC_PREFIX_ROUTES)
 
 const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "")
 
@@ -64,6 +69,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="bg-background" suppressHydrationWarning>
       <head>
+        {/* RUN375: load the official Pi SDK before hydration on authenticated routes only (public routes load none). */}
+        <script dangerouslySetInnerHTML={{ __html: PI_SDK_EARLY_LOADER }} />
         <style>{`
 html {
   font-family: ${GeistSans.style.fontFamily};

@@ -5,7 +5,7 @@
  * field desk exact-match only: /field/studio and /field/admin/** remain inside
  * the authenticated GreenHaven application boundary.
  */
-const PUBLIC_PREFIX_ROUTES = [
+export const PUBLIC_PREFIX_ROUTES = [
   "/privacy",
   "/terms",
   "/support",

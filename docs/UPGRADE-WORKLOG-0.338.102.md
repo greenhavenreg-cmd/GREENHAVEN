@@ -44,3 +44,12 @@ Changes:
 Not changed: `Pi.init({ sandbox })` is still resolved by `getPiSandbox()`. Setting it to false would point Testnet at Mainnet. No env vars, Supabase, payments or Mainnet were touched.
 
 Validation: RUN373 9/9, RUN374 source 9/9, RUN374 host tests 9/9, `npm run verify:static` exit 0. Node 22 only; typecheck, lint and build were not run. Live Pi Browser Testnet test required.
+
+## RUN375 addendum — SDK early-load regression repair (same version, 0.338.102)
+Archive comparison against two older builds where Pi sign-in worked (RUN249 0.338.20, RUN302 0.338.86) found that both load the Pi SDK in the root layout before hydration. The field-research public-access work removed that script so public respondents never load Pi, leaving the SDK to load only after hydration. RUN374 field logs showed exactly that (`PI_SDK_INIT_START hasPi:false` at runtime) and a generic SDK rejection.
+
+Change: `lib/pi-sdk-early-loader.ts` builds a tiny inline head script that injects the official SDK before hydration on every route except those in `lib/routing/public-route-policy.ts` (now exports `PUBLIC_PREFIX_ROUTES`). Public routes still load no Pi SDK. The loader skips if `window.Pi` or the script tag already exists.
+
+Unchanged: `Pi.init` sandbox flag, server verification, CSP, env, Supabase, payments, Mainnet. Unconfirmed: this is a timing regression match, not yet proven live. The full CSP in `vercel.json` (absent in both older archives) is the second suspect if sign-in still fails.
+
+Validation: RUN375 source 8/8, executable loader test 21/21 (every authenticated path injects, every public path does not), `npm run verify:static` below.
