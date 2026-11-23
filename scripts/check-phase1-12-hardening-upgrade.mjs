@@ -24,7 +24,7 @@ const checks = [
   ["API middleware assigns and propagates a request correlation ID", /requestCorrelationId\(request\)/.test(middleware) && /requestHeaders\.set\("x-request-id", requestId\)/.test(middleware) && /response\.headers\.set\("X-Request-ID", requestId\)/.test(middleware)],
   ["untrusted request IDs are validated before reuse", /crypto\.randomUUID\(\)/.test(middleware) && /\[0-9a-f\]\{8\}/i.test(middleware)],
   ["cross-origin rejection includes the correlation ID", /CROSS_ORIGIN_MUTATION_BLOCKED", requestId/.test(middleware) && /"X-Request-ID": requestId/.test(middleware)],
-  ["canonical identity prioritizes the current Pi UID over cached identity", /input\?\.piUid,\s*input\?\.explicitUserId/.test(identity)],
+  ["canonical GH identity outranks external Pi UID and account switches reset stale identity", /input\?\.canonicalUserId,\s*input\?\.explicitUserId/.test(identity) && /const base = accountChanged \? defaultIdentity\(\) : identity/.test(identity)],
   ["navigation rejects unsafe externally supplied avatar URLs", /userPhoto: safePhoto\(options\.userPhoto\)/.test(navigation) && /parsed\.protocol === \"https:\"/.test(navigation)],
   ["readiness detects malformed explicit Pi network flags", /pi_sandbox_flag_schema/.test(readiness) && /invalidSandboxFlag/.test(readiness)],
   ["profile hydration keeps its upstream deadline", /timeoutMs:\s*5000/.test(profile) && /signal:\s*fetchInit\.signal \?\? AbortSignal\.timeout\(timeoutMs \?\? 15_000\)/.test(restClient)],

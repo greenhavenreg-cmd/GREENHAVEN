@@ -13,7 +13,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { timingSafeEqual } from "node:crypto"
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
-import { checkDurableRateLimit, durableRateLimitCode, durableRateLimitStatus } from "@/lib/server/security/control-plane"
 import {
   listPendingForReview,
   updateVerificationRequestStatus,
@@ -50,8 +49,6 @@ export async function GET(req: NextRequest) {
   if (!authorize(req)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 })
   }
-  const limit = await checkDurableRateLimit("verification-review-read:operator", 30, 60_000, { onUnavailable: "deny" })
-  if (!limit.ok) return NextResponse.json({ ok: false, error: durableRateLimitCode(limit), retryAfterSec: limit.retryAfterSec }, { status: durableRateLimitStatus(limit), headers: { "Cache-Control": "no-store" } })
   try {
     const pending = await listPendingForReview(50)
     return NextResponse.json({ ok: true, pending }, { headers: { "Cache-Control": "private, no-store, max-age=0", Pragma: "no-cache" } })
@@ -75,8 +72,6 @@ export async function POST(req: NextRequest) {
   if (!authorize(req)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 })
   }
-  const limit = await checkDurableRateLimit("verification-review-write:operator", 10, 60_000, { onUnavailable: "deny" })
-  if (!limit.ok) return NextResponse.json({ ok: false, error: durableRateLimitCode(limit), retryAfterSec: limit.retryAfterSec }, { status: durableRateLimitStatus(limit), headers: { "Cache-Control": "no-store" } })
 
   try {
     const parsed = await readBoundedJson(req, 8 * 1024)

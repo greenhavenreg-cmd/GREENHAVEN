@@ -90,18 +90,14 @@ export function isPiSandboxFrame(): boolean {
   let framed = false
   try { framed = window.self !== window.top } catch { framed = true }
   const referrerHost = getReferrerHost()
-  // Pi's Developer Sandbox can embed the registered app through either its
-  // sandbox host or the Pi app CDN wrapper. The reported Pi Browser frame uses
-  // app-cdn.minepi.com; excluding it sends sign-in through the legacy parent
-  // credential probe, which awaits postMessage and loses the original tap's
-  // transient user activation before Pi.authenticate is invoked.
-  // Framing and Testnet mode are still mandatory; a copied referrer alone is
-  // never enough to classify a top-level page as a trusted Sandbox frame.
-  const trustedSandboxReferrer =
+  // Pi's Developer Sandbox wraps the registered app on this host. The referrer
+  // is corroborating evidence; framing remains required so a copied referrer
+  // cannot make a top-level Vercel page appear authorised.
+  return framed && (
     referrerHost === "sandbox.minepi.com" ||
     referrerHost.endsWith(".sandbox.minepi.com") ||
     referrerHost === "app-cdn.minepi.com"
-  return framed && trustedSandboxReferrer
+  )
 }
 
 function isWindowFramed(): boolean {
@@ -336,9 +332,7 @@ export async function ensurePiInitialized(): Promise<PiRuntimeSnapshot> {
       if (typeof Pi.init !== "function") {
         throw new Error("Official Pi SDK is present but Pi.init is unavailable; refusing to call other Pi SDK methods")
       }
-      // The Pi SDK methods are host-bridge methods. Preserve `Pi` as `this`;
-      // detaching init can break the bridge in Pi Browser / Sandbox WebViews.
-      await (Pi.init as (this: Record<string, unknown>, cfg: { version: string; sandbox: boolean }) => Promise<void> | void).call(Pi, {
+      await (Pi.init as (cfg: { version: string; sandbox: boolean }) => Promise<void> | void)({
         version: "2.0",
         sandbox: getPiSandbox(),
       })
@@ -410,9 +404,7 @@ export async function piAuthenticateOfficial(
   const authTimeoutMs = 25000
   let authTimeout: ReturnType<typeof setTimeout> | undefined
   try {
-    // Pi.authenticate is also a host-bridge method. Invoke it with the SDK
-    // object as its receiver; a detached call can lose bridge context.
-    const authPromise = authenticate.call(Pi, scopes, (payment: unknown) => {
+    const authPromise = authenticate(scopes, (payment: unknown) => {
       void onIncompletePaymentFound(
         payment as {
           identifier?: string

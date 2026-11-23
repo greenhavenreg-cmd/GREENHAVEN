@@ -1,70 +1,13 @@
-# GreenHaven source authority — 0.338.112 Pi Testnet identity and fail-closed Preview reconciliation (2026-11-22)
+# GreenHaven source authority — 0.338.101 RUN372 identity-principal consolidation (2026-11-23)
 
-**Current source version:** `0.338.112`  
-**Package identity:** `gh-connect@0.338.112`  
-**Baseline:** user-supplied `GREENHAVEN-0_338_111-TESTNET-FEATURE-ENABLEMENT-2026-11-21-1.zip` (SHA-256 `4992c71befdc6e6c21ce011e08c5c2f93fb68b034d5beb71a2b4720196bac604`).  
-**Current derivative:** surgical Pi app identity correction and Testnet Preview profile reconciliation. Source-only candidate; not pushed to GitHub, deployed to Vercel, or applied to Supabase.
+**Current source version:** `0.338.101`
+**Current user-provided archive:** `GREENHAVEN-0_338_99-RUN370-PI-AUTH-REJECTION-DIAGNOSTICS-2026-11-19.zip`
+**Current local working derivative:** RUN372 canonical identity-principal consolidation, derived through RUN339 optional-provider isolation, RUN340 payment maintenance and RUN341 identity maintenance; source-only, not pushed or deployed.
+**Package identity:** `gh-connect@0.338.101` (user-facing brand: GREENHAVEN).
 
-The registered Pi Developer Portal Sandbox launch URL supplied by the operator identifies the app slug as `greenhaven-2tm2`; `lib/system-config.ts` is aligned to that slug. The Testnet Preview profile is corrected to match this document's fail-closed release policy: Pi network/Sandbox identity and authentication/E2E scaffolding remain available, while Pi purchases, rewards, referrals, tips, curation settlement, payouts, A2U, withdrawals, marketplace payouts and Paystack transfers are explicitly disabled. The previous 0.338.111 template contradicted this source-of-truth policy by enabling those financial and ledger-mutating paths. Its regression checker and operator guide now enforce the connectivity/authentication-only contract.
+The RUN370 archive supplied on 2026-11-19 is the authoritative baseline for this task. RUN339 is a local implementation derivative of that archive and does not supersede it as the user's uploaded source. Preserve the existing architecture, canonical ecosystem access-control helper, and dedicated Events and Charity release checks.
 
-The operator-provided Pi diagnostic proves SDK initialization, Sandbox frame recognition and a user-gesture authentication invocation, followed by a generic SDK rejection without an access token. The source already invokes `Pi.authenticate(["username"])` from the explicit user gesture and preserves server-side bearer-token verification; no unsupported SDK workaround or client identity fallback was introduced. A missing app API key must not be asserted as the cause of `/v2/me` user-token verification failure. A read-only Vercel Preview inspection confirms that `NEXT_PUBLIC_PI_CLIENT_ID`, `PI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY` and `DOMAIN_VALIDATION_KEY` entries exist for branch `testnet`; encrypted values were not decrypted, so their correctness and provider acceptance remain unverified. This corrects the earlier audit statement that these entries were empty. The Vercel Preview `testnet` branch financial/ledger feature flags were then explicitly set false (and Testnet-only network fences retained); no Production variables or credentials were changed.
-
-No credentials were added or decrypted. No Supabase migration, database mutation, financial operation, GitHub push, Vercel deployment, or Mainnet action occurred. The only live Vercel mutation was setting the Testnet Preview branch financial/ledger feature flags to false. Full Node 24.15.x typecheck/lint/build, fresh CI, Pi Portal authorization, live Sandbox sign-in, `/v2/me` verification, durable session restoration and authenticated Testnet acceptance remain required. Production remains **NOT APPROVED**.
-
----
-
-# GreenHaven source authority — 0.338.111 Testnet Preview profile reconciliation (2026-11-21)
-
-**Current source version:** `0.338.111`  
-**Package identity:** `gh-connect@0.338.111`  
-**Baseline:** user-designated 0.338.110 Run #269 ACL-checker repair archive.  
-**Current derivative:** Testnet Preview environment policy reconciliation, fail-closed profile regression gate, synchronized 0.338.111 release metadata and migration inventory. Source-only for `testnet` / Vercel Preview; not pushed or deployed.
-
-The 0.338.111 update resolves contradictory Testnet Preview instructions. The PDF deployment profile had enabled payout execution, withdrawal intake, Paystack transfers, rewards, referral settlement and curation surfaces even though the canonical `.env.example` and release checks intentionally kept those rails disabled. The dedicated profile is now a connectivity/verification overlay: Testnet identity and E2E scaffolding remain available, while money-moving and ledger-mutating gates remain closed until provider, database, authorization, settlement and authenticated E2E prerequisites are proven. `DOMAIN_VALIDATION_KEY` and `PI_API_KEY` are documented as private Preview-only inputs and remain blank in source. A dedicated regression checker is registered in static verification and prebuild. No live Vercel settings or secrets were modified.
-
-
----
-
-## Previous source authority — 0.338.108
-
-# GreenHaven source authority — 0.338.108 release-gate manifest repair (2026-11-19)
-
-**Current source version:** `0.338.108`
-**Package identity:** `gh-connect@0.338.108`  
-**Baseline:** reopened 0.338.103 RUN376–RUN377 project archive.  
-**Current working derivative:** 0.338.106 plus release-gate manifest repair; local source only, not pushed or deployed.
-
-
-This increment removes an accidental top-level `verify:static` key from package metadata, preserves the canonical `scripts.verify:static` command, expands the credential-free environment template, and adds release-hygiene assertions for package-script placement, duplicate environment keys and Pi Testnet/API-mode separation. The component review found no evidence-supported behavior change to make: local QR SVG is generated by the repository encoder, external links use `noopener noreferrer`, and current image/session components retain their explicit viewer/session handling. No financial, database or provider behavior changed.
-
-RUN378 inventories 280 API route files, 368 HTTP method exports and 186 mutating routes; all mutating routes have one declared domain owner. All 45 routes without the ordinary session-auth marker have explicit access classifications. 176/186 mutating routes use durable rate limits; two analytics/vitals endpoints remain local per-IP telemetry throttles and eight endpoints are documented worker/disabled/cron/signed-callback/retired/middleware-blocked exceptions. 90 direct fetch calls across 55 route files were checked for AbortSignal deadlines.
-
-RUN379 adds explicit 10-second deadlines to 18 previously unbounded route modules, stable no-store 503 handling for upstream failures, fail-closed durable report intake, and durable rate limits for high-risk economy, curation, withdrawal, media, social, notification, session, WebAuthn and operator actions. RUN378 passes 10/10; RUN379 passes 21/21; RUN380 separate Testnet/Mainnet readiness gate passes 12/12. All 379 commands registered in `npm run verify:static` passed across three bounded batches; the monolithic command exceeded the 120-second execution window. All 280 API route files and both Phase 4/Phase 5 Playwright specs pass TypeScript syntax parsing only.
-
-Phase 4 adds guarded authenticated Testnet API/browser acceptance across Feed, Discover, Profiles, Messages, Communities, Marketplace, Wallet, Rewards, Membership, Notifications and Media. It has not been run against real Testnet sessions. Phase 5 source-level performance/security checks pass in targeted groups, but no measured browser/device/load/heap/database benchmark is claimed; the new Phase 5 Playwright suite is opt-in and unexecuted. Separate Phase 6 Testnet and Mainnet reports are both NOT CERTIFIED / NOT APPROVED.
-
-The RUN376 atomic global-emission and curation idempotency SQL proposals remain review-only and unapplied; GHPV daily calibration-cap durability is still outstanding; GHC-to-Pi withdrawals remain disabled/manual. Votes and curation do not mint GHC. The prior dependency audit remains unresolved at 22 findings (1 critical, 13 high, 6 moderate, 2 low). Node 24.15.0 dependency-backed typecheck/lint/build and a fresh CI run are still required. Pi Sandbox authorization, real multi-account Testnet acceptance and migration/ACL rehearsal remain operator gates.
-
-No Supabase schema/ACL/migration mutation, ledger mutation, payment, payout, Pi transfer, GitHub push, Vercel deployment or Mainnet action occurred. Production remains NOT APPROVED.
-
----
-
-## Previous source authority — 0.338.102 RUN373–RUN375
-
-# GreenHaven source authority — 0.338.102 RUN373–RUN374 authentication and API hardening (2026-11-19)
-
-**Current source version:** `0.338.102`
-**Current user-provided archive:** `GREENHAVEN-0_338_101-RUN372-FIELD-RESEARCH-DISCONNECTED-2026-11-19.zip`  
-**Current local working derivative:** RUN373–RUN374 Pi authentication UX and API hardening plus RUN375 review-only identity/session ACL proposal on top of RUN372; source-only, not pushed or deployed.  
-**Package identity:** `gh-connect@0.338.102` (user-facing brand: GREENHAVEN).
-
-RUN375 adds a review-only SQL proposal to revoke redundant client SELECT grants on `gh_pi_identities` and `gh_sessions`, with postflight assertions for retained service-role access; it remains outside canonical migrations pending history reconciliation and operator approval. RUN373 improves the observed generic Pi Sandbox SDK rejection message without changing authentication scopes or server verification. RUN374 adds durable per-user throttling and bounded Supabase deadlines to social post editing, hardens announcement publishing with the shared 32-byte constant-time operator-key verifier and scoped durable rate limits, and applies the same shared key verifier to GHPV settlement. Targeted gates pass; Pi Portal/Sandbox authorization, Testnet ACL revocation, migration reconciliation and supported-runtime acceptance remain operator gates. No Supabase mutation, migration, GitHub push, Vercel deployment or Mainnet operation occurred.
-
-RUN372 suspends Field Research without deleting its source or changing database state. The canonical service is `UNAVAILABLE` with no destination; `/field/**` and `/r/**` are blocked with a non-disclosing 404 at middleware, while `/api/research/**` and `/api/field/**` return a no-store 503 before route handlers execute. Research routes are removed from the public-route allowlist and crawler indexing. Migration classifications and history are unchanged. Targeted checks pass: isolation 8/8, RUN342 auth-scope 6/6, public-route boundary 12/12, ecosystem registry and 30-track coverage 15/15. The source remains in the repository and may still be parsed by general build tooling; full Node 24 typecheck/lint/build and live browser acceptance remain outstanding. No Supabase mutation, migration, GitHub push, Vercel deployment or Mainnet operation occurred. Production remains NOT APPROVED.
-
-The following RUN339 and earlier notes are historical records; they do not override RUN372's current suspension state.
-
----
+The RUN331/RUN332/RUN364 notes below are historical implementation records only and do not override the user-supplied RUN370 baseline or RUN339 changes.
 
 ## RUN364 full-project audit and gate repair
 

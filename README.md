@@ -1,34 +1,22 @@
 # GreenHaven
 
-
-## Testnet Preview configuration
-
-For the dedicated Testnet connectivity and verification profile, see [`TESTNET-VERCEL-ENVIRONMENT.md`](./TESTNET-VERCEL-ENVIRONMENT.md) and the safe overlay template [`docs/TESTNET-PREVIEW-ENVIRONMENT.template`](./docs/TESTNET-PREVIEW-ENVIRONMENT.template). Apply the overlay to Vercel **Preview only**; do not apply it to Production or Mainnet.
-
-**Current source version:** `0.338.112` (Pi Testnet app identity and connectivity-only Preview policy repair; based on the user-supplied 0.338.111 archive)
+**Current source version:** `0.338.101` (RUN339 optional ecosystem provider isolation derivative of user-supplied RUN370)
 
 Production status: **NOT APPROVED** — supported Node 24.15.0 dependency-backed typecheck/lint/build, browser/device, live database/provider and operator acceptance remain outstanding.
 
 This repository is the canonical GreenHaven source tree. See `docs/SOURCE_OF_TRUTH.md` and `docs/CURRENT_BUILD_CONTEXT.md` before implementation or release work.
 
+## Identity principal consolidation — 2026-11-23 / Run 372
 
-## Latest maintenance — 0.338.112 / Pi Testnet identity and Preview policy repair
+The app now uses one canonical GreenHaven account principal resolved from the durable server-side Pi mapping. Pi UID remains provider authentication metadata only and cannot become an app account ID before mapping verification. Account-switch state is isolated; existing database/financial keys are preserved. No migration or deployment was performed. See `docs/RUN372-IDENTITY-PRINCIPAL-CONSOLIDATION-2026-11-23.md`.
 
-Aligns the Pi Developer Portal app slug with the operator-provided registered Sandbox slug `greenhaven-2tm2`. Reconciles the Testnet Preview template and operator guide with the authoritative connectivity/authentication-only release policy: Pi purchases, payouts, A2U, withdrawals, marketplace payouts, Paystack transfers, rewards, referrals, tips and curation settlement are explicitly disabled. Corrects the distinction between user bearer-token `/v2/me` verification and app API-key operations, adds a 13-check profile safety contract, and synchronizes release metadata. No Pi authentication rewrite, client identity fallback, credentials, SQL, database history, GitHub branch, Production or Mainnet settings were changed. Vercel Preview `testnet` financial/ledger flags were set to false; no secrets were decrypted or modified.
+## Payments audit and maintenance — 2026-11-23 / Run 340
 
-Targeted source checks are run on the available Node 22.16.0 runtime. The full Node 24.15.0 prebuild, dependency-backed typecheck/lint/Next.js build, browser/device E2E, Pi Portal authorization and live Sandbox authentication remain unverified. Production remains NOT APPROVED.
+Audited Pi payment intents and recovery, GHC ledger and wallet, membership purchases/renewals, marketplace checkout and payouts, and Pi withdrawal/A2U controls. Repaired legacy regression checks so they validate the current dedicated withdrawal-sheet flow and archived implementation records; superseded stale operator enablement instructions. No financial execution, ledger/route/RPC change, migration, deployment or Mainnet action was performed. Targeted gates pass; live Testnet/provider and Node 24.15.x build acceptance remain outstanding. See `docs/RUN340-PAYMENTS-AUDIT-AND-MAINTENANCE-2026-11-23.md`.
 
-## Previous maintenance — 0.338.105 / RUN378–RUN380 API reliability, Phase 4–6 and runtime acceptance
+## Latest maintenance — 0.338.101 / RUN372 canonical identity principal consolidation
 
-RUN378 inventories all 280 API route files, assigns domain ownership to all 186 mutating route files, explicitly classifies all 45 routes without the ordinary session-auth marker, and records durable rate-limit coverage and exceptions. RUN379 adds deadlines to the 18 route modules with unbounded direct Supabase fetches, stable retryable errors, fail-closed report intake, and durable cross-instance limits across high-risk economy, curation, withdrawal, media, social, notification, session and operator actions. Phase 4 adds a guarded two-account Testnet acceptance suite for Feed, Discover, Profiles, Messages, Communities, Marketplace, Wallet, Rewards, Membership, Notifications and Media. Phase 5 and separate Testnet/Mainnet Phase 6 reports record verified source contracts and remaining live/runtime gates. No SQL proposal was applied and no database, ledger, payment, payout, Pi transfer, GitHub push or deployment was performed. Production remains NOT APPROVED. See `docs/RUN378-PHASE3-API-ROUTE-REVIEW-2026-11-19.md`, `docs/RUN379-PHASE3-API-RELIABILITY-HARDENING-2026-11-19.md`, `docs/PHASE4-PRODUCT-ACCEPTANCE-2026-11-19.md`, `docs/PHASE5-PERFORMANCE-SECURITY-2026-11-19.md`, and the separate `docs/PHASE6-TESTNET-READINESS-2026-11-19.md` / `docs/PHASE6-MAINNET-READINESS-2026-11-19.md` reports.
-
-## Previous maintenance — 0.338.103 / RUN376–RUN377 economy, curation, withdrawal, pipeline and dependency-audit hardening
-
-RUN376 corrects final GHPV reviewer influence caps and duplicate-reviewer quorum handling, fails closed on unavailable calibration/population state, introduces a shared atomic global-emission proposal for daily claims and activity emissions behind a disabled-by-default operator gate, hardens GHC-to-Pi withdrawal requests with request-bound PIN proof and platform-verified wallet matching, and makes balance-funded curation redistribution replay-safe behind a separate disabled-by-default proposal. Neither proposal has been applied to Supabase. GHPV automated settlement is also disabled until its daily JCS calibration cap is durably serialized in the database. Withdrawal execution remains manual and disabled by default. Generic reward evaluation remains daily-claim-only; votes and curation never mint GHC. See `docs/RUN376-ECONOMY-CURATION-WITHDRAWAL-HARDENING-2026-11-19.md` and `docs/RUN377-DEPENDENCY-AUDIT-AND-CI-REMEDIATION-2026-11-19.md`.
-
-## Previous maintenance — 0.338.102 / RUN373 Phase 1–3 security and authentication remediation
-
-RUN373 improves Pi Sandbox sign-in rejection guidance, applies durable per-user throttling and bounded upstream deadlines to social post edits, uses the shared constant-time operator-key verifier for announcement publishing and GHPV settlement, and adds a review-only identity/session ACL proposal that remains unapplied. Field Research / Research Studio remains temporarily disconnected. The ecosystem registry marks the service unavailable with no destination; `/field/**` and `/r/**` are blocked at middleware, and `/api/research/**` plus `/api/field/**` return 503 before route handlers execute. Source code, SQL migrations and migration history are retained unchanged for a controlled future re-enable. See `docs/RUN373-PHASE1-2-REMEDIATION-2026-11-19.md` and `docs/RUN374-PHASE3-API-HARDENING-2026-11-19.md`.
+Optional providers are now required to pass the canonical ecosystem release gate before dynamic import or initialization. Coming Soon/unknown providers are not invoked; provider errors are contained. Startup prefetch warms released core surfaces only, and realtime startup is best-effort. See `docs/RUN339-OPTIONAL-ECOSYSTEM-PROVIDER-ISOLATION-2026-11-19.md`.
 
 ## Previous maintenance — 0.338.99 / Run 318 Pi authentication reliability repair
 

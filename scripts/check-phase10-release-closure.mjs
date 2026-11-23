@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 /**
  * Phase 10 release-engineering closure contract.
- * Verifies that critical release gates are directly invoked by both the
- * prebuild manifest and static verification suite, and remain CI-gated.
- * It never deploys, pushes migrations, or approves Mainnet.
+ * Verifies that the same complete source gate is wired into local verification,
+ * prebuild, and CI. It does not approve deployments or execute migrations.
  */
 import { readFileSync, existsSync } from 'node:fs'
-import { parseNodeScriptCommands } from './lib/prebuild-command-contract.mjs'
+import { hasNodeScript } from './lib/prebuild-command-contract.mjs'
 import { hasProjectDoc } from './lib/read-project-doc.mjs'
 
 const read = (path) => readFileSync(path, 'utf8')
@@ -17,30 +16,11 @@ const nvmrc = read('.nvmrc').trim()
 const release = read('lib/app-release.ts')
 const truth = read('docs/PROJECT_TRUTH.md')
 const prebuild = pkg.scripts?.prebuild ?? ''
-const prebuildRunsManifest = /node scripts\/run-prebuild-checks\.mjs/.test(prebuild)
 const prebuildChecks = pkg.scripts?.['prebuild:checks'] ?? ''
 const verify = pkg.scripts?.['verify:static'] ?? ''
-const root = process.cwd()
-const parseOptions = { root, existsSync: (path) => existsSync(path) }
-
-function parseSuite(name, raw) {
-  try {
-    return { commands: parseNodeScriptCommands(raw, parseOptions), error: null }
-  } catch (error) {
-    return { commands: [], error: error instanceof Error ? error.message : String(error) }
-  }
-}
-const prebuildSuite = parseSuite('prebuild:checks', prebuildChecks)
-const verifySuite = parseSuite('verify:static', verify)
-const requiredGates = [
-  ['release hygiene', 'scripts/check-release-hygiene.mjs'],
-  ['project truth', 'scripts/check-project-truth.mjs'],
-  ['phase 10 closure contract', 'scripts/check-phase10-release-closure.mjs'],
-  ['phase 10 platform acceptance', 'scripts/check-phase10-platform-acceptance.mjs'],
-  ['migration classification/review', 'scripts/check-phase24-release-review.mjs'],
-]
-const prebuildScripts = new Set(prebuildSuite.commands.map(({ script }) => script))
-const verifyScripts = new Set(verifySuite.commands.map(({ script }) => script))
+const commandOptions = { root: process.cwd(), existsSync: (path) => existsSync(path) }
+const prebuildHas = (script) => hasNodeScript(prebuildChecks, script, commandOptions)
+const verifyHas = (script) => hasNodeScript(verify, script, commandOptions)
 const checks = []
 const check = (name, ok) => {
   checks.push(Boolean(ok))
@@ -78,13 +58,11 @@ check('release gate accepts scalar, flow-list, and block-list CI dependencies', 
   declaresStaticDependency('    needs: [static]\n'),
   declaresStaticDependency('    needs:\n      - static\n'),
 ].every(Boolean))
-check('prebuild check manifest parses without unsupported syntax', !prebuildSuite.error && prebuildSuite.commands.length > 0)
-check('static verification manifest parses without unsupported syntax', !verifySuite.error && verifySuite.commands.length > 0)
-if (prebuildSuite.error) console.error(`  prebuild:checks parse error: ${prebuildSuite.error}`)
-if (verifySuite.error) console.error(`  verify:static parse error: ${verifySuite.error}`)
-for (const [label, script] of requiredGates) {
-  check(`${label} runs in prebuild and static verification`, prebuildRunsManifest && prebuildScripts.has(script) && verifyScripts.has(script))
-}
+check('release hygiene runs in prebuild and static verification', prebuild === 'node scripts/run-prebuild-checks.mjs' && prebuildHas('scripts/check-release-hygiene.mjs') && verifyHas('scripts/check-release-hygiene.mjs'))
+check('project truth runs in prebuild and static verification', prebuild === 'node scripts/run-prebuild-checks.mjs' && prebuildHas('scripts/check-project-truth.mjs') && verifyHas('scripts/check-project-truth.mjs'))
+check('phase 10 closure contract runs in prebuild and static verification', prebuild === 'node scripts/run-prebuild-checks.mjs' && prebuildHas('scripts/check-phase10-release-closure.mjs') && verifyHas('scripts/check-phase10-release-closure.mjs'))
+check('phase 10 platform acceptance remains in prebuild and static verification', prebuild === 'node scripts/run-prebuild-checks.mjs' && prebuildHas('scripts/check-phase10-platform-acceptance.mjs') && verifyHas('scripts/check-phase10-platform-acceptance.mjs'))
+check('migration classification/review gate remains in both suites', prebuild === 'node scripts/run-prebuild-checks.mjs' && prebuildHas('scripts/check-phase24-release-review.mjs') && verifyHas('scripts/check-phase24-release-review.mjs'))
 check('no database push is wired into CI', !/supabase\s+db\s+push/i.test(ci))
 check('production remains explicitly not approved', /NOT APPROVED/i.test(truth))
 check('release report is present in canonical or preserved historical documentation', hasProjectDoc('docs/PHASE-10-RELEASE-ENGINEERING-ACCEPTANCE-2026-11-09.md'))

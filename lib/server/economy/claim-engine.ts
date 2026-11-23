@@ -148,7 +148,6 @@ export type ClaimComputeResult =
       idempotencyKey: string
       economicVersion: string
       missedDayReset: boolean
-      eligibleEconomicUsers?: number
     }
   | {
       ok: false
@@ -239,29 +238,19 @@ export async function computeDailyClaim(input: {
   now?: Date
   eligibleEconomicUsers?: number
 }): Promise<ClaimComputeResult> {
-  let n = 0
-  try {
-    n = isDatabaseConfigured()
-      ? await resolveEligibleEconomicUsers()
-      : input.eligibleEconomicUsers != null
-        ? Math.max(1, Math.floor(input.eligibleEconomicUsers))
-        : await resolveEligibleEconomicUsers()
-  } catch {
-    return { ok: false, error: "ECONOMIC_POPULATION_UNAVAILABLE", cycleDay: 0, dayKey: lagosDayKey(input.now || new Date()) }
-  }
-  if (!Number.isSafeInteger(n) || n < 1) {
-    return { ok: false, error: "ECONOMIC_POPULATION_UNAVAILABLE", cycleDay: 0, dayKey: lagosDayKey(input.now || new Date()) }
-  }
+  const n =
+    input.eligibleEconomicUsers != null
+      ? Math.max(1, Math.floor(input.eligibleEconomicUsers))
+      : await resolveEligibleEconomicUsers()
   cacheEligibleEconomicUsers(n)
   try {
     const state = await loadClaimStreakState(input.userId)
-    const computed = computeDailyClaimFromState({
+    return computeDailyClaimFromState({
       userId: input.userId,
       state,
       now: input.now,
       eligibleEconomicUsers: n,
     })
-    return computed.ok ? { ...computed, eligibleEconomicUsers: n } : computed
   } catch (e) {
     const msg = e instanceof Error ? e.message : "STREAK_BACKEND_UNAVAILABLE"
     return {

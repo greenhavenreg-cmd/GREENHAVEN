@@ -1,24 +1,9 @@
-# CURRENT BUILD CONTEXT — 0.338.108 (2026-11-19)
+# CURRENT BUILD CONTEXT — 0.338.101 RUN372 (2026-11-23)
 
-- **Baseline:** reopened `GREENHAVEN-0_338_103-RUN376-RUN377-PHASE3-ECONOMY-CURATION-WITHDRAWAL-2026-11-19.zip`.
-- **Current derivative:** `gh-connect@0.338.108`, 0.338.105 RUN378–RUN380 Phase 3 API route/reliability hardening plus Phase 4 product acceptance, Phase 5 responsive/loading/memory/concurrency browser harness, Phase 6 readiness reports, and this release-gate manifest repair.
-- **Phase 3:** 280 route files; 186/186 mutation-owner assignments; 45/45 explicit non-session access classifications; 176/186 durable mutation rate-limit controls; 90/90 direct fetch call sites with abort deadlines. RUN378 10/10; RUN379 21/21; RUN380 12/12. All 379 registered static commands passed across three bounded batches; the monolithic verification exceeded the execution window.
-- **Phase 4:** guarded Testnet browser/API suite added for eleven product surfaces. It requires real Testnet cookies, refuses Production and has not been run against live sessions.
-- **Phase 5:** source-level CWV, feed/profile, caching, media, accessibility, RUM and security contracts pass in targeted groups. A guarded Phase 5 Playwright harness now records viewport overflow, timing, LCP/heap when supported and eight-way feed concurrency; it has not been run. No measured mobile/browser/load/heap/database result is claimed.
-- **Phase 6:** separate Testnet and Mainnet readiness reports both block release pending supported-runtime CI, dependency audit remediation, Testnet acceptance and operator/database evidence.
-- **Runtime limitation:** available Node is 22.16.0; project requires Node 24.15.0; `node_modules` is absent. Full `tsc`, lint and Next production build are not claimed.
-- **Financial boundaries:** RUN376 SQL proposals remain review-only/unapplied; emission, curation redistribution, automated GHPV settlement and GHC-to-Pi withdrawal gates remain disabled/manual as documented. No ledger mutation, payment, payout or Pi transfer occurred.
-- **Deployment:** no GitHub push, Vercel deployment, Supabase mutation, migration application or Mainnet action. Production remains NOT APPROVED.
-
----
-
-## Historical build context — 0.338.105
-
-The preceding source candidate is retained as the 0.338.106 parent. Its Phase 4–6 readiness and runtime acceptance limitations remain unchanged.
-
-## Historical build context — 0.338.100
-
-RUN339 optional-provider isolation, failure containment, startup prefetch reduction and best-effort realtime recovery. This older derivative is superseded by the 0.338.108 source authority above.
+- **User-designated source baseline:** RUN339 optional-provider-isolation archive. RUN340 is the payment audit derivative; RUN341 is the identity audit derivative. Both are local source-only candidates, not pushed or deployed.
+- **Latest work:** RUN341 identity audit and surgical fixes: canonical GH ID/Pi UID separation, account-switch token/state isolation, durable App Studio session round-trip, corrected last-seen persistence and Pi sandbox iframe host recognition.
+- **Verification:** RUN341 identity contract 11/11; lifecycle runtime 24 assertions; full `npm run verify:static` PASS. RUN340 payment maintenance and its targeted checks are retained.
+- **Outstanding:** full Node 24.15.x dependency-backed typecheck/lint/build, live Testnet multi-account/device acceptance and browser/device tests. Workspace runtime Node 22.16.0, dependencies absent. Production remains NOT APPROVED. See `docs/RUN341-IDENTITY-AUDIT-AND-MAINTENANCE-2026-11-23.md` and `docs/RUN340-PAYMENTS-AUDIT-AND-MAINTENANCE-2026-11-23.md`.
 
 ## Historical build context — 0.338.99
 
@@ -77,3 +62,8 @@ The latest local derivative fixes the exact CI lint failures, the missing React 
 ## 0.338.99 Run 317 — browser-safe crypto build repair
 
 GitHub Actions on 0.338.98 confirmed typecheck and lint passed and all 362 prebuild checks passed; the production build failed with Webpack `UnhandledSchemeError` for `node:crypto`. Run 317 replaces shared dynamic Node crypto imports with Web Crypto, isolates push endpoint hashing in the server-only layer, and adds a 9/9 regression gate. Push contract tests pass 19/19. A fresh Node 24.15.0 CI run must still confirm the production build. No GitHub push, Vercel deployment, Supabase mutation, migration apply, financial operation or Mainnet action occurred.
+
+
+## 0.338.101 RUN372 — canonical identity principal consolidation
+
+The Pi UID is an authentication-provider subject, not a second GreenHaven account ID. The browser now retains the local placeholder until the server returns a durable, verified Pi-to-GreenHaven mapping; profile hydration and SDK-only login cannot promote the Pi UID into an account principal. Server verification requires a Pi UID and a non-placeholder canonical GreenHaven user ID. Account switches reset prior account-bound state. Existing database keys and financial records are intentionally unchanged pending a complete Testnet data/schema inventory; Pi UID aliases are compatibility lookups only and never financial authorization evidence. No migration, database mutation, payout, deployment or Mainnet action was performed.

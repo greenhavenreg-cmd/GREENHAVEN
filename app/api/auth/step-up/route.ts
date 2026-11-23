@@ -25,7 +25,6 @@ import {
 } from "@/lib/server/identity/step-up-store"
 import { checkRateLimit, pruneRateLimitBuckets } from "@/lib/server/economy/rate-limit"
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
-import { checkDurableRateLimit, durableRateLimitCode, durableRateLimitStatus } from "@/lib/server/security/control-plane"
 import {
   extractSessionTokenFromCookie,
   rotateSession,
@@ -58,9 +57,6 @@ export async function POST(request: Request) {
         { status: 403, headers: { "Cache-Control": "no-store" } }
       )
     }
-
-    const durableStepUpLimit = await checkDurableRateLimit(`step-up:${auth.userId}`, 5, 60_000, { onUnavailable: "deny" })
-    if (!durableStepUpLimit.ok) return NextResponse.json({ ok: false, error: durableRateLimitCode(durableStepUpLimit), retryAfterSec: durableStepUpLimit.retryAfterSec }, { status: durableRateLimitStatus(durableStepUpLimit), headers: { "Cache-Control": "no-store", "Retry-After": String(durableStepUpLimit.retryAfterSec) } })
 
     const rl = rateLimitStepUp(auth.userId)
     if (!rl.ok) {

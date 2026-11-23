@@ -12,8 +12,8 @@ const checks = [
   ['timeout is always cleared after resolve or rejection', /finally \{\s*if \(authTimeout !== undefined\) clearTimeout\(authTimeout\)/.test(runtime)],
   ['server-side identity verification remains mandatory', /caller must POST accessToken to \/api\/auth\/pi for verification/.test(runtime)],
   ['timeout does not introduce local identity fallback', !/PI_AUTH_PROMPT_TIMEOUT[\s\S]{0,500}continueLocalPreview/.test(runtime)],
-  ['a second tap during an active attempt is clearly deferred until the user taps again', /A Pi sign-in attempt is still finishing\. Wait for its result, then tap Sign in with Pi again\./.test(context)],
-  ['Pi authentication is never automatically retried after the user-gesture attempt fails', !/window\.setTimeout\(\(\) => \{ void initialize\(\); \}, 1200\)/.test(context) && !/retryRequestedRef/.test(context)],
+  ['manual Retry is queued instead of silently ignored during an in-flight attempt', /retryRequestedRef = useRef\(false\)/.test(context) && /if \(authAttemptRef\.current\) \{\s*retryRequestedRef\.current = true/.test(context)],
+  ['queued Retry starts only after the active attempt releases its single-flight guard', /authAttemptRef\.current = false;\s*if \(retryRequestedRef\.current\)/.test(context) && /window\.setTimeout\(\(\) => \{ void initialize\(\); \}, 0\)/.test(context)],
 ]
 let failures = 0
 for (const [label, ok] of checks) {

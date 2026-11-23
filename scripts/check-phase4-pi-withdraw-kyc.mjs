@@ -2,6 +2,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { hasProjectDoc } from './lib/read-project-doc.mjs'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (f) => readFileSync(join(root, f), 'utf8')
 const dash = read('components/ghc/unified-earnings-dashboard.tsx')
@@ -23,7 +24,7 @@ const checks = [
   ['3% fee copy', /3%/.test(dash)],
   ['linked wallet destination copy', /KYC/.test(dash) || /linked Pi wallet/.test(dash)],
   ['withdrawal completion refreshes wallet from the owning sheet', /ghc:wallet-refresh/.test(withdrawSheet) && /ghc:earnings-refresh/.test(withdrawSheet) && /onCompleted\?\.\(\)/.test(withdrawSheet) && /ghc:open-pi-withdraw/.test(dash)],
-  ['phase 4 doc present', existsSync(join(root, 'docs/PHASE4_PI_WITHDRAW_KYC.md'))],
+  ['phase 4 doc present', hasProjectDoc('docs/PHASE4_PI_WITHDRAW_KYC.md')],
 ]
 let failed = 0
 for (const [label, ok] of checks) {

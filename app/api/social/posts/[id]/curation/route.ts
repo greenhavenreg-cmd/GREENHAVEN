@@ -19,7 +19,6 @@ import {
   inferJudgmentMode,
 } from "@/lib/server/ghpv/vote-weight"
 import type { CurationChoice } from "@/lib/server/ghpv/types"
-import { checkDurableRateLimit, durableRateLimitCode, durableRateLimitStatus } from "@/lib/server/security/control-plane"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -44,8 +43,6 @@ export async function POST(
       { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } }
     )
   }
-  const durableLimit = await checkDurableRateLimit(`ghpv-curation:${auth.userId}`, 60, 60_000, { onUnavailable: "deny" })
-  if (!durableLimit.ok) return NextResponse.json({ ok: false, error: durableRateLimitCode(durableLimit), retryAfterSec: durableLimit.retryAfterSec }, { status: durableRateLimitStatus(durableLimit), headers: { "Cache-Control": "no-store", "Retry-After": String(durableLimit.retryAfterSec) } })
 
   const { id } = await ctx.params
   const postId = String(id || "").trim()
@@ -262,7 +259,7 @@ export async function POST(
   ) {
     const authorId = await lookupPostAuthor(postId)
     if (authorId && authorId !== auth.userId) {
-      const amount = Math.round(Math.min(1, Math.max(0, (Number(rewardPercentage) / 100) * 0.1)) * 10_000) / 10_000
+      const amount = Math.min(1, Math.max(0, (Number(rewardPercentage) / 100) * 0.1))
       if (amount > 0) {
         const red = await redistributeCurationReward({
           voterId: auth.userId,

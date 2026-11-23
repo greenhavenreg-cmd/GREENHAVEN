@@ -55,7 +55,7 @@ for (const [label, pattern] of forbidden) {
   if (hits.length) console.log(`  found: ${hits.slice(0, 5).join(', ')}`)
 }
 
-add('source-of-truth documents the package release', new RegExp('^\\*\\*Current source version:\\*\\* `' + pkg.version.replaceAll('.', '\\.') + '`[\\t ]*$', 'm').test(read('docs/SOURCE_OF_TRUTH.md')))
+add('source-of-truth documents the package release', new RegExp('^\\*\\*Current source version:\\*\\* `' + pkg.version.replaceAll('.', '\\.') + '`$', 'm').test(read('docs/SOURCE_OF_TRUTH.md')))
 add('current migration inventory contains the applied ACL migration', read('docs/MIGRATION_CHECKLIST.md').includes('20261110174922_revoke_client_table_write_and_sequence_privileges.sql'))
 add('Testnet reconciliation records the verified postflight and Mainnet hold', /20261110174922/.test(read('docs/TESTNET-RECONCILIATION-2026-11-10.md')) && /Mainnet remains inactive/.test(read('docs/TESTNET-RECONCILIATION-2026-11-10.md')))
 

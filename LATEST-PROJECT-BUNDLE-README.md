@@ -1,21 +1,19 @@
 # GreenHaven — Current Project Bundle
 
-**Current package:** `gh-connect@0.338.108`  
-**Current source archive:** `GREENHAVEN-0_338_106-CONFIG-COMPONENT-REVIEW-2026-11-19.zip`  
-**Parent source:** 0.338.105 RUN378–RUN380 Phase 3–6 acceptance/readiness candidate.  
-**Current increment:** release-gate manifest repair and environment-template packaging repair; see `docs/UPGRADE-WORKLOG-0.338.108.md` and `docs/CONFIGURATION-COMPONENT-REVIEW-2026-11-19.md`.  
-**Date:** 2026-11-19  
-**Release status:** **NOT APPROVED** for Testnet certification or Mainnet production.
-
-> Historical note: the remaining RUN373–RUN375 / RUN333 details below are preserved as prior implementation history. They do not describe the current package or supersede the 0.338.108 source-of-truth documents.
-
-## RUN373–RUN374 — Authentication and API hardening
-
-Pi Sandbox generic authentication rejections now provide actionable operator checks; post editing and announcement mutations have durable throttles and bounded upstream requests; announcement and GHPV settlement operator secrets use the shared 32-byte constant-time verifier. A separate review-only SQL proposal prepares client SELECT revocation on `gh_pi_identities` and `gh_sessions`, but remains outside canonical migrations pending history reconciliation and approval. Field Research / Research Studio remains temporarily unavailable. The canonical service registry marks it `UNAVAILABLE` with no destination. Edge middleware blocks `/field/**` and `/r/**` with a non-disclosing 404, and blocks `/api/research/**` plus `/api/field/**` with a no-store 503 before route handlers execute. Research is removed from the public-route allowlist and crawler indexing. Its source code, SQL migrations and migration classifications are retained unchanged for a future controlled re-enable. RUN372 targeted checks: 8/8 isolation, 6/6 RUN342 scope, 12/12 public-route boundary, 15/15 ecosystem coverage. The full static suite passes 63/63; Node 24 dependency-backed typecheck/lint/build and live browser/Testnet acceptance remain separate gates. No DB write, migration, GitHub push or Vercel deployment occurred.
+**Package:** `gh-connect@0.338.101`  
+**Working increment:** RUN372 — canonical identity principal consolidation (RUN340 payment audit retained; RUN339 user-designated baseline retained)  
+**Baseline:** user-designated RUN339 source archive; RUN340 and RUN341 are local source-only derivatives.  
+**Date:** 2026-11-23  
+**Release status:** **NOT APPROVED** for production.
 
 ## Delivery identity
 
-This package is a local source-only derivative of the user-provided RUN372 archive, through RUN373, RUN374 and RUN375. It has not been pushed to GitHub or deployed to Vercel.
+This RUN372 archive is a local source derivative of the RUN341 identity-audit candidate, itself derived from the RUN340 payment-audit candidate and the user-designated RUN339 source baseline. It has not been pushed to GitHub or deployed to Vercel.
+
+
+## RUN372 — canonical identity principal consolidation
+
+RUN341 separates the actual Pi app UID from the canonical internal GreenHaven user ID, prevents old account tokens/profile/onboarding/verification state from leaking across account switches, hardens the App Studio bridge to require durable identity + session + HttpOnly cookie round-trip, fixes last-seen persistence through the shared bounded Supabase REST client, and recognizes the framed Pi app CDN sandbox referrer. Two legacy regression checks were aligned with the true canonical identity model. Identity contract 11/11, lifecycle runtime 24 assertions, and full static verification pass. No database writes/migrations, account mutations, payments, GitHub push, Vercel deployment or Mainnet actions occurred. Full Node 24.15.x typecheck/lint/build and live Testnet acceptance remain outstanding. See `docs/RUN341-IDENTITY-AUDIT-AND-MAINTENANCE-2026-11-23.md`.
 
 ## RUN333 baseline changes (retained)
 
@@ -100,3 +98,8 @@ The authenticated app's startup prefetch now warms only released, frequently use
 Regression coverage: unreleased provider callback is never invoked; released provider success is returned; provider exception is contained; unknown service callback is never invoked. Existing ecosystem registry, server release helper, Events and Charity release checks are preserved. This does not claim every unreleased provider adapter has been migrated to the new wrapper: any future provider integration must use `runOptionalEcosystemProvider` and must keep provider imports inside its guarded callback.
 
 No database migrations, Supabase writes, GitHub push, Vercel deployment, or Mainnet operations were performed. Production approval status remains unchanged.
+
+
+## RUN372 — canonical identity principal consolidation
+
+The Pi UID is treated as an authentication-provider subject. A GreenHaven account ID is established only by the durable, server-verified Pi→GreenHaven mapping. SDK-only and unverified Pi sessions remain unbound; account switches clear previous account state. Existing database and financial ownership identifiers are preserved pending a verified Testnet migration inventory. No database migration, payment operation or deployment was performed.

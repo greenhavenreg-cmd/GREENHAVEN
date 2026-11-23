@@ -5,7 +5,6 @@
 import { NextResponse } from "next/server"
 import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
-import { checkDurableRateLimit, durableRateLimitCode, durableRateLimitStatus } from "@/lib/server/security/control-plane"
 import {
   operatorSetWithdrawalStatus,
   type WithdrawalStatus,
@@ -33,8 +32,6 @@ export async function POST(request: Request) {
   if (!isWithdrawalOperator(auth.userId)) {
     return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403, headers: __ghNoStore })
   }
-  const limit = await checkDurableRateLimit(`ghc-withdrawal-operator:${auth.userId}`, 10, 60_000, { onUnavailable: "deny" })
-  if (!limit.ok) return NextResponse.json({ ok: false, error: durableRateLimitCode(limit), retryAfterSec: limit.retryAfterSec }, { status: durableRateLimitStatus(limit), headers: __ghNoStore })
 
   const parsed = await readBoundedJson(request, 4 * 1024)
   if (!parsed.ok) {

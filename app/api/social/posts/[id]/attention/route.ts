@@ -16,7 +16,6 @@ import {
 } from "@/lib/social/attention"
 
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
-import { checkDurableRateLimit, durableRateLimitCode, durableRateLimitStatus } from "@/lib/server/security/control-plane"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -45,8 +44,6 @@ export async function POST(
       { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } }
     )
   }
-  const durableLimit = await checkDurableRateLimit(`post-attention:${auth.userId}`, ATTENTION_LIMIT, ATTENTION_WINDOW_MS, { onUnavailable: "deny" })
-  if (!durableLimit.ok) return NextResponse.json({ ok: false, error: durableRateLimitCode(durableLimit), retryAfterSec: durableLimit.retryAfterSec }, { status: durableRateLimitStatus(durableLimit), headers: { "Cache-Control": "no-store", "Retry-After": String(durableLimit.retryAfterSec) } })
 
   const { id } = await ctx.params
   const postId = String(id || "").trim()

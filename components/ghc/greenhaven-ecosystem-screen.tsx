@@ -350,6 +350,10 @@ export function GreenHavenEcosystemScreen({
   }, [filtered, featured, isSearching])
 
   const handleSelect = useCallback((service: EcosystemService) => {
+    if (service.id === "field-research") {
+      window.location.assign("/field/studio")
+      return
+    }
     if (isInteractiveStatus(service.status)) {
       if (service.id === "marketplace") {
         setFocusId("marketplace")

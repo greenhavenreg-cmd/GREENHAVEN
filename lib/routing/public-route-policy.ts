@@ -1,8 +1,9 @@
 /**
  * Explicit public-route policy.
  *
- * Research and field routes are temporarily disconnected at middleware.
- * They must not be classified as public while the service is suspended.
+ * Public respondents must not be forced through Pi authentication. Keep the
+ * field desk exact-match only: /field/studio and /field/admin/** remain inside
+ * the authenticated GreenHaven application boundary.
  */
 const PUBLIC_PREFIX_ROUTES = [
   "/privacy",
@@ -21,5 +22,10 @@ export function isPublicRoutePath(pathname: string | null | undefined): boolean 
     return true
   }
 
-  return false
+  // Public, opaque survey links only. Nested or owner-facing research routes
+  // are deliberately excluded from the public policy.
+  if (/^\/r\/[^/]+\/?$/.test(path)) return true
+
+  // Public agent intake desk only. Do not turn this into a /field prefix.
+  return path === "/field" || path === "/field/"
 }

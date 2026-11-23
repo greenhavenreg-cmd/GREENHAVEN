@@ -2,6 +2,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { hasProjectDoc } from './lib/read-project-doc.mjs'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (f) => readFileSync(join(root, f), 'utf8')
 const balance = read('features/wallet/wallet-balance.tsx')
@@ -18,7 +19,7 @@ const checks = [
   ['PI tools expanded when PI selected', /assetRail === "pi"/.test(screen) && /UnifiedEarningsDashboard/.test(screen)],
   ['PI tools collapsed when GHC selected', /PI earnings & cashback/.test(screen)],
   ['advanced recovery accordion', /Advanced · payment recovery/.test(screen)],
-  ['phase 2 doc present', existsSync(join(root, 'docs/PHASE2_DUAL_ASSET_WALLET.md'))],
+  ['phase 2 doc present', hasProjectDoc('docs/PHASE2_DUAL_ASSET_WALLET.md')],
 ]
 let failed = 0
 for (const [label, ok] of checks) {

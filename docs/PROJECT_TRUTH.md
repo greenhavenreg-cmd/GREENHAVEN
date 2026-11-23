@@ -1,73 +1,17 @@
-# Current project truth — 0.338.112 Pi Testnet identity and Preview policy repair (2026-11-22)
-- Aligned `PI_NETWORK_CONFIG.APP_SLUG` to the operator-provided registered Pi Developer Portal Sandbox slug `greenhaven-2tm2`.
-- Reconciled Testnet Preview profile, operator guide and safety checker to the authoritative connectivity/authentication-only policy. Financial and ledger-mutating feature flags remain disabled; Testnet identity and E2E scaffolding remain available.
-- Corrected documentation: Pi `/v2/me` user identity verification uses the user's bearer access token; `PI_API_KEY` is for app-level provider operations that require it. Durable identity/session persistence still requires server-side Supabase credentials.
-- No secrets were added or decrypted; no Pi auth rewrite, client identity fallback, migration, database mutation, GitHub push, deployment, financial operation or Mainnet action occurred. Vercel Preview `testnet` financial/ledger feature flags were explicitly set false; Production variables were not changed. A read-only audit confirmed the Pi Client ID, Pi API key, Supabase service-role key and domain-validation key entries exist, but encrypted values were not decrypted or validated against Pi Portal.
-- Current local derivative: `0.338.112`, based on user-supplied `GREENHAVEN-0_338_111-TESTNET-FEATURE-ENABLEMENT-2026-11-21-1.zip`; source-only candidate, not pushed or deployed.
-- Targeted source checks run under Node 22.16.0; full Node 24.15.0 prebuild, dependency-backed typecheck/lint/build, browser/device E2E, Pi Portal authorization and live Sandbox sign-in remain outstanding. Production remains NOT APPROVED.
+# Current project truth — 0.338.101 RUN372 (2026-11-23)
 
-## 0.338.112 — Pi Testnet identity and Preview policy repair (2026-11-22)
+- User-designated source baseline remains the RUN339 optional-provider-isolation archive. RUN340 payment maintenance and RUN341 identity audit are retained as local source-only derivatives; RUN372 builds on RUN341. No derivative has been pushed or deployed.
+- RUN372 establishes one canonical GreenHaven account principal (`userId`) from the durable server-verified Pi→GreenHaven mapping. The Pi UID is retained only as the authentication-provider subject and a transitional legacy lookup alias; it is not allowed to become a GreenHaven account ID before mapping verification.
+- Pi SDK identity alone now remains unbound (`current-user` local placeholder). Profile hydration cannot promote an unverified Pi subject into an account. `server_verified` requires both a Pi UID and a non-placeholder canonical account ID. Account switches clear prior account-bound credentials and state.
+- Existing `gh_pi_identities`, `gh_sessions`, wallet, ledger, marketplace, membership and community records continue using their established canonical GreenHaven user key. No mass identity rewrite or database migration is included. Transitional Pi UID aliases are not authorization evidence and must not be used by server-side financial ownership checks.
+- RUN372 identity principal checks: 9/9; canonical identity runtime: 44 assertions; Phase 2 canonical identity: 18/18; Phase 4 identity authentication: 16/16; Phase 4 identity integration: 17/17; Phase 4 identity/community/messaging: 32/32; Run 250 immutable mapping integrity: 10/10; Run 251 RPC ACL: 8/8; Run 252 search-path hardening: 5/5; account-switch engagement: 15/15; Pi auth scope isolation: 6/6; profile identity snapshot: 8/8 plus 13 runtime assertions.
+- Node 22.16.0 is available in this workspace; the project requires Node `^24.15.0`. Dependency-backed typecheck, lint and production build are not claimed. Live Testnet two-account, cross-device and IDOR acceptance remain outstanding. Production remains NOT APPROVED.
+- No database writes, migrations, wallet/payment operations, GitHub push, Vercel deployment or Mainnet actions were performed.
 
-**Current source version:** `0.338.112`  
-**Package identity:** `gh-connect@0.338.112`  
-**Baseline:** `GREENHAVEN-0_338_111-TESTNET-FEATURE-ENABLEMENT-2026-11-21-1.zip`  
-**Current derivative:** Pi app slug alignment, fail-closed connectivity-only Testnet Preview profile, documentation/regression-gate reconciliation; source-only.
-
-
-## 0.338.111 — Pi authentication repair and release-integrity synchronization (2026-11-21)
-
-- Preserved the existing Testnet-only release boundary; this source update does not authorize Mainnet, Production, or database migration changes.
-- Synchronized README, project-truth, verified manifest, migration checklist, CSV source manifest, and Testnet apply-order records from the package version and canonical migration directory.
-- Migration inventory generation remains deterministic and read-only in `--check` mode; historical SQL files and database history are not modified.
-- Build acceptance remains contingent on the full ordered prebuild suite, TypeScript, lint, and Next.js production compilation passing on the declared Node 24 runtime.
-- Dependency audit findings must be remediated through reviewed, lockfile-consistent updates; no forced major upgrades or security-check bypasses are permitted.
-
-**Current source version:** `0.338.111`  
-**Package identity:** `gh-connect@0.338.111`  
-**Baseline candidate:** `GREENHAVEN-0_338_108-TESTNET-SAFE-UPGRADES-2026-11-19.zip`  
-**Current derivative:** Full-project audit, command-manifest integrity check, duplicate pretypecheck command removal, synchronized release metadata; source-only.  
-**Current status:** **NOT APPROVED** for live Testnet certification or Production.
-
----
-
-## Historical project truth — 0.338.103 RUN376–RUN377
-
-### Historical project truth details — 0.338.103 RUN376–RUN377 (2026-11-19)
-
-- Latest local source derivative: `0.338.103` RUN376, based on the verified local 0.338.102 RUN373–RUN375 derivative of the user-designated 0.338.101 archive.
-- GHPV excludes duplicate reviewer identities, applies a true final-share anti-whale cap, validates settlement snapshots and stops when durable calibration state cannot be read. The daily JCS cap is not durable in the current schema; automated settlement remains gated pending a per-reviewer-serialized SQL fix.
-- Daily claims and activity emissions use a shared atomic database allocator proposal behind `GHC_ATOMIC_GLOBAL_EMISSION_V13_ENABLED=false`; no process-memory fallback is permitted in database-backed deployments. The proposal is review-only and unapplied.
-- GHC-to-Pi withdrawals require explicit Testnet-only gates, request-bound PIN proof and an exact platform-API-verified Pi wallet destination. Requests remain manual operator settlements, not automatic Pi transfers, and remain disabled by default.
-- Balance-funded curation redistribution uses deployed four-decimal precision and an idempotency-safe v2 wrapper proposal behind `GHC_CURATION_REDISTRIBUTE_V2_ENABLED=false`; no new GHC issuance is introduced.
-- Votes, GHPV judgments and curation do not mint GHC. Generic reward evaluation remains daily-claim-only.
-- Field Research / Research Studio remains deliberately disconnected as documented by RUN372. Pi Sandbox authentication still has an external Portal/Sandbox authorization rejection.
-- RUN376 focused source/runtime checks pass 43/43 and 5/5; the network/DB-independent consolidated verifier passes 63/63. The full npm aggregate exceeded the available command time budget after completing that verifier; remaining registered checks were run individually. RUN377 records the failed 53-second dependency audit (22 vulnerable package entries, including one critical) and the remote pretypecheck-order failure, now fixed locally but awaiting a new CI run. Node 24.15.x dependency-backed typecheck/lint/build, dependency patching, PostgreSQL rehearsal, migration-history reconciliation, live Testnet concurrency and authenticated browser/device acceptance remain separate gates. The separate Pi earnings A2U and linked-wallet consent boundary is documented in `docs/PHASE4_PI_WITHDRAW_KYC.md`.
-- No live Supabase mutation, migration application, ledger mutation, payout, payment, GitHub push, Vercel deployment or Mainnet action occurred. Production remains NOT APPROVED.
-
-**Current source version:** `0.338.103`  
-**Package identity:** `gh-connect@0.338.103`  
-**Latest user-provided archive:** `GREENHAVEN-0_338_101-RUN372-FIELD-RESEARCH-DISCONNECTED-2026-11-19.zip`  
-**Current local derivative:** RUN373–RUN377; source-only, not pushed or deployed.
-**Current status:** **NOT APPROVED** for production.
-
----
-
-## Previous project truth — 0.338.102 RUN373–RUN374
-
-### Historical project truth — 0.338.102 RUN373–RUN374 (2026-11-19)
-
-- Latest local source derivative: `0.338.102` RUN373–RUN374, based on the user-designated `GREENHAVEN-0_338_101-RUN372-FIELD-RESEARCH-DISCONNECTED-2026-11-19.zip`.
-- Field Research / Research Studio is deliberately disconnected: registry status `UNAVAILABLE`, no service destination, `/field/**` and `/r/**` return 404 at middleware, and `/api/research/**` plus `/api/field/**` return 503 before route handlers execute.
-- Research source, SQL migrations, migration classifications and historical records are retained. No database, storage, user-submission or migration state was changed.
-- The public-route policy no longer treats research share links or the field desk as public routes; crawler policy disallows `/field` and `/r`.
-- Targeted verification: RUN373 Pi auth UX 8/8; RUN374 API hardening 14/14; RUN372 isolation 8/8; RUN342 auth-scope isolation 6/6; public-route boundary 12/12; ecosystem registry 42 services / 10 categories / 11 Active / 30 Coming Soon / 1 Unavailable; ecosystem coverage 15/15.
-- Pi SDK authorization still fails before token delivery; Pi Portal/Sandbox authorization checks remain external operator actions. Full static suite, Node 24 dependency-backed typecheck/lint/build, and live browser/Testnet acceptance remain separate gates. Retained Research/Field source is still present in the repository and may still be parsed by general build tooling.
-- No GitHub push, Vercel deployment, Supabase mutation, migration application or Mainnet action occurred. Production remains NOT APPROVED.
-
-**Current source version:** `0.338.102`  
-**Package identity:** `gh-connect@0.338.102`  
-**Latest user-provided source archive:** `GREENHAVEN-0_338_101-RUN372-FIELD-RESEARCH-DISCONNECTED-2026-11-19.zip`  
-**Current local derivative:** RUN373–RUN374 authentication/API hardening with RUN375 review-only ACL proposal; not pushed or deployed.  
+**Current source version:** `0.338.101`  
+**Package identity:** `gh-connect@0.338.101`  
+**User-designated source archive:** RUN339 optional-provider-isolation archive  
+**Current local working derivative:** RUN372 identity-principal consolidation on top of RUN341; not pushed or deployed.  
 **Current status:** **NOT APPROVED** for production.
 
 ## Historical RUN364 and earlier records

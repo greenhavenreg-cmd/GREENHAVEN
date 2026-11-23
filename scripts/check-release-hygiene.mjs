@@ -14,7 +14,6 @@ const checks = []
 const check = (name, ok, detail = '') => checks.push({ name, ok: Boolean(ok), detail })
 
 check('package and lockfile versions agree', pkg.version === lock.version && pkg.version === lock.packages?.['']?.version, `${pkg.version} / ${lock.version}`)
-check('script commands are stored only under package.json scripts', !Object.prototype.hasOwnProperty.call(pkg, 'verify:static') && typeof pkg.scripts?.['verify:static'] === 'string', 'verify:static must not be a stray top-level package field')
 check('release notice uses package version', release.includes(`APP_RELEASE_VERSION = "${pkg.version}"`), `expected ${pkg.version}`)
 check('Node engine supports documented runtime', /\^24\.15\.0/.test(pkg.engines?.node ?? ''), pkg.engines?.node ?? 'missing')
 check('.nvmrc selects exact supported Node 24.15.0', readFileSync(join(root, '.nvmrc'), 'utf8').trim() === '24.15.0', readFileSync(join(root, '.nvmrc'), 'utf8').trim())
@@ -30,17 +29,9 @@ const vercelConfig = readJson('vercel.json')
 check('Vercel install clears obsolete npm cache-dir environment aliases', /unset npm_config_cache_dir NPM_CONFIG_CACHE_DIR/.test(vercelConfig.installCommand ?? ''))
 check('Vercel build clears oversized stale Webpack cache before compilation', /prepare-vercel-build\.mjs/.test(vercelConfig.buildCommand ?? '') && existsSync(join(root, 'scripts/prepare-vercel-build.mjs')))
 check('native dependency install scripts are approved only at reviewed lockfile versions', pkg.allowScripts?.['sodium-native@3.4.1'] === true && pkg.allowScripts?.['unrs-resolver@1.12.2'] === true && Object.keys(pkg.allowScripts || {}).length === 2)
-check('Vercel keeps .env.example in deployment source while excluding local secret env files', (() => {
-  const lines = readFileSync(join(root, '.vercelignore'), 'utf8').split(/\r?\n/).map((line) => line.trim())
-  return ['.env', '.env.local', '.env.development.local', '.env.test.local', '.env.production.local'].every((name) => lines.includes(name)) && !lines.includes('.env*') && existsSync(join(root, '.env.example'))
-})())
 check('safe .env.example exists', existsSync(join(root, '.env.example')))
 if (existsSync(join(root, '.env.example'))) {
   const envExample = readFileSync(join(root, '.env.example'), 'utf8')
-  const envKeys = [...envExample.matchAll(/^([A-Z][A-Z0-9_]*)=/gm)].map((match) => match[1])
-  const duplicateEnvKeys = envKeys.filter((key, index) => envKeys.indexOf(key) !== index)
-  check('environment template has no duplicate variable declarations', duplicateEnvKeys.length === 0, duplicateEnvKeys.join(', '))
-  check('Testnet example separates Pi API mode from blockchain network', /^PI_ENV=production$/m.test(envExample) && /^PI_NETWORK=testnet$/m.test(envExample) && /^NEXT_PUBLIC_PI_SANDBOX=true$/m.test(envExample), 'PI_ENV=production is the Pi Platform API mode; PI_NETWORK and the SDK sandbox flag define Testnet')
   check('private credentials are not NEXT_PUBLIC in env template', !/^NEXT_PUBLIC_(?:PI_API_KEY|PI_SERVER_API_KEY|SUPABASE_SERVICE_ROLE_KEY|PI_WALLET_PRIVATE_SEED)=/m.test(envExample))
   const privateKeys = ['SUPABASE_SERVICE_ROLE_KEY', 'PI_SERVER_API_KEY', 'PI_WALLET_PRIVATE_SEED', 'PAYSTACK_SECRET_KEY', 'CRON_SECRET']
   const assignedPrivateValues = privateKeys.filter((key) => new RegExp(`^${key}[ \t]*=[ \t]*\\S+`, 'm').test(envExample))

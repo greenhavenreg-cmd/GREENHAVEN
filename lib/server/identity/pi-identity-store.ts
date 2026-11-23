@@ -475,22 +475,21 @@ export async function touchLastSeen(ghUserId: string): Promise<void> {
     const env = readGhcServerEnv()
     if (env.supabaseUrl && env.supabaseServiceRoleKey) {
       try {
-        const url = `gh_pi_identities?gh_user_id=eq.${encodeURIComponent(key)}`
-        await fetch(url, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: env.supabaseServiceRoleKey,
-            Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+        const timestamp = new Date().toISOString()
+        const result = await supabaseRest(
+          `gh_pi_identities?gh_user_id=eq.${encodeURIComponent(key)}`,
+          {
+            method: "PATCH",
+            headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({ last_seen_at: timestamp, updated_at: timestamp }),
+            timeoutMs: 5_000,
           },
-          body: JSON.stringify({
-            last_seen_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }),
-          cache: "no-store",
-        })
+        )
+        if (!result.ok) {
+          console.warn("[pi-identity] touchLastSeen persistence failed", result.status)
+        }
       } catch {
-        /* non-fatal */
+        /* last-seen telemetry is non-critical; identity authorization remains durable */
       }
     }
   }

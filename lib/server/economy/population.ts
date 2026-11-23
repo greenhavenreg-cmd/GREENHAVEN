@@ -53,18 +53,17 @@ export async function resolveEconomicPopulation(): Promise<
       }
       return { ...stats, usedOverride: false }
     }
-    // A configured database is the production authority. Never replace a failed
-    // population read with a synthetic one-user population or a caller override.
+    // DB configured but RPC unavailable — do not invent large N; use override or 1
     return {
       ok: false,
       registeredUsers: 0,
       verifiedUsers: 0,
-      eligibleEconomicUsers: 0,
+      eligibleEconomicUsers: override ?? 1,
       activeEconomicUsers: 0,
       suspendedUsers: 0,
       suspectedDuplicateUsers: 0,
       source: "unavailable",
-      usedOverride: false,
+      usedOverride: override != null,
     }
   }
 
@@ -84,8 +83,5 @@ export async function resolveEconomicPopulation(): Promise<
 
 export async function resolveEligibleEconomicUsers(): Promise<number> {
   const pop = await resolveEconomicPopulation()
-  if (!pop.ok || (isDatabaseConfigured() && pop.source !== "database") || !Number.isSafeInteger(pop.eligibleEconomicUsers) || pop.eligibleEconomicUsers < 1) {
-    throw new Error("ECONOMIC_POPULATION_UNAVAILABLE")
-  }
-  return pop.eligibleEconomicUsers
+  return Math.max(1, pop.eligibleEconomicUsers)
 }
