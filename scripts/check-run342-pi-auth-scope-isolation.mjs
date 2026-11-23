@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** RUN342 — isolate baseline identity sign-in from optional payment permissions. */
+/** RUN342 — request payment capability at sign-in while isolating optional wallet-address consent. */
 import { readFileSync } from 'node:fs'
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 const auth = read('contexts/pi-auth-context.tsx')
@@ -10,7 +10,7 @@ const registry = read('lib/navigation/service-registry.ts')
 const release = read('lib/server/ecosystem/service-release.ts')
 const checks = []
 const test = (name, ok) => { checks.push(Boolean(ok)); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`) }
-test('baseline Pi sign-in requests identity scope only', /piAuthenticateOfficial\(\["username"\]\)/.test(auth) && !/piAuthenticateOfficial\(\["username",\s*"payments"\]\)/.test(auth))
+test('baseline Pi sign-in requests username and payments scopes', /piAuthenticateOfficial\(\["username",\s*"payments"\]\)/.test(auth))
 test('wallet permission is requested only inside explicit wallet-consent flow', /piAuthenticateOfficial\(\["wallet_address"\]\)/.test(wallet))
 test('public research share links bypass Pi auth shell', policy.includes('^\\/r\\/[^/]+\\/?$') && wrapper.includes('isPublicRoutePath(pathname)'))
 test('public field desk bypasses Pi auth shell without exposing studio/admin paths', /return path === "\/field" \|\| path === "\/field\/"/.test(policy) && /!isPublicRoutePath/.test(policy) === false)

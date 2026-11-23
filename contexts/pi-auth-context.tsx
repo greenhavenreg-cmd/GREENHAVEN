@@ -256,7 +256,7 @@ async function officialPiAuthenticate(): Promise<{
   // later, inside the specific payment/authorization flow that needs them.
   // Keeping the payments scope out of bootstrap avoids making ordinary login
   // depend on optional commerce permissions or payment capability.
-  return piAuthenticateOfficial(["username"])
+  return piAuthenticateOfficial(["username", "payments"])
 }
 
 

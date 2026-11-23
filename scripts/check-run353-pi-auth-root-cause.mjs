@@ -22,7 +22,7 @@ const checks = [
   ['Authentication invocation records transient user-activation evidence', /PI_AUTH_INVOKE_CONTEXT/.test(runtime) && /userActivationActive: isUserActivationActive\(\)/.test(runtime)],
   ['Verified sign-in does not trigger a second Pi login during optional commerce setup', /Pioneer has already authenticated through the official Pi/.test(context) && !/await pi\.auth\.login\(\);\s*await sdkLite\.login\(\);/.test(context)],
   ['Legacy SDK adapter no longer launches a second payments-scope Pi.authenticate prompt', !/wPi\.authenticate\(\["username",\s*"payments"\]/.test(piAdapter)],
-  ['Normal identity sign-in remains username-only', /piAuthenticateOfficial\(\["username"\]\)/.test(context)],
+  ['Normal Pi sign-in requests username and payments scopes in the single official auth flow', /piAuthenticateOfficial\(\["username",\s*"payments"\]\)/.test(context)],
   ['Server identity verification remains mandatory and access token is sent to Pi /me', /caller must POST accessToken to \/api\/auth\/pi for verification/.test(runtime) && /verifyPiAccessTokenDetailed\(accessToken\)/.test(route) && /GET \/v2\/me|\/v2\/me/.test(read('lib/server/economy/auth.ts'))],
   ['Sandbox path does not enable local identity fallback', /if \(host\.endsWith\("\.vercel\.app"\)\) return false/.test(read('lib/system-config.ts'))],
   ['Auth UI routes Sandbox sign-in through the Pi SDK on explicit tap', /isPiBrowserRuntime\(\) \|\| isPiSandboxFrame\(\)/.test(read('components/auth/sign-in-with-pi-button.tsx')) && /SignInWithPiButton/.test(screen)],
