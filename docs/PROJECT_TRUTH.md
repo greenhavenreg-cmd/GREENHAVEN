@@ -1,7 +1,7 @@
-# Current project truth — 0.338.104 RUN377 + RUN376 + RUN373 (2026-11-23)
+# Current project truth — 0.338.105 RUN380 Pi-only Research access control (2026-11-24)
 
-- User-designated source baseline is `GREENHAVEN-0_338_102-RUN375-PI-SDK-EARLY-LOAD-2026-11-23 (1).zip`. RUN376 and RUN377 are local source-only derivatives of that archive; no derivative has been pushed or deployed.
-- Inherited RUN373–RUN375 checks remain part of the supplied parent baseline. RUN377 ACL source contract 17/17; RUN376 readiness-policy regression 14 assertions; project-truth 11/11; release hygiene 17/17; migration inventory 232/232 synchronized. Full `npm run verify:static` exceeded the workspace execution window after 4,641 output lines with no reported assertion failure before timeout; completion is not claimed.
+- User-designated parent baseline is `GREENHAVEN-0.338.104-RUN379-ACCESS-AUDIT-RECONCILED-2026-11-24.zip`. RUN379 includes the inherited RUN377 identity/session ACL work and adds token-safe requested-scope/CSP diagnostics. The current audit edits are local source changes only; no push or deployment is claimed.
+- Inherited RUN373–RUN375 checks remain part of the supplied parent baseline. RUN377 ACL source contract 17/17; RUN376 readiness-policy regression 14 assertions; project-truth 11/11; release hygiene 17/17; migration inventory 232/232 synchronized. The 2026-11-24 RUN379 audit records `npm run verify:static` completing with exit code 0, 4,738 PASS lines, and zero FAIL lines. This is static verification only; it does not certify dependency-backed typecheck/lint/build or live acceptance.
 - RUN376 fixes Preview readiness evaluation: the readiness check now uses the effective `readGhcServerEnv().allowDevAuth` policy, which hard-denies development auth whenever `NODE_ENV=production`, including Vercel Preview. A stale `GHC_ALLOW_DEV_AUTH` opt-in no longer becomes a false critical blocker; the report advises removing the ineffective flag. Pi payment health separately reports payment-configuration readiness and platform readiness. Detailed diagnostics remain operator-key protected. This is source-level only; it does not prove a live Pi API request or end-to-end payment.
 - RUN373 fixes Pi frame classification: only an iframe whose exact referrer host is `sandbox.minepi.com` is treated as the Developer Sandbox. `app-cdn.minepi.com` is a Pi SDK/bridge host and no longer bypasses the App Studio parent-credentials handshake.
 - RUN372 establishes one canonical GreenHaven account principal (`userId`) from the durable server-verified Pi→GreenHaven mapping. The Pi UID is retained only as the authentication-provider subject and a transitional legacy lookup alias; it is not allowed to become a GreenHaven account ID before mapping verification.
@@ -11,11 +11,23 @@
 - Node 22.16.0 is available in this workspace; the project requires Node `^24.15.0`. Dependency-backed typecheck, lint and production build are not claimed. Live Testnet two-account, cross-device and IDOR acceptance remain outstanding. Production remains NOT APPROVED.
 - No database writes, migrations, wallet/payment operations, GitHub push, Vercel deployment or Mainnet actions were performed.
 
-**Current source version:** `0.338.104`  
-**Package identity:** `gh-connect@0.338.104`  
-**User-designated source archive:** RUN375 Pi SDK early-load archive  
-**Current local working derivative:** RUN377 identity/session ACL audit on top of RUN376 and the user-supplied RUN375 archive; not pushed or deployed.  
+**Current source version:** `0.338.105`  
+**Package identity:** `gh-connect@0.338.105`  
+**Authoritative parent archive:** RUN379 access-audit reconciled archive  
+**Current local working tree:** RUN380 Pi-only Research/Field access-control derivative; not pushed or deployed.  
 **Current status:** **NOT APPROVED** for production.
+
+## RUN380 — Pi-only Research and Field access control
+
+- Full `npm run verify:static` completed with exit code 0; the consolidated static suite passed 63/63. This remains network/database independent and does not certify the Node 24.15.x dependency-backed build or live Pi Browser acceptance.
+
+- The anonymous page allowlist no longer includes `/r/:slug`, `/field`, or `/portal-setup`. Only legal/help documents and the Pi domain-validation resource remain public. `/field` remains available as a Pioneer-authenticated field reporting workspace.
+- Middleware redirects service-page requests without a `gh_session` cookie to the root sign-in entry. This is not treated as authentication: affected Field/Research API handlers require the durable account-security context, which verifies the server session and checks production session-store durability.
+- Shared field access-code unlock is retired (HTTP 410). Field reporting, survey retrieval, evidence uploads/completion, session status, and admin evidence/report operations now require a durable Pioneer session. Field evidence scope is derived from canonical Pioneer identity and verified GH session ID.
+- Research share pages and all published-form, evidence, and examination APIs require the durable Pioneer session. Read-only service metadata/fee-quote APIs used by Marketplace, Communities, Economy, Pi capabilities, push configuration, social reward/quality, and portal setup/compliance endpoints also require the durable session. Research response submission keys and examination respondent hashes are server-derived from the authenticated Pioneer. New projects disable anonymous participation.
+- Pi SDK authentication and server-side Pi Platform verification remain the identity authority. Browser user-agent/referrer checks are not claimed as cryptographic browser attestation.
+- Targeted checks: route policy 12/12; RUN380 boundary 17/17; RUN342 auth scope 6/6; RUN375 loader 21/21; field intake 7/7; scoped evidence 26/26; research integrity 12/12; field foundation 23/23; Sandbox classification 9/9.
+- Node 24.15.x dependency-backed typecheck/lint/build, live Pi Browser and Preview API bypass tests, and database-backed field evidence verification remain outstanding. Node 22.16.0 is available and dependencies are not installed. No push, deployment, migration, database write, Mainnet action or financial operation occurred.
 
 ## RUN377 identity/session privilege audit
 
@@ -80,8 +92,8 @@ RUN331 is the latest user-provided 0.338.99 archive. RUN332 and RUN333 are local
 
 ## 0.338.92 implementation
 
-- Public respondents can upload images, video, audio and PDF files to a published project using short-lived signed Storage URLs and a one-hour project/submission-key scoped upload session. Up to five files per submission key are accepted. Files attach to the response only when that exact submission key is submitted.
-- Field agents can upload evidence only to a durable report created by the same field-session JTI. Field-session codes do not become GreenHaven accounts or admin credentials.
+- Authenticated Pioneers can upload images, video, audio and PDF files to a published project using short-lived signed Storage URLs and a one-hour project/submission-key scoped upload session. Up to five files per submission key are accepted. Files attach to the response only when that exact submission key is submitted.
+- Authenticated Pioneers can upload evidence only to a durable report created by the same verified GreenHaven session scope. Field-session codes do not become GreenHaven accounts or admin credentials.
 - The central administrator Evidence Review Centre lists Research and Field Desk evidence and records review decisions. Admin access is checked against `GHC_FIELD_ADMIN_USER_ID`.
 - Upload completion streams the object through SHA-256 hashing and checks basic file magic bytes against the claimed MIME type. This is MIME-spoofing resistance, not malware detection.
 - All new evidence enters `scan_status=pending` and `verification_status=quarantined`. Content delivery is denied until a trusted scanner reports a matching SHA-256 digest as clean. Scanner queue and HMAC-authenticated callback endpoints are implemented; a separate trusted scanning worker/provider and `GHC_EVIDENCE_SCANNER_SECRET` configuration are still required. No file is claimed to have been malware-scanned in this source-only increment.
@@ -140,8 +152,8 @@ The current visible shell navigation contains six destinations, in order: Home �
 - Full Node 24.15.0 dependency-backed checks and visual browser/device acceptance remain required.
 ## 0.338.92 implementation
 
-- Public respondents can upload images, video, audio and PDF files to a published project using short-lived signed Storage URLs and a one-hour project/submission-key scoped upload session. Up to five files per submission key are accepted. Files attach to the response only when that exact submission key is submitted.
-- Field agents can upload evidence only to a durable report created by the same field-session JTI. Field-session codes do not become GreenHaven accounts or admin credentials.
+- Authenticated Pioneers can upload images, video, audio and PDF files to a published project using short-lived signed Storage URLs and a one-hour project/submission-key scoped upload session. Up to five files per submission key are accepted. Files attach to the response only when that exact submission key is submitted.
+- Authenticated Pioneers can upload evidence only to a durable report created by the same verified GreenHaven session scope. Field-session codes do not become GreenHaven accounts or admin credentials.
 - The central administrator Evidence Review Centre lists Research and Field Desk evidence and records review decisions. Admin access is checked against `GHC_FIELD_ADMIN_USER_ID`.
 - Upload completion streams the object through SHA-256 hashing and checks basic file magic bytes against the claimed MIME type. This is MIME-spoofing resistance, not malware detection.
 - All new evidence enters `scan_status=pending` and `verification_status=quarantined`. Content delivery is denied until a trusted scanner reports a matching SHA-256 digest as clean. Scanner queue and HMAC-authenticated callback endpoints are implemented; a separate trusted scanning worker/provider and `GHC_EVIDENCE_SCANNER_SECRET` configuration are still required. No file is claimed to have been malware-scanned in this source-only increment.

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
+import { usePiAuth } from "@/contexts/pi-auth-context"
 
 type Survey = {
   id: string
@@ -17,12 +18,9 @@ type Session = {
 }
 
 export function FieldDeskClient() {
+  const { signOut } = usePiAuth()
   const [session, setSession] = useState<Session | null>(null)
   const [activeView, setActiveView] = useState<"overview" | "report" | "surveys">("overview")
-  const [code, setCode] = useState("")
-  const [label, setLabel] = useState("")
-  const [unlockError, setUnlockError] = useState<string | null>(null)
-  const [unlocking, setUnlocking] = useState(false)
 
   const [kind, setKind] = useState<"situation" | "result" | "general">("situation")
   const [body, setBody] = useState("")
@@ -70,36 +68,6 @@ export function FieldDeskClient() {
     })()
   }, [session?.authenticated])
 
-  async function onUnlock(e: React.FormEvent) {
-    e.preventDefault()
-    setUnlocking(true)
-    setUnlockError(null)
-    try {
-      const res = await fetch("/api/field/unlock", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, label: label || undefined }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.ok) {
-        setUnlockError(
-          data.error === "INVALID_ACCESS_CODE"
-            ? "That access code is not valid."
-            : data.error === "FIELD_DESK_NOT_CONFIGURED"
-              ? "Field Desk is not configured on this deployment yet."
-              : "Could not unlock. Try again shortly.",
-        )
-        setUnlocking(false)
-        return
-      }
-      setCode("")
-      await refreshSession()
-    } catch {
-      setUnlockError("Network error. Check your connection and try again.")
-    }
-    setUnlocking(false)
-  }
 
   async function onSendReport(e: React.FormEvent) {
     e.preventDefault()
@@ -116,8 +84,8 @@ export function FieldDeskClient() {
       if (!res.ok || !data.ok) {
         setSendState("error")
         setSendMessage(
-          data.error === "FIELD_AUTH_REQUIRED"
-            ? "Session expired. Unlock again with your access code."
+          data.error === "AUTH_REQUIRED" || data.error === "SESSION_REQUIRED"
+            ? "Your Pi session has expired. Sign in again inside Pi Browser."
             : "Could not send report.",
         )
         return
@@ -190,13 +158,13 @@ export function FieldDeskClient() {
   }
 
   async function onLock() {
-    await fetch("/api/field/session", { method: "DELETE", credentials: "include" })
-    setSession({ configured: session?.configured ?? true, authenticated: false, label: null })
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" })
+    signOut()
   }
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-lg bg-background px-5 pb-24 pt-[max(1.25rem,env(safe-area-inset-top))] text-foreground">
-      <nav className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]" aria-label="Public navigation">
+      <nav className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]" aria-label="Field Research navigation">
         <Link href="/" className="font-bold text-emerald-600">
           ← GreenHaven
         </Link>
@@ -222,11 +190,11 @@ export function FieldDeskClient() {
             <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-50">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" /> Research & intelligence
             </span>
-            <span className="text-[10px] font-semibold text-emerald-100/80">PUBLIC PORTAL</span>
+            <span className="text-[10px] font-semibold text-emerald-100/80">PIONEER WORKSPACE</span>
           </div>
           <h1 className="mt-5 text-3xl font-extrabold tracking-tight">Field Research</h1>
           <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-emerald-50/85">
-            Collect insights, field observations and survey responses in one trusted workspace — accessible from any browser.
+            Collect insights, field observations and survey responses in one trusted workspace — available only to Pi-authenticated Pioneers inside Pi Browser.
           </p>
           <div className="mt-5 flex flex-wrap gap-2 text-[11px] font-semibold text-white/90">
             <span className="rounded-full bg-white/10 px-3 py-1.5">Surveys</span>
@@ -236,7 +204,7 @@ export function FieldDeskClient() {
         </div>
       </header>
       <div className="mt-4 grid grid-cols-3 gap-2" aria-label="Research capabilities">
-        {[{ n: "01", t: "Create", d: "Build a study" }, { n: "02", t: "Share", d: "Invite anyone" }, { n: "03", t: "Analyse", d: "Review responses" }].map((item) => (
+        {[{ n: "01", t: "Create", d: "Build a study" }, { n: "02", t: "Share", d: "Invite authenticated Pioneers" }, { n: "03", t: "Analyse", d: "Review responses" }].map((item) => (
           <div key={item.n} className="rounded-2xl border border-border/70 bg-card px-3 py-3">
             <p className="text-[10px] font-bold tracking-widest text-emerald-700 dark:text-emerald-400">{item.n}</p>
             <p className="mt-1 text-[13px] font-bold">{item.t}</p>
@@ -246,58 +214,10 @@ export function FieldDeskClient() {
       </div>
 
       {!session?.authenticated ? (
-        <section className="mt-8 space-y-4" aria-labelledby="unlock-heading">
-          <h2 id="unlock-heading" className="text-lg font-semibold">
-            Unlock with access code
-          </h2>
-          <p className="text-[13px] text-muted-foreground">
-            Use one of the codes issued by GreenHaven operations. Codes are shared with field agents
-            only and expire with this browser session.
-          </p>
-          {session && !session.configured && (
-            <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[13px] text-amber-900 dark:text-amber-100">
-              Field Desk is not configured on this server yet (access codes / session secret missing).
-            </p>
-          )}
-          <form onSubmit={onUnlock} className="space-y-3">
-            <label className="block text-[13px] font-medium">
-              Access code
-              <input
-                type="password"
-                autoComplete="off"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-border bg-card px-3 py-2.5 text-[15px] outline-none ring-emerald-500/40 focus:ring-2"
-                required
-                inputMode="numeric"
-                minLength={4}
-                maxLength={128}
-              />
-            </label>
-            <label className="block text-[13px] font-medium">
-              Agent label (optional)
-              <input
-                type="text"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="e.g. Ward 4 team"
-                className="mt-1 w-full rounded-xl border border-border bg-card px-3 py-2.5 text-[15px] outline-none ring-emerald-500/40 focus:ring-2"
-                maxLength={40}
-              />
-            </label>
-            {unlockError && (
-              <p className="text-[13px] text-red-600 dark:text-red-400" role="alert">
-                {unlockError}
-              </p>
-            )}
-            <button
-              type="submit"
-              disabled={unlocking || code.length < 4}
-              className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-[15px] font-semibold text-white disabled:opacity-50"
-            >
-              {unlocking ? "Unlocking…" : "Unlock Field Desk"}
-            </button>
-          </form>
+        <section className="mt-8 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5" aria-live="polite">
+          <h2 className="text-lg font-semibold">Pi authentication required</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Complete official Pi SDK sign-in in Pi Browser. GreenHaven will then establish and verify your secure Pioneer session before enabling reports, surveys or evidence uploads.</p>
+          <button type="button" onClick={() => void refreshSession()} className="mt-4 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white">Retry secure session check</button>
         </section>
       ) : (
         <section className="mt-8 space-y-8">
@@ -329,7 +249,7 @@ export function FieldDeskClient() {
           ) : null}
           <div className="flex items-center justify-between gap-2">
             <p className="text-[13px] text-muted-foreground">
-              Signed in as field agent
+              Signed in as Pioneer
               {session.label ? (
                 <>
                   : <span className="font-medium text-foreground">{session.label}</span>
@@ -469,8 +389,7 @@ export function FieldDeskClient() {
       )}
 
       <footer className="mt-12 text-[11px] leading-relaxed text-muted-foreground">
-        Field Research access codes do not grant GreenHaven account login, π payments, or admin privileges.
-        Field submissions support text reports, surveys and scoped evidence uploads. Uploaded evidence remains quarantined until security scanning and review are complete. For app support use{" "}
+        Pi SDK authentication and a verified GreenHaven session are required for every field report, survey and evidence upload. Field submissions are bound to the authenticated Pioneer session. Uploaded evidence remains quarantined until security scanning and review are complete. For app support use{" "}
         <Link href="/support" className="underline-offset-2 hover:underline">
           Support
         </Link>

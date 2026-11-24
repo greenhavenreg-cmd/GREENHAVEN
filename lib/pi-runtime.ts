@@ -41,7 +41,7 @@ export type PiRuntimeSnapshot = {
 /** Emit stable, token-free Pi auth diagnostics for field troubleshooting. */
 export function reportPiAuthDiagnostic(
   code: string,
-  details: { stage?: string; status?: number; sandbox?: boolean; hasPi?: boolean; hasAccessToken?: boolean; errorName?: string; errorShape?: string; reasonClass?: string; reason?: string; sdkErrorCode?: string; sdkErrorStatus?: number; sdkErrorFields?: string; inIframe?: boolean; userActivationActive?: boolean; frameKind?: string; referrerHost?: string; ancestorHosts?: string; piMethods?: string; rejectionShape?: string; initSandbox?: boolean } = {},
+  details: { stage?: string; status?: number; sandbox?: boolean; hasPi?: boolean; hasAccessToken?: boolean; errorName?: string; errorShape?: string; reasonClass?: string; reason?: string; sdkErrorCode?: string; sdkErrorStatus?: number; sdkErrorFields?: string; inIframe?: boolean; userActivationActive?: boolean; frameKind?: string; referrerHost?: string; ancestorHosts?: string; piMethods?: string; rejectionShape?: string; initSandbox?: boolean; requestedScopes?: string; cspDirective?: string; cspBlockedHost?: string; cspDisposition?: string } = {},
 ): void {
   const safeCode = /^[A-Z0-9_]{3,64}$/.test(code) ? code : "PI_AUTH_DIAGNOSTIC_INVALID"
   const safeDetails = {
@@ -67,6 +67,10 @@ export function reportPiAuthDiagnostic(
     piMethods: typeof details.piMethods === "string" && /^[A-Za-z0-9_$,]{0,200}$/.test(details.piMethods) ? details.piMethods : undefined,
     rejectionShape: typeof details.rejectionShape === "string" && /^[A-Za-z0-9_$:,]{0,200}$/.test(details.rejectionShape) ? details.rejectionShape : undefined,
     initSandbox: typeof details.initSandbox === "boolean" ? details.initSandbox : undefined,
+    requestedScopes: typeof details.requestedScopes === "string" && /^(username|payments|wallet_address)(,(username|payments|wallet_address))*$/.test(details.requestedScopes) ? details.requestedScopes : undefined,
+    cspDirective: typeof details.cspDirective === "string" && /^[a-z-]{1,48}$/.test(details.cspDirective) ? details.cspDirective : undefined,
+    cspBlockedHost: typeof details.cspBlockedHost === "string" && /^(inline|eval|[a-z0-9.-]{1,100}|unknown)$/.test(details.cspBlockedHost) ? details.cspBlockedHost : undefined,
+    cspDisposition: details.cspDisposition === "enforce" || details.cspDisposition === "report" ? details.cspDisposition : undefined,
   }
   // Never include tokens, usernames, Pi UIDs, cookies, request bodies, or raw errors.
   console.info("[GH_PI_AUTH_DIAGNOSTIC]", { code: safeCode, ...safeDetails })
@@ -89,6 +93,30 @@ function recordPiAuthDiagnostic(entry: PiAuthDiagnosticEntry): void {
     if (list.length > PI_AUTH_HISTORY_MAX) list.splice(0, list.length - PI_AUTH_HISTORY_MAX)
     w[PI_AUTH_HISTORY_KEY] = list
   } catch { /* diagnostics must never break authentication */ }
+}
+
+let cspDiagnosticsInstalled = false
+
+/** Capture CSP violations without recording paths, query strings, credentials or page content. */
+function installPiCspDiagnostics(): void {
+  if (typeof window === "undefined" || cspDiagnosticsInstalled) return
+  cspDiagnosticsInstalled = true
+  window.addEventListener("securitypolicyviolation", (event: SecurityPolicyViolationEvent) => {
+    let blockedHost = "unknown"
+    const blocked = event.blockedURI || ""
+    if (blocked === "inline" || blocked === "eval" || blocked === "wasm-eval") {
+      blockedHost = blocked
+    } else {
+      try { blockedHost = new URL(blocked).hostname.toLowerCase() || "unknown" } catch { blockedHost = "unknown" }
+    }
+    const directive = (event.effectiveDirective || event.violatedDirective || "unknown").toLowerCase()
+    reportPiAuthDiagnostic("PI_CSP_VIOLATION", {
+      stage: "csp",
+      cspDirective: directive,
+      cspBlockedHost: blockedHost,
+      cspDisposition: event.disposition === "report" ? "report" : "enforce",
+    })
+  })
 }
 
 function getReferrerHost(): string {
@@ -253,6 +281,7 @@ export function buildPiAuthDiagnosticReport(): string {
     `host=${snap.hostname} origin=${snap.origin || "none"} mode=${snap.mode} sandbox=${snap.sandbox}`,
     `clientIdConfigured=${snap.clientIdConfigured} hasWindowPi=${snap.hasWindowPi} hasInit=${snap.hasInit} hasAuthenticate=${snap.hasAuthenticate} initialized=${snap.initialized}`,
     `inIframe=${snap.inIframe} referrerHost=${referrerHost} sandboxFrame=${snap.sandboxFrame} appCdnFrame=${snap.appCdnFrame} ancestorHosts=${snap.ancestorHosts}`,
+    `cspViolations=${history.filter((e) => e.code === "PI_CSP_VIOLATION").map((e) => `${e.cspDisposition || "unknown"}:${e.cspDirective || "unknown"}@${e.cspBlockedHost || "unknown"}`).join(";") || "none"}`,
     ...history.map((e) => JSON.stringify(e)),
   ].join("\n")
 }
@@ -373,6 +402,8 @@ export async function ensurePiInitialized(): Promise<PiRuntimeSnapshot> {
     throw new Error("Pi runtime is client-only")
   }
 
+  installPiCspDiagnostics()
+
   if (initialized && getWindowPi()) {
     reportPiAuthDiagnostic("PI_SDK_ALREADY_INITIALIZED", { stage: "sdk_init", sandbox: getPiSandbox(), hasPi: true })
     return getPiRuntimeSnapshot()
@@ -467,8 +498,9 @@ export async function piAuthenticateOfficial(
     hasPi: true,
     inIframe: isWindowFramed(),
     userActivationActive: isUserActivationActive(),
+    requestedScopes: scopes.filter((scope) => scope === "username" || scope === "payments" || scope === "wallet_address").join(","),
   })
-  reportPiAuthDiagnostic("PI_AUTH_PROMPT_START", { stage: "pi_authenticate", sandbox: getPiSandbox(), hasPi: true })
+  reportPiAuthDiagnostic("PI_AUTH_PROMPT_START", { stage: "pi_authenticate", sandbox: getPiSandbox(), hasPi: true, requestedScopes: scopes.filter((scope) => scope === "username" || scope === "payments" || scope === "wallet_address").join(",") })
   let authResult: Awaited<ReturnType<PiAuthFn>>
   // The Pi bridge can leave authenticate() pending indefinitely when its host
   // cannot present/complete the authorization prompt. Bound this wait so the

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** RUN342 — request payment capability at sign-in while isolating optional wallet-address consent. */
+/** RUN342 historical scope regression, updated for RUN380's universal Pioneer gate. */
 import { readFileSync } from 'node:fs'
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 const auth = read('contexts/pi-auth-context.tsx')
@@ -12,11 +12,10 @@ const checks = []
 const test = (name, ok) => { checks.push(Boolean(ok)); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`) }
 test('baseline Pi sign-in requests username and payments scopes', /piAuthenticateOfficial\(\["username",\s*"payments"\]\)/.test(auth))
 test('wallet permission is requested only inside explicit wallet-consent flow', /piAuthenticateOfficial\(\["wallet_address"\]\)/.test(wallet))
-test('public research share links bypass Pi auth shell', policy.includes('^\\/r\\/[^/]+\\/?$') && wrapper.includes('isPublicRoutePath(pathname)'))
-test('public field desk bypasses Pi auth shell without exposing studio/admin paths', /return path === "\/field" \|\| path === "\/field\/"/.test(policy) && /!isPublicRoutePath/.test(policy) === false)
+test('research share links are no longer public', !policy.includes('^\\/r\\/'))
+test('field desk and field reporting routes are no longer public', !policy.includes('path === "/field"'))
 test('coming-soon services are non-interactive and have no destination', /COMING_SOON/.test(registry) && /destination: \{ kind: "none" \}/.test(registry) && /isInteractiveStatus\(service\.status\)/.test(release))
-const publicShell = wrapper.split('function PublicRouteShell')[1]?.split('function AuthenticatedRouteShell')[0] || ''
-test('Pi auth SDK initialization is not mounted in public shell', !publicShell.includes('<PiAuthProvider>') && !publicShell.includes('<IdentityProvider>') && wrapper.includes('<PiAuthProvider>'))
+test('service routes mount Pi auth shell', wrapper.includes('<PiAuthProvider>') && wrapper.includes('<IdentityProvider>'))
 const failed = checks.filter(Boolean).length !== checks.length
 console.log(`\nRUN342 Pi auth scope isolation: ${checks.filter(Boolean).length}/${checks.length} passed`)
 process.exit(failed ? 1 : 0)

@@ -245,3 +245,8 @@ The active source package is now `gh-connect@0.338.85`. Run #296 prevents incomp
 ## Current package identity — RUN339 (2026-11-19)
 
 The current source derivative package identity is `gh-connect@0.338.104`, based on the user-supplied RUN375 archive through local RUN376–RUN377 maintenance derivatives. RUN377 adds a source-only identity/session service_role privilege repair and corrects configuration-only readiness reporting. The Vercel Preview database reference remains unconfirmed, so no live migration application is claimed. This line is a current identity pointer; the historical audit findings and dates above remain unchanged.
+
+
+## Current source pointer — RUN380 (2026-11-24)
+
+The current source-only derivative is `gh-connect@0.338.105`, based on the user-designated reconciled RUN379 archive `GREENHAVEN-0.338.104-RUN379-ACCESS-AUDIT-RECONCILED-2026-11-24.zip`. RUN380 closes anonymous Field Research and published Research participation paths by requiring the durable GreenHaven session created after official Pi SDK authentication and server-side Pi Platform verification. This addendum updates only the current package pointer; the dated Phase 1 audit and historical findings remain unchanged. Full Node 24.15.x build and live Pi Browser acceptance remain outstanding. No GitHub push, Vercel deployment, database migration, Mainnet action or financial operation occurred. Production remains NOT APPROVED.

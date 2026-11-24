@@ -4,13 +4,17 @@ import { supabaseRest, getServiceSupabaseConfig } from "@/lib/server/supabase/re
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
 import { checkDurableRateLimit, durableRateLimitCode, durableRateLimitStatus } from "@/lib/server/security/control-plane"
 import { isResearchQuestionVisible, type ResearchQuestion } from "@/lib/research/logic"
+import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
+import { researchSubmissionKey } from "@/lib/server/research/respondent"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 const NO_STORE = { "Cache-Control": "no-store" }
 type Question = ResearchQuestion
 
-export async function GET(_request: Request, context: { params: Promise<{ slug: string }> }) {
+export async function GET(request: Request, context: { params: Promise<{ slug: string }> }) {
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
   const { slug } = await context.params
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(slug) || !getServiceSupabaseConfig()) return NextResponse.json({ ok: false, error: "RESEARCH_NOT_FOUND" }, { status: 404, headers: NO_STORE })
   const result = await supabaseRest<Array<Record<string, unknown>>>(`gh_research_projects?slug=eq.${encodeURIComponent(slug)}&status=eq.published&select=id,slug,title,description,project_type,form_schema,settings&limit=1`)
@@ -20,6 +24,8 @@ export async function GET(_request: Request, context: { params: Promise<{ slug: 
 }
 
 export async function POST(request: Request, context: { params: Promise<{ slug: string }> }) {
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
   const { slug } = await context.params
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(slug)) return NextResponse.json({ ok: false, error: "RESEARCH_NOT_FOUND" }, { status: 404, headers: NO_STORE })
   const rawIp = request.headers.get("x-real-ip")?.trim() || "unknown"
@@ -65,7 +71,8 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   }
   const acceptedIds = new Set(questions.filter((q) => isResearchQuestionVisible(q.showWhen, normalized)).map((q) => q.id))
   if (Object.keys(answers).some((key) => !acceptedIds.has(key))) return NextResponse.json({ ok: false, error: "UNKNOWN_OR_HIDDEN_ANSWER" }, { status: 400, headers: NO_STORE })
-  const idempotencyKey = typeof payload.submissionKey === "string" && /^[A-Za-z0-9_-]{16,80}$/.test(payload.submissionKey) ? payload.submissionKey : randomUUID()
+  const clientSubmissionKey = typeof payload.submissionKey === "string" && /^[A-Za-z0-9_-]{16,80}$/.test(payload.submissionKey) ? payload.submissionKey : randomUUID()
+  const idempotencyKey = researchSubmissionKey(access.auth.userId, clientSubmissionKey)
   const saved = await supabaseRest<Array<Record<string, unknown>>>("gh_research_responses?on_conflict=project_id,submission_key&select=id,submitted_at", { method: "POST", headers: { "Content-Type": "application/json", Prefer: "return=representation,resolution=ignore-duplicates" }, body: JSON.stringify({ id: randomUUID(), project_id: project.id, submission_key: idempotencyKey, answers: normalized, consent_recorded_at: new Date().toISOString(), review_status: "received" }), timeoutMs: 12_000 })
   if (!saved.ok) return NextResponse.json({ ok: false, error: "RESPONSE_SAVE_FAILED" }, { status: 503, headers: NO_STORE })
   const fallbackResponse = saved.data?.[0] ? null : await supabaseRest<Array<{ id: string }>>(`gh_research_responses?project_id=eq.${project.id}&submission_key=eq.${encodeURIComponent(idempotencyKey)}&select=id&limit=1`)

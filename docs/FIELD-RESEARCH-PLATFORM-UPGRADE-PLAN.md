@@ -3,18 +3,18 @@
 **Baseline:** `GREENHAVEN-0.338.87-FIELD-RESEARCH-FOUNDATION-2026-11-16.zip`  
 **Current implementation:** `0.338.89` Research Studio, conditional branching & Research Intelligence schema foundation  
 **Scope:** Field Research, Challenge-on-Post, and Polls-on-Post  
-**Status:** Owner-facing visual authoring, public share links, anonymous browser responses, consent capture, durable response storage and private owner inbox are implemented. Basic previous-question conditional branching is now implemented in the visual editor and server submission validator. Release 0.338.89 adds REVIEW_REQUIRED additive schema foundations for evidence metadata, team roles, configurable geography, election contests/candidates/agent assignments/tallies, timed exam attempts, durable challenge participation/events, poll policy settings and audit history. Media upload-to-response integration, verified Nigeria reference-data import, full election workflows, exam runtime/scoring, advanced analytics and the full Challenge/Poll product transformations remain staged work. This document is a delivery contract, not a claim that all 90 upgrades are already shipped.
+**Status:** Owner-facing visual authoring, share identifiers, Pi-authenticated Pioneer responses, consent capture, durable response storage and private owner inbox are implemented. RUN380 removes anonymous participation and requires a durable Pioneer session for every published share-link interaction. Basic previous-question conditional branching is now implemented in the visual editor and server submission validator. Release 0.338.89 adds REVIEW_REQUIRED additive schema foundations for evidence metadata, team roles, configurable geography, election contests/candidates/agent assignments/tallies, timed exam attempts, durable challenge participation/events, poll policy settings and audit history. Media upload-to-response integration, verified Nigeria reference-data import, full election workflows, exam runtime/scoring, advanced analytics and the full Challenge/Poll product transformations remain staged work. This document is a delivery contract, not a claim that all 90 upgrades are already shipped.
 
 ## Product direction
 
 Field Research is a research and data-collection platform, not merely a field-agent text form. It has two distinct surfaces:
 
 - **Research Studio (authenticated owner):** create, configure, preview, publish, share, close, analyse, export, and archive a project.
-- **Public Response Portal (browser-accessible):** respondents open a share link without a GreenHaven account or Pi Browser, subject to the project's publication and response controls.
-- **Field Agent Portal (scoped access):** code-authorized agents submit structured observations and evidence without receiving a GreenHaven account, wallet, or admin session.
+- **Pioneer Response Portal (Pi Browser only):** authenticated Pioneers open a share identifier inside Pi Browser after official Pi SDK authentication and server-side identity verification.
+- **Field Agent Portal (Pioneer session scoped):** authenticated Pioneers submit structured observations and evidence under their durable GreenHaven session; shared field codes do not grant access.
 - **Research Inbox (owner/operator):** durable response review, moderation, evidence verification, exports, and audit history.
 
-The public response capability must never imply that an anonymous response is a verified person, an official vote, or an authenticated election result. Election observation is an evidence and reporting workflow; it is not an online voting system or a substitute for an election authority's official process.
+A Pi-authenticated Pioneer response is attributable to a verified GreenHaven identity, but it is not an official vote or an authenticated election result. Election observation is an evidence and reporting workflow; it is not an online voting system or a substitute for an election authority's official process.
 
 ## Field Research — 30 upgrade tracks
 
@@ -26,8 +26,8 @@ The public response capability must never imply that an anonymous response is a 
 6. **Validation rules:** required fields, ranges, formats, answer limits, and cross-field checks.
 7. **Examination mode:** timed attempts, question pools, randomized order, attempt limits, scoring rules, and result release controls.
 8. **Public share links:** opaque, revocable project links with optional expiry and response limits.
-9. **Anonymous and identified modes:** clear consent and identity disclosure before response collection.
-10. **Respondent access controls:** public, link-only, code-gated, invited, or authenticated modes.
+9. **Pioneer-attributed participation:** clear consent and identity disclosure before response collection.
+10. **Pioneer access controls:** verified Pi identity, durable session, project membership and role authorization.
 11. **Mobile-first response experience:** low-bandwidth layouts, progress, save/resume where safe, and accessible controls.
 12. **Multilingual forms:** per-project language variants and locale-aware formatting.
 13. **Geographic hierarchy builder:** country, state/province, district/zone, LGA/county, ward, polling unit, and configurable local levels.
@@ -88,7 +88,7 @@ The public response capability must never imply that an anonymous response is a 
 2. Single-choice, multiple-choice, ranked, rating, and opinion-scale formats.
 3. Draft, scheduled, open, paused, closed, and archived lifecycle.
 4. Server-enforced opening and closing timestamps.
-5. Configurable anonymous or attributable voting with clear disclosure.
+5. Configurable attributable Pioneer participation with clear disclosure.
 6. One-vote and change-vote policies enforced server-side.
 7. Multi-select limits and strict option validation.
 8. Optional write-in answers with moderation and abuse controls.
@@ -130,8 +130,8 @@ The 30-track programmes below are the upgrade requirements for each feature; the
 - `/field` remains a public browser route and is now branded as **Field Research** with clearer navigation and an agent workspace overview.
 - Field Research is listed in the GreenHaven Ecosystem under **Research & Intelligence**.
 - The existing access-code verifier now accepts 4–128 character codes, allowing the requested numeric codes (`1000` through `10000`). Hashes are still compared using SHA-256 plus timing-safe equality.
-- Field session signing now requires the dedicated `GHC_FIELD_SESSION_SECRET`; it no longer silently reuses the app auth/JWT secret.
-- Existing field intake is still text-only and the built-in survey catalog is environment-configured. A full owner form builder, public anonymous response endpoint, media uploads, and analytics are not yet implemented.
+- Historical shared-code field-session signing is retired by RUN380; field report ownership now derives from the verified Pioneer identity and durable GreenHaven session.
+- Existing field intake is still text-only and the built-in survey catalog is environment-configured. A full owner form builder, public unauthenticated response endpoint, media uploads, and analytics are not yet implemented.
 - The SQL proposal `supabase/proposals/20261116160000_gh_field_reports.sql` remains a proposal pending Testnet operator review and migration-state verification. Do not apply blindly or replay it if already applied.
 
 ## Preview environment setup
@@ -140,14 +140,7 @@ Set these in the existing Vercel project's **Preview** environment only. Do not 
 
 ```bash
 # Preferred: SHA-256 hex digests for the ten requested codes
-GHC_FIELD_ACCESS_CODE_HASHES=<comma-separated SHA-256 digests>
-
-# Remove/leave unset when using hashes
-# GHC_FIELD_ACCESS_CODES=
-
-# Generate a dedicated secret locally; store the output only in Vercel Preview
-openssl rand -base64 48
-GHC_FIELD_SESSION_SECRET=<generated-output>
+Shared field access-code and field-token secrets are retired by RUN380. Do not configure GHC_FIELD_ACCESS_CODES, GHC_FIELD_ACCESS_CODE_HASHES, or GHC_FIELD_SESSION_SECRET.
 
 # Optional: authenticated GreenHaven account identifier for future in-app routing
 GHC_FIELD_ADMIN_USER_ID=<GreenHaven-user-id>
@@ -163,3 +156,8 @@ Generate each digest locally with `printf %s '1000' | openssl dgst -sha256` (rep
 4. Verify multi-instance insert/read behavior, timeout behavior, and duplicate submission behavior.
 5. Only then route reports to the GreenHaven central inbox. Notification delivery is supplemental; the durable report record remains the source of truth.
 6. Do not treat a successful in-app notification as proof that a report was durably stored.
+
+
+## RUN380 access policy amendment (2026-11-24)
+
+All research participation and field reporting is restricted to Pi Browser users who complete official Pi SDK authentication and server-side Pi Platform verification before GreenHaven issues a durable session. Research share URLs are identifiers only; possession of a link does not grant access. Shared field access codes are retired and cannot establish identity or authorize reporting. Field and research page/API routes independently enforce the verified session. No anonymous or non-Pioneer participation path is permitted.

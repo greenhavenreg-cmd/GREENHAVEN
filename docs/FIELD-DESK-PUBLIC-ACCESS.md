@@ -1,58 +1,38 @@
-# Field Research — public surveys / elections observation / situation reports
+# Field Research — Pi-authenticated access policy
 
-## Purpose
-A **public, all-browser** surface (`/field`) for field agents and civic partners who may not have Pi Browser or a Pi account. Same reachability model as Privacy / Terms / Support.
+**RUN380 supersedes the former public/access-code Field Desk design.** The old instructions for all-browser participation, shared access codes, `gh_field_session`, and `Authorization: Field` tokens are historical and must not be used.
 
-## What it is not
-- Not GreenHaven login
-- Not Pi wallet / economy / messaging graph access
-- Not a substitute for authenticated admin consoles
+## Current access requirement
 
-## Access model (10 codes)
-Configure **up to 10** shared access codes:
+Field Research is available only inside the Pi-authenticated GreenHaven application. A Pioneer must:
 
-```bash
-# Preferred: SHA-256 hex digests (comma-separated, max 10)
-GHC_FIELD_ACCESS_CODE_HASHES=hex1,hex2,...
+1. Open GreenHaven in Pi Browser.
+2. Complete official Pi SDK authentication.
+3. Have the Pi access token verified server-side by Pi Platform.
+4. Establish a durable GreenHaven session mapped to the canonical Pioneer identity.
 
-# Or plaintext codes (min 4 characters) hashed at runtime — ops convenience only
-GHC_FIELD_ACCESS_CODES=1000,2000,3000,4000,5000,6000,7000,8000,9000,10000
+A field URL, report link, client-provided label, user-agent, shared code or local-storage value does not grant access.
 
-# Required: ≥32-byte secret for field session HMAC (dedicated secret preferred)
-GHC_FIELD_SESSION_SECRET=<openssl rand -base64 48>
+## Current routes
 
-# Optional: GH user id that owns the central inbox (for future durable routing)
-GHC_FIELD_ADMIN_USER_ID=<uuid-or-gh-user-id>
+| Method | Path | Authorization |
+|---|---|---|
+| GET | `/api/field/session` | Durable GreenHaven Pioneer session |
+| DELETE | `/api/field/session` | Retired; sign out through `/api/auth/logout` |
+| POST | `/api/field/unlock` | Retired; returns HTTP 410 |
+| POST | `/api/field/report` | Durable GreenHaven Pioneer session |
+| GET | `/api/field/surveys` | Durable GreenHaven Pioneer session |
+| POST | `/api/field/reports/:id/evidence/intent` | Durable session and exact report scope |
+| POST | `/api/field/reports/:id/evidence/complete` | Durable session and exact report scope |
+| GET/PATCH | `/api/field/admin/evidence` | Durable session plus configured administrator identity |
+| GET | `/api/field/admin/reports` | Durable session plus operator diagnostic authorization |
 
-# Optional: custom surveys JSON
-GHC_FIELD_SURVEYS_JSON=[{"id":"...","title":"...","questions":[{"id":"...","prompt":"..."}]}]
-```
+## Evidence and persistence
 
-Generate a digest: `echo -n 'your-code' | openssl dgst -sha256`
+Field evidence scope IDs are derived server-side from the canonical Pioneer ID and verified GreenHaven session ID. Durable field reports require the scoped `gh_field_report_append_scoped` RPC. The implementation fails closed if that scoped persistence contract is unavailable; it does not fall back to an unscoped legacy report write. The scoped evidence migration remains subject to the repository's migration review and target-history reconciliation process.
 
-## Session scope
-- Cookie: `gh_field_session` (HttpOnly, SameSite=Lax, 12h)
-- Agents may also send `Authorization: Field <token>`
-- Authorizes **only** `/api/field/*`
+Evidence remains quarantined until the configured trusted scanner attests that the stored SHA-256 digest is clean. File-signature checks alone are not malware scanning.
 
-## APIs
-| Method | Path | Auth |
-|--------|------|------|
-| POST | `/api/field/unlock` | Access code |
-| GET/DELETE | `/api/field/session` | Cookie |
-| POST | `/api/field/report` | Field session |
-| GET | `/api/field/surveys` | Field session |
-| GET | `/api/field/admin/reports` | `x-ghc-operator-key` |
+## Retired configuration
 
-## Durability
-- Proposal SQL: `supabase/proposals/20261116160000_gh_field_reports.sql`
-- Applied to GH Connect Testnet as migration `20261116170409_gh_field_reports_public_intake.sql`. Preview must run the matching migration before it can provide multi-instance durable reports; without database configuration the current development fallback is process-local only.
-
-## Security controls
-- Rate limits on unlock and report
-- Text body max 4000 chars; no file uploads
-- Timing-safe code compare; HMAC session tokens
-- Operator admin list requires reconcile key
-
-
-See `docs/FIELD-RESEARCH-PLATFORM-UPGRADE-PLAN.md` for the product architecture and the 30-track upgrade plans for Field Research, Challenge-on-Post, and Polls-on-Post. The current Field Research intake is text-only; media uploads and owner-created public forms are planned capabilities, not shipped functionality.
+Do not configure or restore `GHC_FIELD_ACCESS_CODES`, `GHC_FIELD_ACCESS_CODE_HASHES`, or `GHC_FIELD_SESSION_SECRET`. The former shared-code unlock route and field-token cookie are no longer an authorization path.

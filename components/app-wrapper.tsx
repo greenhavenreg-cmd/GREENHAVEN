@@ -100,8 +100,8 @@ function AppContent({ children }: { children: ReactNode }) {
 }
 
 function PublicRouteShell({ children }: { children: ReactNode }) {
-  // This shell intentionally mounts no PiAuthProvider, IdentityProvider,
-  // session-lock provider, or Pi SDK bootstrap. Public links work in any browser.
+  // Only legal/help and the Pi domain-validation resource use this shell.
+  // No ecosystem service or research/reporting route is publicly allowlisted.
   return (
     <>
       <AccessibilitySetup />

@@ -1,7 +1,8 @@
 /**
- * GET /api/economy/supply — network-level GHC supply snapshot (no private user data).
+ * GET /api/economy/supply — authenticated network-level GHC supply snapshot (no private user data).
  */
 import { isDatabaseConfigured, jsonOk } from "@/lib/server/economy/http"
+import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
 import { rpcEconomicPopulationStats } from "@/lib/server/economy/db"
 import {
   ACTIVITY_DAILY_CAP_GHC,
@@ -13,7 +14,9 @@ import { aggregateTelemetry } from "@/lib/server/economy/telemetry"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-export async function GET() {
+export async function GET(request: Request) {
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
   let population: Awaited<ReturnType<typeof rpcEconomicPopulationStats>> | null = null
   if (isDatabaseConfigured()) {
     try {

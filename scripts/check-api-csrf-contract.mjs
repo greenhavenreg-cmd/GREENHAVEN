@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const source = readFileSync(join(root, 'middleware.ts'), 'utf8')
 const checks = [
-  ['middleware is scoped to API routes', source.includes('matcher: ["/api/:path*"]')],
+  ['middleware covers service pages and API routes while excluding static assets', source.includes('matcher: ["/((?!_next/static') && source.includes('request.cookies.get("gh_session")')],
   ['safe methods are explicitly enumerated', /new Set\(\["GET", "HEAD", "OPTIONS"\]\)/.test(source)],
   ['webhook exception is explicit and narrow', /new Set\(\["\/api\/webhooks\/paystack"\]\)/.test(source)],
   ['origin is validated against request origin', source.includes('new URL(origin).origin !== request.nextUrl.origin')],

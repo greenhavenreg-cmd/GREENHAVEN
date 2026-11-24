@@ -1,17 +1,20 @@
 /**
  * GET /api/social/posts/[id]/ghpv
- * Safe public quality status. No private calibration, no vote weights, no GHC.
+ * Safe Pioneer-authenticated quality status. No private calibration, no vote weights, no GHC.
  */
 import { NextResponse } from "next/server"
+import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
 import { socialDbConfigured, socialRpc } from "@/lib/server/social/rpc"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function GET(
-  _request: Request,
+  request: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
   const { id } = await ctx.params
   const postId = String(id || "").trim()
   if (!postId || postId.length > 128) {

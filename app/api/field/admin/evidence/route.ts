@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
-import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
+import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
 import { checkDurableRateLimit, durableRateLimitCode, durableRateLimitStatus } from "@/lib/server/security/control-plane"
 import { supabaseRest } from "@/lib/server/supabase/rest-client"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 const noStore = { "Cache-Control": "private, no-store", Vary: "Cookie, Authorization" }
-async function isAdmin(request: Request) { const auth = await resolveAuthenticatedUser(request.headers); const id = String(process.env.GHC_FIELD_ADMIN_USER_ID || "").trim(); return auth && id && auth.userId === id ? auth : null }
+async function isAdmin(request: Request) { const access = await requireAccountSecurityContext(request.headers); if (!access.ok) return null; const id = String(process.env.GHC_FIELD_ADMIN_USER_ID || "").trim(); return id && access.auth.userId === id ? access.auth : null }
 export async function GET(request: Request) {
   const auth = await isAdmin(request)
   if (!auth) return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403, headers: noStore })

@@ -1,8 +1,9 @@
 /**
- * GET /api/economy/catalog — transparent GHC utility + membership prices.
+ * GET /api/economy/catalog — authenticated GHC utility + membership prices.
  * Dual-rail π amounts are independent product prices, not FX.
  */
 import { NextResponse } from "next/server"
+import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
 import { listPublicSpendCatalog, listUtilitySinks } from "@/lib/server/economy/spend-catalog"
 import { ASSET_POLICY } from "@/lib/asset-separation"
 import {
@@ -15,6 +16,8 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function GET(request: Request) {
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
   const url = new URL(request.url)
   const utilityOnly = url.searchParams.get("utility") === "1"
 
@@ -44,6 +47,6 @@ export async function GET(request: Request) {
       },
       items,
     },
-    { headers: { "Cache-Control": "public, max-age=60" } }
+    { headers: { "Cache-Control": "private, no-store, max-age=0" } }
   )
 }

@@ -5,11 +5,14 @@
 import { NextResponse } from "next/server"
 import { operatorDiagnosticsAuthorized } from "@/lib/server/security/operator-key"
 import { listFieldReports } from "@/lib/server/field/store"
+import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function GET(request: Request) {
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
   if (!operatorDiagnosticsAuthorized(request)) {
     return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403, headers: { "Cache-Control": "no-store" } })
   }

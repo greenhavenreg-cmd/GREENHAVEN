@@ -3,6 +3,7 @@
  * Absolute URLs for Pi Developer Portal configuration fields (no secrets).
  */
 import { NextResponse } from "next/server"
+import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -20,6 +21,8 @@ function originFromEnv(request: Request): string {
 }
 
 export async function GET(request: Request) {
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
   const origin = originFromEnv(request)
   const abs = (path: string) => (origin ? `${origin}${path}` : path)
 
@@ -46,6 +49,6 @@ export async function GET(request: Request) {
         note: "KYC status is measured by Pi, not by this API.",
       },
     },
-    { headers: { "Cache-Control": "no-store" } },
+    { headers: { "Cache-Control": "private, no-store, max-age=0" } },
   )
 }

@@ -1,10 +1,10 @@
 # GreenHaven
 
-**Current source version:** `0.338.104` (RUN377 identity/session ACL audit and readiness evidence correction on the RUN375 Pi SDK early-load source)
+**Current source version:** `0.338.105` (RUN380 Pi-only Research and Field access-control derivative)
 
 Production status: **NOT APPROVED** — supported Node 24.15.0 dependency-backed typecheck/lint/build, browser/device, live database/provider and operator acceptance remain outstanding.
 
-This repository is the canonical GreenHaven source tree. See `docs/SOURCE_OF_TRUTH.md` and `docs/CURRENT_BUILD_CONTEXT.md` before implementation or release work.
+This repository is the canonical GreenHaven source tree. The authoritative parent archive is `GREENHAVEN-0.338.104-RUN379-ACCESS-AUDIT-RECONCILED-2026-11-24.zip`; RUN380 is a source-only derivative. See `docs/SOURCE_OF_TRUTH.md`, `docs/PROJECT_TRUTH.md`, `docs/RUN380-PI-ONLY-RESEARCH-ACCESS-CONTROL.md`, and `docs/PROJECT-WIDE-AUDIT-RUN379-2026-11-24.md` before implementation or release work. Older RUN/phase notes are historical evidence, not current implementation instructions.
 
 ## Pi authentication frame-routing correction — 2026-11-23 / Run 373
 
@@ -152,3 +152,8 @@ Adds the Field Research Ecosystem destination, a redesigned public field-agent p
 RUN328 coordinates the user-selected Identity & Authentication, Community discussion/participation, and Messenger community communications tracks. It adds session step-up ordering hardening, a held atomic session-cap proposal, a privacy-aware community member directory, recipient-accepted group invitations and consent-based sharing of the user's own public GreenHaven profile. See `docs/RUN328-PHASE4-IDENTITY-COMMUNITY-MESSAGING-2026-11-18.md`. The SQL proposal is not applied; full Node 24.15.x dependency-backed build and PostgreSQL/Testnet/device acceptance remain required. This is not a deployment or production approval.
 
 RUN377 repairs and verifies the Testnet service-role ACLs for Pi identity/session storage, reconciles the source migration filename to the exact remote version `20261123145603`, and upgrades `/api/health` to perform bounded live PostgREST read probes of both table contracts. The updated source remains pending Node 24.15.x build and deployed Preview / real Pi Browser acceptance. Mainnet remains untouched. See `docs/UPGRADE-WORKLOG-0.338.104.md`.
+
+
+## RUN380 — Pi-only Research and Field access
+
+Research share URLs, survey submissions, examination attempts, evidence uploads and Field reporting are restricted to Pioneers who complete official Pi SDK authentication and server-side Pi Platform verification before a durable GreenHaven session is issued. The old shared-code Field Desk unlock is retired. `/field` remains available as an authenticated Pioneer reporting workspace; `/r/:slug` is a share identifier only and no longer grants anonymous participation. Only legal/help pages and the Pi domain-validation resource remain public. See `docs/RUN380-PI-ONLY-RESEARCH-ACCESS-CONTROL.md` for implementation details and verification limits.

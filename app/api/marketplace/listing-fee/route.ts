@@ -3,6 +3,7 @@
  * Server-authoritative fee quote for sell/edit CTAs.
  */
 import { NextResponse } from "next/server"
+import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
 import {
   calculateMarketplaceListingFee,
   listingFeeRequiresSettlement,
@@ -13,6 +14,8 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function GET(request: Request) {
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
   const url = new URL(request.url)
   const mode = (url.searchParams.get("mode") || "create").toLowerCase()
   const price = Number(url.searchParams.get("price") || 0)

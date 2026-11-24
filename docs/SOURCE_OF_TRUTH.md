@@ -1,13 +1,26 @@
-# GreenHaven source authority — 0.338.104 RUN377 identity/session ACL audit and readiness evidence correction (2026-11-23)
+# GreenHaven source authority — 0.338.105 RUN380 Pi-only Research access control (2026-11-24)
 
-**Current source version:** `0.338.104`
-**Current user-provided archive:** `GREENHAVEN-0_338_102-RUN375-PI-SDK-EARLY-LOAD-2026-11-23 (1).zip`
-**Current local working derivative:** RUN377 identity/session ACL audit and readiness evidence correction on top of the user-provided RUN375 archive; source-only, not pushed or deployed.
-**Package identity:** `gh-connect@0.338.104` (user-facing brand: GREENHAVEN).
+**Current source version:** `0.338.105`
+**Authoritative parent archive:** `GREENHAVEN-0.338.104-RUN379-ACCESS-AUDIT-RECONCILED-2026-11-24.zip`
+**Current working tree:** RUN380 source-only derivative of the reconciled RUN379 archive; Pi-only Research and Field access controls have been implemented and targeted static checks pass. Not pushed or deployed.
+**Package identity:** `gh-connect@0.338.105` (user-facing brand: GREENHAVEN).
 
-The RUN375 archive supplied on 2026-11-23 is the authoritative baseline for this task. RUN376 and RUN377 are narrowly scoped local source derivatives and do not replace the uploaded archive. Preserve the established architecture, financial authority boundaries, canonical ecosystem access-control helper, and dedicated Events and Charity release checks.
+The reconciled RUN379 archive uploaded on 2026-11-24 is the sole authoritative parent baseline for this derivative. RUN375–RUN377 are inherited historical implementation increments, not alternative current baselines. Preserve the established architecture, canonical GreenHaven identity principal, financial authority boundaries, server-side Pi token verification, and dedicated release checks. Do not use an older archive or historical document to override the RUN379 source.
 
-The RUN331/RUN332/RUN364 notes below are historical implementation records only and do not override the user-supplied RUN375 baseline.
+The RUN331/RUN332/RUN364 notes and earlier RUN worklogs below are historical implementation records only. The current executable source and this RUN380 authority header take precedence.
+
+## RUN380 — Pi-only Research and Field access boundary
+
+The complete registered `npm run verify:static` suite now exits 0. The consolidated network/database-independent suite passes 63/63. This does not replace Node 24.15.x dependency-backed typecheck/lint/build or live Pi Browser acceptance.
+
+
+- Removed `/r/:slug`, `/field`, and `/portal-setup` from the anonymous route allowlist. Only `/privacy`, `/terms`, `/support`, and `/validation-key.txt` remain public. Every ecosystem/service route uses the Pi-authenticated application shell and early Pi SDK loader.
+- Middleware now redirects anonymous service-page requests to the root sign-in entry until a `gh_session` cookie exists. This is an early page perimeter only; it does not treat cookie presence as authentication. Protected Research and Field API handlers independently require `requireAccountSecurityContext`, which verifies the GreenHaven server session and enforces durable session storage in production.
+- `/field` remains the field reporting workspace inside the authenticated app shell; the public code-entry unlock UI is removed. `/api/field/unlock` is retired and returns HTTP 410. Field session status, surveys, reports, evidence intent/completion and admin review/content APIs require a durable Pi-derived GreenHaven session. Field evidence scope identifiers are derived server-side from canonical Pioneer ID plus the verified session ID.
+- Research share pages still use their existing opaque URLs, but the form metadata, submission, evidence-intent/completion and examination APIs now require a durable GreenHaven session. Read-only service metadata and fee-quote APIs used by Marketplace, Communities, Economy, Pi capabilities, push configuration and social quality/reward surfaces also require the durable account-security context. Response evidence submission keys are server-derived per Pioneer; examination attempt hashes are derived from the authenticated Pioneer rather than client-provided respondent keys. New Research projects set `allow_anonymous=false`.
+- Pi Browser enforcement is based on the official Pi SDK authentication flow plus server-side Pi Platform token verification and the resulting durable GreenHaven session. User-agent/referrer strings are not treated as cryptographic proof of browser identity. The middleware cookie-presence check is only an early gate.
+- Targeted static checks: Pi-only route policy 12/12; RUN380 access boundary 16/16; RUN342 auth scope regression 6/6; RUN375 SDK loader 21/21; field intake 7/7; scoped evidence engine 26/26; research integrity 12/12; Field Research foundation 23/23; Pi Sandbox classification 9/9.
+- Full Node 24.15.x dependency-backed typecheck/lint/build, live Pi Browser tests, API bypass tests against Preview, and migration-backed field evidence persistence remain outstanding. The workspace runtime is Node 22.16.0 and dependencies are not installed. No GitHub push, Vercel deployment, database mutation, migration application, Mainnet operation, or financial change occurred. Production remains NOT APPROVED.
 
 ## RUN373 Pi authentication frame-routing correction
 
@@ -27,7 +40,7 @@ RUN336 addresses the seven TypeScript diagnostics in the supplied GitHub Actions
 
 ## Latest implementation
 
-Public respondent and field-session scoped evidence uploads are implemented in source, with signed upload URLs, project/report-bound tokens, streamed SHA-256, file signature checks, quarantine-first storage records, central admin review UI, scanner queue/HMAC callback contract, active geographic-unit validation and append-only SHA-256 evidence event chains. The scanner provider itself is not deployed or configured, so uploads remain quarantined until an external trusted scanner is connected and reports clean. Do not claim malware scanning is operational.
+Pioneer-scoped research and durable-session-scoped field evidence uploads are implemented in source, with signed upload URLs, project/report-bound tokens, streamed SHA-256, file signature checks, quarantine-first storage records, central admin review UI, scanner queue/HMAC callback contract, active geographic-unit validation and append-only SHA-256 evidence event chains. The scanner provider itself is not deployed or configured, so uploads remain quarantined until an external trusted scanner is connected and reports clean. Do not claim malware scanning is operational.
 
 ## Held migrations
 

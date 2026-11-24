@@ -62,7 +62,7 @@ export async function persistFieldReport(input: {
 
   const config = getServiceSupabaseConfig()
   if (config) {
-    // Best-effort RPC; proposal migration may not be applied yet.
+    // Required scoped RPC; the report is rejected if its Pioneer-session binding is unavailable.
     const scopedRpc = await supabaseRpc<Record<string, unknown>>("gh_field_report_append_scoped", {
       p_id: report.id,
       p_kind: report.kind,
@@ -77,17 +77,10 @@ export async function persistFieldReport(input: {
       report.fieldSessionJti = input.fieldSessionJti
       return { ok: true, report }
     }
-    const rpcMissing = !scopedRpc.ok && (scopedRpc.status === 404 || (scopedRpc.status === 400 && /function|schema cache|not found/i.test(JSON.stringify(scopedRpc.body || ""))))
-    if (rpcMissing) {
-      // Backward-compatible report intake while the additive scoped-upload migration is held.
-      // These legacy rows intentionally have no session JTI and cannot receive direct agent uploads.
-      const legacy = await supabaseRpc<Record<string, unknown>>("gh_field_report_append", {
-        p_id: report.id, p_kind: report.kind, p_body: report.body, p_label: report.label || null,
-        p_location_hint: report.locationHint || null, p_survey_id: report.surveyId || null, p_admin_user_id: adminInboxUserId(),
-      }, { timeoutMs: 8_000 })
-      if (legacy.ok && legacy.data && (legacy.data as { ok?: boolean }).ok === true) return { ok: true, report }
-    }
-    // Once durable storage is configured, never acknowledge a process-local write.
+    // Never fall back to the legacy unscoped RPC: every durable report must
+    // retain the verified Pioneer session scope for evidence ownership and audit.
+    // If the scoped migration is not installed, fail closed until it is reconciled.
+    // never acknowledge a process-local write or an unscoped write in production.
     return { ok: false, error: "FIELD_REPORT_PERSIST_FAILED" }
   }
 

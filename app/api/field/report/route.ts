@@ -1,24 +1,21 @@
 /**
  * POST /api/field/report — text-only situation / result / general report.
- * Requires field session cookie (or Authorization: Field <token>).
+ * Requires a durable GreenHaven session established after Pi SDK authentication.
  */
 import { NextResponse } from "next/server"
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
 import { checkDurableRateLimit, durableRateLimitCode, durableRateLimitStatus } from "@/lib/server/security/control-plane"
-import { fieldTokenFromRequest } from "@/lib/server/field/access"
+import { fieldSessionScopeId } from "@/lib/server/field/access"
+import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
 import { persistFieldReport, type FieldReportKind } from "@/lib/server/field/store"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function POST(request: Request) {
-  const session = fieldTokenFromRequest(request)
-  if (!session) {
-    return NextResponse.json(
-      { ok: false, error: "FIELD_AUTH_REQUIRED" },
-      { status: 401, headers: { "Cache-Control": "no-store" } },
-    )
-  }
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
+  const session = { jti: fieldSessionScopeId(access.auth.userId, access.auth.sessionId), label: access.auth.username || "Pioneer" }
 
   const rateKey = `field-report:${session.jti}`
   const rate = await checkDurableRateLimit(rateKey, 20, 60_000, { onUnavailable: "deny" })

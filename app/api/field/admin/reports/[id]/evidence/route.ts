@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server"
-import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
+import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
 import { supabaseRest, getServiceSupabaseConfig } from "@/lib/server/supabase/rest-client"
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 const noStore = { "Cache-Control": "private, no-store", Vary: "Cookie, Authorization" }
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await resolveAuthenticatedUser(request.headers)
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
+  const auth = access.auth
   const admin = String(process.env.GHC_FIELD_ADMIN_USER_ID || "").trim()
-  if (!auth || !admin || auth.userId !== admin) return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403, headers: noStore })
+  if (!admin || auth.userId !== admin) return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403, headers: noStore })
   const { id } = await context.params
   if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404, headers: noStore })
   const report = await supabaseRest<Array<{ id: string }>>(`gh_field_reports?id=eq.${id}&select=id&limit=1`)
@@ -18,9 +20,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   return NextResponse.json({ ok: true, evidence: rows.data }, { headers: noStore })
 }
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await resolveAuthenticatedUser(request.headers)
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
+  const auth = access.auth
   const admin = String(process.env.GHC_FIELD_ADMIN_USER_ID || "").trim()
-  if (!auth || !admin || auth.userId !== admin) return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403, headers: noStore })
+  if (!admin || auth.userId !== admin) return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403, headers: noStore })
   const parsed = await readBoundedJson(request, 4 * 1024)
   if (!parsed.ok) return NextResponse.json({ ok: false, error: "INVALID_BODY" }, { status: 400, headers: noStore })
   const { id } = await context.params
@@ -38,9 +42,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await resolveAuthenticatedUser(request.headers)
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
+  const auth = access.auth
   const admin = String(process.env.GHC_FIELD_ADMIN_USER_ID || "").trim()
-  if (!auth || !admin || auth.userId !== admin) return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403, headers: noStore })
+  if (!admin || auth.userId !== admin) return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403, headers: noStore })
   const parsed = await readBoundedJson(request, 4 * 1024)
   if (!parsed.ok) return NextResponse.json({ ok: false, error: "INVALID_BODY" }, { status: 400, headers: noStore })
   const { id } = await context.params

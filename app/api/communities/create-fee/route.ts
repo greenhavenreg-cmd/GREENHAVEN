@@ -3,6 +3,7 @@
  * Server-authoritative community create fee quote.
  */
 import { NextResponse } from "next/server"
+import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
 import { quoteCommunityCreateFee, feesRequireSettlement } from "@/lib/server/fees/pilot-fee-policy"
 import { isPiOnlyCommerceEnabled } from "@/lib/server/economy/pi-only-commerce"
 
@@ -10,6 +11,8 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function GET(request: Request) {
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
   const url = new URL(request.url)
   let preferred: "PI" | "GHC" =
     String(url.searchParams.get("currency") || "GHC").toUpperCase() === "PI" ? "PI" : "GHC"

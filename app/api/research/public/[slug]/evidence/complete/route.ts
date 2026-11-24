@@ -3,10 +3,13 @@ import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
 import { checkDurableRateLimit, durableRateLimitCode, durableRateLimitStatus } from "@/lib/server/security/control-plane"
 import { supabaseRest } from "@/lib/server/supabase/rest-client"
 import { finalizeScopedEvidenceUpload } from "@/lib/server/evidence/scoped-upload"
+import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 const noStore = { "Cache-Control": "no-store" }
 export async function POST(request: Request, context: { params: Promise<{ slug: string }> }) {
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
   const { slug } = await context.params
   const parsed = await readBoundedJson(request, 8 * 1024)
   if (!parsed.ok) return NextResponse.json({ ok: false, error: "INVALID_BODY" }, { status: 400, headers: noStore })

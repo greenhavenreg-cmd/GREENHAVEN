@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { isPublicRoutePath } from "@/lib/routing/public-route-policy"
 
 /**
  * Edge-safe helpers only.
@@ -42,6 +43,17 @@ function requestCorrelationId(request: NextRequest): string {
 export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
   const requestId = requestCorrelationId(request)
+
+  // Page-level perimeter: service pages are not served to anonymous browsers.
+  // The cookie-presence check is only an early gate; sensitive data and every
+  // field/research API still verify the durable session server-side. The root
+  // route remains available to bootstrap Pi SDK authentication.
+  if (!path.startsWith("/api/") && path !== "/" && !isPublicRoutePath(path) && !request.cookies.get("gh_session")?.value) {
+    const destination = request.nextUrl.clone()
+    destination.pathname = "/"
+    destination.searchParams.set("auth_required", "1")
+    return NextResponse.redirect(destination, 307)
+  }
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set("x-request-id", requestId)
 
@@ -103,5 +115,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/api/:path*"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\..*).*)"],
 }

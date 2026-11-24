@@ -6,6 +6,11 @@ const root = process.cwd()
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const docsRoot = join(root, 'docs')
 const required = new Set([
+  'docs/INDEX.md',
+  'docs/PROJECT-WIDE-AUDIT-RUN379-2026-11-24.md',
+  'docs/RUN380-PI-ONLY-RESEARCH-ACCESS-CONTROL.md',
+  'docs/UPGRADE-WORKLOG-0.338.104.md',
+  'docs/UPGRADE-WORKLOG-0.338.105.md',
   'docs/FULL-PROJECT-AUDIT-0.338.94-2026-11-17.md',
   'docs/FULL-PROJECT-AUDIT-0.338.95-2026-11-17.md',
   'docs/FULL-PROJECT-AUDIT-0.338.96-2026-11-17.md',
@@ -461,6 +466,7 @@ const required = new Set([
   'docs/security/RUN364-NPM-AUDIT-2026-11-18.json',
   'docs/security/RUN365-AUDIT-AND-FIX-2026-11-19.md',
   'docs/security/RUN370-PI-AUTH-REJECTION-DIAGNOSTICS-2026-11-19.md',
+  'docs/security/RUN379-PI-CSP-AUTH-DIAGNOSTICS-2026-11-23.md',
 ])
 const failures=[]
 const walk=(dir)=>{

@@ -1,5 +1,7 @@
 # GreenHaven Acceptance Completion Register
 
+> **HISTORICAL SNAPSHOT — NOT THE CURRENT RELEASE BASELINE OR LIVE EXECUTION PLAN.** This register describes the 0.330.48-era state recorded on 2026-11-08. For current authority, use `docs/SOURCE_OF_TRUTH.md`, `docs/PROJECT_TRUTH.md`, and the current audit report. Do not use the statuses below to infer the state of package 0.338.104.
+
 **Baseline:** `0.330.48` (`GREENHAVEN-0.330.48-MAINTAINED-SNAPSHOT.zip`)
 **Last updated:** 2026-11-08
 **Policy:** A stage is not Verified complete until implementation, automated regression checks, supported-runtime verification, and required integration/runtime acceptance evidence are available. Static source checks alone do not establish production or Testnet readiness.

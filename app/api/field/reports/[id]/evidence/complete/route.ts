@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server"
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
-import { fieldTokenFromRequest } from "@/lib/server/field/access"
+import { fieldSessionScopeId } from "@/lib/server/field/access"
+import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
 import { checkDurableRateLimit, durableRateLimitCode, durableRateLimitStatus } from "@/lib/server/security/control-plane"
 import { finalizeScopedEvidenceUpload } from "@/lib/server/evidence/scoped-upload"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 const noStore = { "Cache-Control": "no-store" }
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const session = fieldTokenFromRequest(request)
-  if (!session) return NextResponse.json({ ok: false, error: "FIELD_AUTH_REQUIRED" }, { status: 401, headers: noStore })
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
+  const session = { jti: fieldSessionScopeId(access.auth.userId, access.auth.sessionId), label: access.auth.username || "Pioneer" }
   const { id } = await context.params
   if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ ok: false, error: "REPORT_NOT_FOUND" }, { status: 404, headers: noStore })
   const rate = await checkDurableRateLimit(`field-evidence-complete:${session.jti}`, 15, 60 * 60_000, { onUnavailable: "deny" })

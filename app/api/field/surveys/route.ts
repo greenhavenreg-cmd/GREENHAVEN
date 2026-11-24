@@ -1,18 +1,14 @@
 import { NextResponse } from "next/server"
-import { fieldTokenFromRequest } from "@/lib/server/field/access"
+import { fieldSessionScopeId } from "@/lib/server/field/access"
+import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
 import { listFieldSurveys } from "@/lib/server/field/store"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function GET(request: Request) {
-  const session = fieldTokenFromRequest(request)
-  if (!session) {
-    return NextResponse.json(
-      { ok: false, error: "FIELD_AUTH_REQUIRED" },
-      { status: 401, headers: { "Cache-Control": "no-store" } },
-    )
-  }
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
   return NextResponse.json(
     { ok: true, surveys: listFieldSurveys() },
     { headers: { "Cache-Control": "no-store" } },

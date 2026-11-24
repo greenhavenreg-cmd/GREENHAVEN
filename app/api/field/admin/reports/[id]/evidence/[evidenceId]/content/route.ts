@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server"
-import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
+import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
 import { readGhcServerEnv } from "@/lib/server/economy/env"
 import { supabaseRest } from "@/lib/server/supabase/rest-client"
 import { checkDurableRateLimit, durableRateLimitCode, durableRateLimitStatus } from "@/lib/server/security/control-plane"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export async function GET(request: Request, context: { params: Promise<{ id: string; evidenceId: string }> }) {
-  const auth = await resolveAuthenticatedUser(request.headers)
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
+  const auth = access.auth
   const admin = String(process.env.GHC_FIELD_ADMIN_USER_ID || "").trim()
-  if (!auth || !admin || auth.userId !== admin) return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403, headers: { "Cache-Control": "no-store" } })
+  if (!admin || auth.userId !== admin) return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403, headers: { "Cache-Control": "no-store" } })
   const rate = await checkDurableRateLimit(`field-evidence-content:${auth.userId}`, 60, 60_000, { onUnavailable: "deny" })
   if (!rate.ok) return NextResponse.json({ ok: false, error: durableRateLimitCode(rate) }, { status: durableRateLimitStatus(rate), headers: { "Cache-Control": "no-store" } })
   const { id, evidenceId } = await context.params

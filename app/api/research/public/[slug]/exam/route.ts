@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server"
-import { createHmac, randomInt, randomUUID } from "node:crypto"
+import { randomInt, randomUUID } from "node:crypto"
 import { supabaseRest, getServiceSupabaseConfig } from "@/lib/server/supabase/rest-client"
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
 import { checkDurableRateLimit, durableRateLimitCode, durableRateLimitStatus } from "@/lib/server/security/control-plane"
+import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
+import { researchRespondentHash } from "@/lib/server/research/respondent"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -12,11 +14,6 @@ type ExamConfig = { enabled?: boolean; durationSeconds?: number; maxAttempts?: n
 const asObject = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
 const shuffle = <T,>(items: T[]) => { const out = [...items]; for (let i = out.length - 1; i > 0; i--) { const j = randomInt(i + 1); [out[i], out[j]] = [out[j], out[i]] } return out }
 const cleanQuestion = (q: ExamQuestion) => { const { correctAnswer: _a, answerKey: _b, points: _p, ...safe } = q; return safe }
-function respondentHash(key: string) {
-  const secret = process.env.RESEARCH_EXAM_HASH_SECRET
-  if (!secret || secret.length < 32) return null
-  return createHmac("sha256", secret).update(key).digest("hex")
-}
 function validQuestion(q: ExamQuestion) {
   return typeof q.id === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(q.id) && (["short_text", "long_text"].includes(q.type) || (["single_choice", "dropdown"].includes(q.type) && Array.isArray(q.options) && q.options.length >= 2 && q.options.length <= 30 && q.options.every((v) => typeof v === "string" && v.length <= 180)))
 }
@@ -29,6 +26,8 @@ function normalizeAnswer(value: unknown, q: ExamQuestion) {
 }
 
 export async function POST(request: Request, context: { params: Promise<{ slug: string }> }) {
+  const access = await requireAccountSecurityContext(request.headers)
+  if (!access.ok) return access.response
   const { slug } = await context.params
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(slug)) return NextResponse.json({ ok: false, error: "EXAM_NOT_FOUND" }, { status: 404, headers: NO_STORE })
   const rawIp = request.headers.get("x-real-ip")?.trim() || "unknown"
@@ -40,9 +39,8 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   if (!getServiceSupabaseConfig()) return NextResponse.json({ ok: false, error: "RESEARCH_STORAGE_UNAVAILABLE" }, { status: 503, headers: NO_STORE })
   const body = parsed.value
   const action = typeof body.action === "string" ? body.action : ""
-  const respondentKey = typeof body.respondentKey === "string" ? body.respondentKey : ""
-  if (!new Set(["start", "save", "submit", "resume", "result"]).has(action) || !/^[A-Za-z0-9_-]{24,128}$/.test(respondentKey)) return NextResponse.json({ ok: false, error: "INVALID_EXAM_REQUEST" }, { status: 400, headers: NO_STORE })
-  const keyHash = respondentHash(respondentKey)
+  if (!new Set(["start", "save", "submit", "resume", "result"]).has(action)) return NextResponse.json({ ok: false, error: "INVALID_EXAM_REQUEST" }, { status: 400, headers: NO_STORE })
+  const keyHash = researchRespondentHash(access.auth.userId, process.env.RESEARCH_EXAM_HASH_SECRET)
   if (!keyHash) return NextResponse.json({ ok: false, error: "EXAM_SECURITY_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE })
   const projectResult = await supabaseRest<Array<Record<string, unknown>>>(`gh_research_projects?slug=eq.${encodeURIComponent(slug)}&status=eq.published&select=id,form_schema,settings&limit=1`)
   if (!projectResult.ok) return NextResponse.json({ ok: false, error: "EXAM_STORAGE_UNAVAILABLE" }, { status: 503, headers: NO_STORE })

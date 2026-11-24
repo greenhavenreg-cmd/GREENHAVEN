@@ -252,10 +252,10 @@ async function officialPiAuthenticate(): Promise<{
   if (typeof window === "undefined") {
     throw new Error("No window")
   }
-  // Sign-in needs identity only. Payment and wallet permissions are requested
-  // later, inside the specific payment/authorization flow that needs them.
-  // Keeping the payments scope out of bootstrap avoids making ordinary login
-  // depend on optional commerce permissions or payment capability.
+  // The official sign-in flow requests both username and payments scopes.
+  // Wallet-address permission remains separate and is requested only inside
+  // an explicit wallet-consent flow. The backend independently verifies the
+  // returned access token and identity before creating a GreenHaven session.
   return piAuthenticateOfficial(["username", "payments"])
 }
 

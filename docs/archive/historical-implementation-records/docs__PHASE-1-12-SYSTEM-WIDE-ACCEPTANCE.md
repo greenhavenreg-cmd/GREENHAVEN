@@ -1,5 +1,5 @@
-Current source baseline for this consolidated report: `0.338.104`
-- Current audit status (v0.338.104): RUN377 source-only identity/session ACL audit 17/17; RUN376 readiness policy 14/14; full static suite remains in progress/subject to the latest recorded result; identity/session grant migration is source-only pending confirmation of the exact Vercel Preview Supabase project reference. Node 24.15.0 dependency-backed typecheck/lint/build and live Pi Testnet sign-in remain required. Production NOT APPROVED.
+Current source baseline for this consolidated report: `0.338.105`
+- Current audit status (v0.338.105): RUN380 Pi-only Research and Field access controls are source-only; route policy 12/12, RUN380 boundary 16/16, Field foundation 22/22, Field intake 7/7, scoped evidence 26/26, Research integrity 12/12, timed examination/election workflow 22/22 and RUN300 release integrity 22/22. Full static verification is being re-run. Node 24.15.0 dependency-backed typecheck/lint/build, live Pi Browser Testnet sign-in and direct API bypass tests remain required. Production NOT APPROVED.
 - The historical phase snapshots below are preserved for audit context and are not evidence of current deployment or production acceptance.
 
 ---
