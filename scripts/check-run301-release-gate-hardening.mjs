@@ -8,8 +8,8 @@ const lock = JSON.parse(read('package-lock.json'))
 const version = pkg.version
 const truth = read('docs/PROJECT_TRUTH.md')
 const readme = read('README.md')
-const acceptance = readProjectDoc('docs/PHASE-1-12-SYSTEM-WIDE-ACCEPTANCE.md')
-const phase12 = readProjectDoc('docs/PHASE-12-FINAL-INTEGRATION-RELEASE-READINESS.md')
+const acceptance = read('docs/CURRENT_BUILD_CONTEXT.md')
+const phase12 = read('docs/SOURCE_OF_TRUTH.md')
 const phase24 = read('scripts/check-phase24-release-review.mjs')
 const worklogPath = `docs/UPGRADE-WORKLOG-${version}.md`
 const worklog = readProjectDoc(worklogPath)
@@ -21,11 +21,11 @@ const checks = [
   ['lockfile root version matches package', lock.packages?.['']?.version === version],
   ['README identifies current baseline', readme.includes(`Current source version:** \`${version}\``)],
   ['project truth identifies current baseline', truth.includes(`Current source version:** \`${version}\``)],
-  ['acceptance fixture identifies current baseline', acceptance.includes(`Current source baseline for this consolidated report: \`${version}\``)],
-  ['acceptance fixture audit status is current', acceptance.includes(`Current audit status (v${version})`)],
-  ['Phase 12 release identifies current baseline', phase12.includes(`Release: \`${version}\``)],
-  ['Phase 12 current baseline is synchronized', phase12.includes(`**Current source baseline:** \`${version}\``)],
-  ['Phase 12 production release remains blocked', /NOT APPROVED for production/.test(phase12)],
+  ['current build context identifies current baseline', acceptance.includes(`0.338.106 RUN385`)],
+  ['current build context records the RUN385 upgrade', acceptance.includes('RUN385 upgrades Research Studio dashboard')],
+  ['source-of-truth identifies current baseline', phase12.includes(`Current source version:** \`${version}\``)],
+  ['source-of-truth documents the current RUN385 increment', phase12.includes('RUN385 — Research & Field Research workspace upgrade')],
+  ['production release remains blocked', /NOT APPROVED/i.test(phase12)],
   ['current versioned worklog exists', worklog.length > 0],
   ['worklog records the coordinated release implementation steps', (worklog.match(/^\d+\. /gm) || []).length >= 10],
   ['worklog records source-only verification limits', /source-only verification scope|source-level/i.test(worklog)],

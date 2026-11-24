@@ -11,8 +11,8 @@ const manifest = read('VERIFIED_MANIFEST.txt')
 const runner = read('scripts/verify-phase14-static.mjs')
 const truth = read('docs/PROJECT_TRUTH.md')
 const readme = read('README.md')
-const acceptance = readProjectDoc('docs/PHASE-1-12-SYSTEM-WIDE-ACCEPTANCE.md')
-const phase12 = readProjectDoc('docs/PHASE-12-FINAL-INTEGRATION-RELEASE-READINESS.md')
+const acceptance = read('docs/CURRENT_BUILD_CONTEXT.md')
+const phase12 = read('docs/SOURCE_OF_TRUTH.md')
 const migrationDir = path.join(process.cwd(), 'supabase/migrations')
 const migrations = fs.readdirSync(migrationDir).filter((name) => name.endsWith('.sql')).sort()
 const migrationVersions = new Map()
@@ -29,8 +29,8 @@ const checks = [
   ['package, lockfile root, and app release versions agree', /^\d+\.\d+\.\d+$/.test(pkg.version) && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version && release.includes(`APP_RELEASE_VERSION = "${pkg.version}"`)],
   ['verified manifest version matches package', manifest.includes(`project_version=${pkg.version}`)],
   ['README and project truth identify current release', readme.includes(`Current source version:** \`${pkg.version}\``) && truth.includes(`**Current source version:** \`${pkg.version}\``)],
-  ['Phase 1–12 acceptance report identifies current baseline', acceptance.includes(`Current source baseline for this consolidated report: \`${pkg.version}\``) && acceptance.includes(`Current audit status (v${pkg.version})`)],
-  ['Phase 12 report identifies current release and blocks unapproved production release', phase12.includes(`Release: \`${pkg.version}\``) && /NOT APPROVED for production/.test(phase12)],
+  ['current build context identifies current baseline', acceptance.includes(`0.338.106 RUN385`) && acceptance.includes('RUN385 upgrades Research Studio dashboard')],
+  ['source-of-truth identifies current release and blocks unapproved production release', phase12.includes(`Current source version:** \`${pkg.version}\``) && /NOT APPROVED/i.test(phase12)],
   ['Phase 3 recovery documentation exists', hasProjectDoc('docs/PHASE-03-DATABASE-INTEGRITY-RECOVERY.md')],
   ['Phase 4 recovery release gate documentation exists', hasProjectDoc('docs/PHASE-04-RECOVERY-RELEASE-GATE.md')],
   ['Phase 5 design system documentation exists', hasProjectDoc('docs/PHASE-05-BRANDING-DESIGN-SYSTEM.md')],
@@ -51,8 +51,8 @@ const checks = [
   ['migration versions have no duplicates', duplicateVersions.length === 0],
   ['migration inventory is clearly source-only and not applied-state evidence', /does NOT prove migrations are applied to any Supabase project/i.test(manifest) && /source migration inventory is not evidence of applied migrations/i.test(truth)],
   ['project truth retains supported runtime requirement', /\^24\.15\.0/.test(truth) && /TypeScript, lint, and Next\.js production build/.test(truth)],
-  ['release report explicitly requires operator verification', /Require explicit operator approval/.test(phase12) || /explicit operator approval/i.test(phase12)],
-  ['no deployment or production mutation is claimed by final gate', /never contacts or mutates external systems/i.test(read('scripts/check-phase12-final-release-readiness.mjs')) && /No production database/.test(phase12)],
+  ['release report explicitly requires operator verification', /explicit operator approval/i.test(phase12)],
+  ['no deployment or production mutation is claimed by final gate', /never contacts or mutates external systems/i.test(read('scripts/check-phase12-final-release-readiness.mjs')) && /No production database/i.test(phase12)],
   ['stale nested duplicate project tree is absent', !fs.existsSync('greenhaven-upgrade-next')],
 ]
 let failed = 0

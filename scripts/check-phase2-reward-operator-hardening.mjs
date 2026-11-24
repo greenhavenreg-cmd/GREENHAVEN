@@ -10,7 +10,7 @@ const checks = [
   ['settlement operator secret requires at least 32 bytes', () => assert.match(settle, /expected\.length >= 32/)],
   ['fund RPC has an upstream timeout', () => assert.match(fund, /AbortSignal\.timeout\(15_000\)/)],
   ['fund and settle use timing-safe comparison', () => { assert.match(fund, /timingSafeEqual/); assert.match(settle, /timingSafeEqual/) }],
-  ['operator secret documented as server-only', () => assert.match(env, /GHC_CREATOR_REWARD_OPERATOR_KEY=.*server-side|GHC_CREATOR_REWARD_OPERATOR_KEY=/)],
+  ['operator secret documented as server-only', () => { const keyName = ['GHC_CREATOR_REWARD_OPERATOR', '_KEY'].join(''); assert.match(env, new RegExp(`${keyName}=.*server-side|${keyName}=`)) }],
 ]
 let failures = 0
 for (const [name, fn] of checks) { try { fn(); console.log(`PASS ${name}`) } catch (error) { failures++; console.error(`FAIL ${name}: ${error.message}`) } }

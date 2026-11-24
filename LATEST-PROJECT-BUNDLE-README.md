@@ -1,15 +1,16 @@
 # GreenHaven — Current Project Bundle
 
-**Package:** `gh-connect@0.338.104`  
-**Working increment:** RUN377 — Pi identity/session ACL repair, migration-history reconciliation and live health-probe correction  
-**Baseline:** user-designated RUN375 Pi SDK early-load archive; RUN376 and RUN377 are subsequent source/database remediation increments.  
-**Date:** 2026-11-23  
+**Package:** `gh-connect@0.338.106`  
+**Working increment:** RUN385 — Research & Field Research workspace upgrade, derived from the RUN384 full project audit archive  
+**Baseline:** RUN384 full project audit archive; RUN385 is a source-only derivative. RUN379–RUN384 are retained as parent and audit history.  
+**Date:** 2026-11-24  
 **Release status:** **NOT APPROVED** for production.
 
 ## Delivery identity
 
-This RUN377 archive is the current source baseline. It supersedes the RUN372 archive description below. The Testnet ACL repair is applied and postflight-verified; the source migration filename now matches remote version `20261123145603`. The live health route performs read-only PostgREST probes. The source has not been pushed to GitHub or deployed to Vercel; Node 24.15.x build and real Pi Browser acceptance remain outstanding.
+This RUN385 source bundle is package `gh-connect@0.338.106`, derived from `GREENHAVEN-0.338.105-RUN384-FULL-PROJECT-AUDIT-2026-11-24.zip`. RUN385 upgrades the Research Studio dashboard with lifecycle totals, study search and status filtering; adds a guarded CSV export for the latest 200 owner-inbox responses; corrects Pioneer share-link messaging to require Pi Browser and verified Pi identity; adds a Field Desk session-verification loading state; and marks the private Studio page no-index/no-follow. The RUN385 static gate passes 15/15 and is registered in static and prebuild verification.
 
+This remains a source-only candidate. GitHub Contents write access was previously denied (HTTP 403); no push or Vercel deployment is claimed. No Supabase migration was applied, no database write was made, and Production/Mainnet and all financial state remain untouched. The package requires Node `^24.15.0`; the current working runtime is Node 22.16.0 without installed dependencies, so dependency-backed typecheck/lint/build and live browser/device acceptance remain release gates. Production remains NOT APPROVED.
 
 ## Historical RUN372 — canonical identity principal consolidation
 
@@ -26,6 +27,19 @@ RUN341 separates the actual Pi app UID from the canonical internal GreenHaven us
 7. Corrected final-release audit network classification to use `PI_NETWORK` rather than `PI_ENV`, and made the reported release version derive from `APP_RELEASE_VERSION`.
 8. Preserved server-side financial authority, Testnet-only payout fences, no mock backends, and Mainnet separation.
 
+## RUN383 — identity/privacy grants and release-gate repair
+
+1. Read-only Vercel Preview runtime inspection found three `/api/profile/me` upsert failures with HTTP 403.
+2. Read-only Supabase catalog inspection confirmed no service_role SELECT/INSERT/UPDATE grants on `gh_user_profiles`, `gh_user_achievements`, `gh_user_progress`, or `gh_user_mutes`; RLS was enabled and client SELECT remained denied.
+3. Added `20261124095500_run383_identity_privacy_service_role_grants.sql` with explicit least-privilege grants and client-role revocations. It is classified REVIEW_REQUIRED; it has not been applied.
+4. Confirmed Testnet migration history includes daily-claim 48-hour lock/issuance and registration-bonus reconciliation migrations. The daily claim RPCs and registration bonus RPCs are SECURITY DEFINER, service_role-only.
+5. Confirmed the Testnet Preview welcome-bonus flag is false while Pi sandbox/network flags are Testnet; the 3 PI bonus remains intentionally disabled pending explicit financial-feature approval.
+6. Added the missing blank server-only `GHC_CREATOR_REWARD_OPERATOR_KEY` placeholder to `.env.example` and registered its 7/7 contract gate.
+7. Corrected the privileged reward body-bound regression to check the shared bounded-reader contract; 13/13.
+8. Full static verification passes (63/63 inherited summary plus RUN383 9/9 and operator-key 7/7); migration inventory 233/233; documentation hygiene passes.
+9. Dependency registry access remains unavailable (`EAI_AGAIN`); no package versions or lockfile integrity data were edited. The stored dependency audit remains a release blocker.
+10. Vercel reports a `readable-secret` issue on the Testnet Preview `GHC_OPERATOR_RECONCILE_KEY`; an attempted type reclassification returned 404. No Vercel environment value was changed.
+
 ## RUN337 GitHub Actions audit / packaging repair
 
 1. Restored the exact safe `.env.example` template from the parent of the failing GitHub commit. It contains blank privileged secrets, Testnet-only Pi defaults and disabled payout/A2U execution. Local populated env files remain excluded.
@@ -35,6 +49,10 @@ RUN341 separates the actual Pi app UID from the canonical internal GreenHaven us
 5. Inspected GitHub audit artifact 14397778034: 29 findings (2 critical, 21 high, 5 moderate, 1 low). Dependency manifest and lockfile were intentionally not modified because this container cannot access the npm registry and the official `pi-backend@0.1.3` → `stellar-sdk@10.4.1` chain has no safe automatic fix in the report. No lockfile hashes were fabricated, no `npm audit fix --force` was used, and the security gate was not bypassed.
 
 RUN337 repairs the prebuild `.env.example` failure and makes the audit failure diagnostic accurate. The complete audit JSON is preserved in `docs/security/RUN337-NPM-AUDIT-44237574920.json`. It does **not** make the dependency audit pass: 29 findings (2 critical, 21 high, 5 moderate, 1 low) remain. Dependency remediation and a fresh Node 24.15.x clean install/audit remain release blockers. See `docs/RUN337-GITHUB-AUDIT-AND-ENV-TEMPLATE-REPAIR-2026-11-18.md`.
+
+## RUN383 dependency security status
+
+The stored npm audit artifact still reports 29 findings (2 critical, 21 high, 5 moderate, 1 low). The current lock contains affected package versions. The npm registry request failed with `EAI_AGAIN`, and this workspace is Node 22.16.0 rather than the required Node 24.15.x. No dependency or lockfile changes were made without registry metadata and a clean install/test. Dependency remediation remains a release blocker.
 
 ## RUN336 GitHub / Vercel build cleanup
 

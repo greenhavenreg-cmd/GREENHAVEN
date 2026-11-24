@@ -16,56 +16,61 @@ function envTrue(name: string): boolean {
   }
 }
 
-/** Explicit operator unlock (Vercel: GHC_TESTNET_UNLOCK=1). */
+function configuredFlag(...names: string[]): boolean | undefined {
+  for (const name of names) {
+    const raw = String(process.env[name] ?? "").trim()
+    if (raw) return envTrue(name)
+  }
+  return undefined
+}
+
+function isTestnetRuntime(): boolean {
+  const network = String(process.env.PI_NETWORK || "").trim().toLowerCase()
+  const vercelEnvironment = String(process.env.VERCEL_ENV || "").trim().toLowerCase()
+  // A sandbox flag is not proof of Testnet when the configured blockchain
+  // network is Mainnet or unknown. Production deployments never inherit the
+  // Testnet exercise unlock, even if a stale Preview flag was copied across.
+  return network === "testnet" && vercelEnvironment !== "production"
+}
+
+/** Explicit operator unlock (only when PI_NETWORK=testnet outside Production). */
 export function isExplicitTestnetUnlock(): boolean {
+  if (!isTestnetRuntime()) return false
   return envTrue("GHC_TESTNET_UNLOCK") || envTrue("NEXT_PUBLIC_GHC_TESTNET_UNLOCK")
 }
 
-/** Pi sandbox / testnet network. */
+/** Pi sandbox / Testnet network. */
 export function isPiSandboxEnv(): boolean {
+  if (!isTestnetRuntime()) return false
   if (envTrue("NEXT_PUBLIC_PI_SANDBOX")) return true
-  if (String(process.env.PI_ENV || "").toLowerCase() === "sandbox") return true
-  // Vercel Preview is treated as non-mainnet for product exercise
-  if (String(process.env.VERCEL_ENV || "").toLowerCase() === "preview") return true
-  return false
+  if (String(process.env.PI_ENV || "").trim().toLowerCase() === "sandbox") return true
+  // Preview is a sandbox only when the blockchain network is explicitly Testnet.
+  return String(process.env.VERCEL_ENV || "").trim().toLowerCase() === "preview"
 }
 
-/**
- * Full product exercise mode: sandbox OR explicit unlock.
- * Use for activity rewards, curation redistribute, Pi→GHC packs, marketplace fees.
- */
+/** Full Testnet product exercise mode; Mainnet and unknown networks fail closed. */
 export function isTestnetProductUnlocked(): boolean {
-  return isExplicitTestnetUnlock() || isPiSandboxEnv()
+  return isTestnetRuntime() && (isExplicitTestnetUnlock() || isPiSandboxEnv())
 }
 
 export function activityRewardsEnabled(): boolean {
-  if (envTrue("GHC_ACTIVITY_REWARDS_ENABLED")) return true
-  return isTestnetProductUnlocked()
+  const configured = configuredFlag("GHC_ACTIVITY_REWARDS_ENABLED")
+  return configured ?? isTestnetProductUnlocked()
 }
 
 export function curationRedistributeEnabled(): boolean {
-  if (
-    envTrue("GHC_CURATION_REDISTRIBUTE_ENABLED") ||
-    envTrue("NEXT_PUBLIC_GHC_CURATION_REDISTRIBUTE_ENABLED")
-  ) {
-    return true
-  }
-  return isTestnetProductUnlocked()
+  const configured = configuredFlag("GHC_CURATION_REDISTRIBUTE_ENABLED", "NEXT_PUBLIC_GHC_CURATION_REDISTRIBUTE_ENABLED")
+  return configured ?? isTestnetProductUnlocked()
 }
 
 export function referralSettlementEnabled(): boolean {
-  if (
-    envTrue("GHC_REFERRAL_SETTLEMENT_ENABLED") ||
-    envTrue("NEXT_PUBLIC_GHC_REFERRAL_SETTLEMENT_ENABLED")
-  ) {
-    return true
-  }
-  return isTestnetProductUnlocked()
+  const configured = configuredFlag("GHC_REFERRAL_SETTLEMENT_ENABLED", "NEXT_PUBLIC_GHC_REFERRAL_SETTLEMENT_ENABLED")
+  return configured ?? isTestnetProductUnlocked()
 }
 
 export function buyGhcWithPiEnabled(): boolean {
-  if (envTrue("GHC_BUY_WITH_PI_ENABLED")) return true
-  return isTestnetProductUnlocked()
+  const configured = configuredFlag("GHC_BUY_WITH_PI_ENABLED")
+  return configured ?? isTestnetProductUnlocked()
 }
 
 export function testnetUnlockSnapshot() {

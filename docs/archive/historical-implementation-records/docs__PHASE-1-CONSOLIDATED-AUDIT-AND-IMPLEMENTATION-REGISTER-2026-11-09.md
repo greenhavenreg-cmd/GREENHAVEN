@@ -5,7 +5,7 @@
 **Authoritative source archive:** `GREENHAVEN-0.338.55-RUN292-MOBILE-WALLET-AUDIT.zip`  
 **Current project package:** `gh-connect@0.338.99`
 
-**Current in-place maintenance derivative:** `gh-connect@0.338.99` (authoritative source archive dated 2026-11-17); the audit findings and historical baseline below remain preserved. Older Run #250–310 snapshots are historical references, not current release pointers.  
+**Current in-place maintenance derivative:** `gh-connect@0.338.106` (RUN385 source-only derivative of the RUN384 audit archive, 2026-11-24); the audit findings and historical baseline below remain preserved. Older Run #250–310 snapshots are historical references, not current release pointers.  
 **Phase:** 1 of the ten-phase completion roadmap — authoritative baseline and complete audit  
 **Disposition:** **Source inventory and selected contracts verified; Phase 1 is NOT fully closed. Production remains NOT APPROVED.**
 

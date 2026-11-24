@@ -1,4 +1,4 @@
-# Current project truth — 0.338.105 RUN382 Supabase REST JSON transport correction (2026-11-24)
+# Current project truth — 0.338.106 RUN385 Research & Field Research workspace upgrade (2026-11-24)
 
 - User-designated parent baseline is `GREENHAVEN-0.338.104-RUN379-ACCESS-AUDIT-RECONCILED-2026-11-24.zip`. RUN379 includes the inherited RUN377 identity/session ACL work and adds token-safe requested-scope/CSP diagnostics. The current audit edits are local source changes only; no push or deployment is claimed.
 - Inherited RUN373–RUN375 checks remain part of the supplied parent baseline. RUN377 ACL source contract 17/17; RUN376 readiness-policy regression 14 assertions; project-truth 11/11; release hygiene 17/17; migration inventory 232/232 synchronized. The 2026-11-24 RUN379 audit records `npm run verify:static` completing with exit code 0, 4,738 PASS lines, and zero FAIL lines. This is static verification only; it does not certify dependency-backed typecheck/lint/build or live acceptance.
@@ -7,15 +7,27 @@
 - RUN372 establishes one canonical GreenHaven account principal (`userId`) from the durable server-verified Pi→GreenHaven mapping. The Pi UID is retained only as the authentication-provider subject and a transitional legacy lookup alias; it is not allowed to become a GreenHaven account ID before mapping verification.
 - Pi SDK identity alone now remains unbound (`current-user` local placeholder). Profile hydration cannot promote an unverified Pi subject into an account. `server_verified` requires both a Pi UID and a non-placeholder canonical account ID. Account switches clear prior account-bound credentials and state.
 - Existing `gh_pi_identities`, `gh_sessions`, wallet, ledger, marketplace, membership and community records continue using their established canonical GreenHaven user key. No mass identity rewrite or database migration is included. Transitional Pi UID aliases are not authorization evidence and must not be used by server-side financial ownership checks.
-- RUN372 identity principal checks: 9/9; canonical identity runtime: 44 assertions; Phase 2 canonical identity: 18/18; Phase 4 identity authentication: 16/16; Phase 4 identity integration: 17/17; Phase 4 identity/community/messaging: 32/32; Run 250 immutable mapping integrity: 10/10; Run 251 RPC ACL: 8/8; Run 252 search-path hardening: 5/5; account-switch engagement: 15/15; Pi auth scope isolation: 6/6; profile identity snapshot: 8/8 plus 13 runtime assertions.
+- RUN372 identity principal checks: 9/9; canonical identity runtime: 44 assertions; Phase 2 canonical identity: 18/18; Phase 4 identity authentication: 16/16; Phase 4 identity integration: 17/17; Phase 4 identity/community/messaging: 32/32; Run 250 immutable mapping integrity: 10/10; Run 251 RPC ACL: 8/8; Run 252 search-path hardening: 5/5; account-switch engagement: 19/19; Pi auth scope isolation: 6/6; profile identity snapshot: 8/8 plus 13 runtime assertions.
 - Node 22.16.0 is available in this workspace; the project requires Node `^24.15.0`. Dependency-backed typecheck, lint and production build are not claimed. Live Testnet two-account, cross-device and IDOR acceptance remain outstanding. Production remains NOT APPROVED.
 - No database writes, migrations, wallet/payment operations, GitHub push, Vercel deployment or Mainnet actions were performed.
 
-**Current source version:** `0.338.105`  
-**Package identity:** `gh-connect@0.338.105`  
+**Current source version:** `0.338.106`  
+**Package identity:** `gh-connect@0.338.106`  
 **Authoritative parent archive:** RUN379 access-audit reconciled archive  
-**Current local working tree:** RUN382 Supabase REST JSON content-type correction on RUN381; GitHub write access denied; not pushed or deployed.  
+**Current local working tree:** RUN385 Research & Field Research upgrade derivative; GitHub write access and Vercel deployment remain pending; not pushed or deployed.  
 **Current status:** **NOT APPROVED** for production.
+
+## RUN385 — Research & Field Research workspace upgrade (2026-11-24)
+
+RUN385 adds the operational dashboard, study search/status filters, guarded latest-200 CSV export, Pi Browser-only response-link messaging, Field Desk session-verification loading state and no-index Research Studio metadata. Static verification completed successfully. This is source-only; no push, deployment or migration was performed. Full Node 24.15.0 dependency-backed typecheck/lint/build and live Pi Browser acceptance remain required.
+
+## RUN384 — full project audit and targeted hardening (2026-11-24)
+
+The live GitHub/Vercel Testnet branch remains at commit `06122b28a5d96ef301e1eb10d344af51c3005702`; RUN384 is local only. Full `npm run verify:static` passes 63/63; the RUN384 focused source contract passes 13/13, unlock runtime/feature-off checks 9/9, and repository secret-pattern scan reports zero potential secret values across 2,788 text files. The connected Supabase project is healthy and its 234 applied migration versions are reconciled against the source inventory after restoring two missing historical call migration files from the live catalog (explicitly marked reconstructed, not byte-identical). RUN384 adds a held least-privilege identity/privacy grant migration, a held 17-FK-index migration, held method-scoped service_role grants for 13 additional server REST tables, a root SECURITY.md, and a repository secret-pattern gate, a Mainnet/unknown-network fence for Testnet exercise unlocks, fail-closed `.env.example` feature defaults, and direct-media bucket provisioning failure handling. Supabase reports no RLS-disabled public tables, no anon/authenticated direct table grants, and no public/anon/authenticated execution of the inspected SECURITY DEFINER functions. Thirty-seven no-policy tables remain server-only and intentionally denied to clients. The 3 PI welcome bonus remains disabled by the existing Preview flag; no GHC/PI credit was issued. Full details and limits are in `docs/RUN384-FULL-PROJECT-AUDIT-2026-11-24.md`.
+
+## RUN383 — identity and feed-privacy service-role grants (2026-11-24)
+
+Preview runtime logs on the existing `testnet` deployment showed three durable profile upsert failures (HTTP 403). RUN383 adds a held, additive migration with least-privilege `service_role` grants for the server-owned profile, achievement, progress-read and feed mute-list tables while preserving RLS and denying all table privileges to `PUBLIC`, `anon`, and `authenticated`. The supplied feed privacy error may share the missing mute-table grant cause, but that exact runtime error was not found in the recent logs. The live Supabase catalog confirms all four tables lacked service_role table privileges while RLS and client-deny state remained intact; the new migration is `REVIEW_REQUIRED` and has not been applied. Daily-claim and registration-bonus migrations/RPC ACLs are already present in Testnet history. Vercel Preview currently has `GHC_REGISTRATION_BONUS_ENABLED=false`, so the 3 PI welcome bonus is intentionally gated off. RUN383 regression check: 9/9; full static suite passed.
 
 ## RUN382 — Supabase REST JSON content-type correction
 

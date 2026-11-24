@@ -2,13 +2,13 @@ GH-CONNECT VERIFIED SOURCE MANIFEST
 ==================================
 inventory_status=OK
 duplicate_version_prefixes=
-project_version=0.338.105
+project_version=0.338.106
 manifest_format_version=1
-canonical_migrations=232
+canonical_migrations=237
 classification_required=122
 classification_requires_approval=1
 classification_proposal=2
-classification_review_required=107
+classification_review_required=112
 source=supabase/migrations/*.sql
 
 IMPORTANT: This manifest inventories repository files only. It does NOT prove migrations are applied to any Supabase project.
@@ -238,6 +238,7 @@ ALL_MIGRATIONS_ORDERED_FOR_REVIEW:
 [REVIEW_REQUIRED] size=372 path=supabase/migrations/20261110193134_social_feed_profile_rpc_search_path_hardening.sql
 [REVIEW_REQUIRED] size=1528 path=supabase/migrations/20261110200001_supporting_foreign_key_indexes.sql
 [REVIEW_REQUIRED] size=10255 path=supabase/migrations/20261110210001_pi_a2u_ecosystem_qualification.sql
+[REVIEW_REQUIRED] size=5960 path=supabase/migrations/20261111064320_gh_direct_call_tables_foundation.sql
 [REVIEW_REQUIRED] size=13449 path=supabase/migrations/20261111064321_call_pair_lock_order_and_retry_safety.sql
 [REVIEW_REQUIRED] size=4078 path=supabase/migrations/20261111064446_call_expiry_sweeper_before_start.sql
 [REVIEW_REQUIRED] size=4539 path=supabase/migrations/20261111064542_call_expiry_sweeper_pair_lock_order.sql
@@ -253,4 +254,8 @@ ALL_MIGRATIONS_ORDERED_FOR_REVIEW:
 [REVIEW_REQUIRED] size=10637 path=supabase/migrations/20261117010001_gh_evidence_scoped_upload_chain_of_custody.sql
 [REQUIRED] size=574 path=supabase/migrations/20261118033839_revoke_client_select_on_server_only_tables.sql
 [REQUIRED] size=1788 path=supabase/migrations/20261118194252_testnet_a2u_network_fence.sql
+[REVIEW_REQUIRED] size=632 path=supabase/migrations/20261122133100_gh_call_sessions_conversation_fk_index.sql
 [REVIEW_REQUIRED] size=1080 path=supabase/migrations/20261123145603_gh_identity_session_service_role_grants.sql
+[REVIEW_REQUIRED] size=1304 path=supabase/migrations/20261124095500_run383_identity_privacy_service_role_grants.sql
+[REVIEW_REQUIRED] size=2440 path=supabase/migrations/20261124110000_run384_research_foreign_key_indexes.sql
+[REVIEW_REQUIRED] size=3206 path=supabase/migrations/20261124120000_run384_server_rest_table_grants.sql

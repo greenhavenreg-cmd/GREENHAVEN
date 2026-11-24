@@ -1,13 +1,25 @@
-# GreenHaven source authority — 0.338.105 RUN382 Supabase REST JSON transport correction (2026-11-24)
+# GreenHaven source authority — 0.338.106 RUN385 Research & Field Research upgrade (2026-11-24)
 
-**Current source version:** `0.338.105`
+**Current source version:** `0.338.106`
 **Authoritative parent archive:** `GREENHAVEN-0.338.104-RUN379-ACCESS-AUDIT-RECONCILED-2026-11-24.zip`
-**Current working tree:** RUN382 source-only Supabase REST JSON content-type correction on RUN381/RUN380, derived from the reconciled RUN379 archive. Pi-only Research/Field access controls, exact-origin Pi CSP correction and shared JSON transport correction are source implemented; static verification passes. GitHub write access is currently denied; not pushed or deployed.
-**Package identity:** `gh-connect@0.338.105` (user-facing brand: GREENHAVEN).
+**Current working tree:** RUN385 source-only Research & Field Research upgrade derived from the RUN384 full project audit archive. It adds a Testnet network fence, explicit feature-off precedence, fail-closed example feature flags, a canonical-identity fallback for the daily-claim FAB, media bucket failure handling, two catalog-recovered historical migration sources, a held 17-index performance migration, and held method-scoped grants for 13 additional server REST tables. RUN383/RUN384 are not yet pushed or deployed.
+**Package identity:** `gh-connect@0.338.106` (user-facing brand: GREENHAVEN).
 
-The reconciled RUN379 archive uploaded on 2026-11-24 is the sole authoritative parent baseline for this derivative. RUN375–RUN377 are inherited historical implementation increments, not alternative current baselines. Preserve the established architecture, canonical GreenHaven identity principal, financial authority boundaries, server-side Pi token verification, and dedicated release checks. Do not use an older archive or historical document to override the RUN379 source.
+Any Testnet migration application, GitHub push, Vercel Preview deployment or Production/Mainnet change requires its own explicit operator approval and verified target. No Production database, balances, payments, orders, entitlements or Mainnet migrations are changed by RUN385. The reconciled RUN379 archive uploaded on 2026-11-24 is the sole authoritative parent baseline for this derivative. RUN375–RUN377 are inherited historical implementation increments, not alternative current baselines. Preserve the established architecture, canonical GreenHaven identity principal, financial authority boundaries, server-side Pi token verification, and dedicated release checks. Do not use an older archive or historical document to override the RUN379 source.
 
 The RUN331/RUN332/RUN364 notes and earlier RUN worklogs below are historical implementation records only. The current executable source and this RUN382 authority header take precedence.
+
+## RUN385 — Research & Field Research workspace upgrade (2026-11-24)
+
+RUN385 reorganizes the Research Studio home with project lifecycle metrics, search and status filters; adds a guarded CSV export for the latest 200 owner-inbox responses; corrects Pioneer share-link messaging to state the Pi Browser and server-verified identity requirement; adds a Field Desk session-verification loading state; and marks the private Studio page no-index/no-follow. The RUN385 gate passes 19/19 and is included in static/prebuild checks. See `docs/RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.md`. This is a source-only increment; no push, deployment or database migration occurred.
+
+## RUN384 — full project audit and targeted hardening (2026-11-24)
+
+The current live target comparison is documented in `docs/RUN384-FULL-PROJECT-AUDIT-2026-11-24.md`. GitHub `testnet` and the READY Vercel Preview remain at commit `06122b28a5d96ef301e1eb10d344af51c3005702`; RUN384 is local only. The connected Supabase Testnet project is `jhlsjnmfpakvibuuoygx`, healthy on PostgreSQL 17.12, with 234 applied migration records. RUN384 restores the two applied-but-missing call migration source files from the live catalog as explicitly reconstructed sources, adds two held migrations (RUN383 least-privilege identity/privacy grants and RUN384 17 foreign-key indexes), hardens Testnet unlock network fencing, changes `.env.example` financial feature defaults to off, and makes direct media upload fail clearly when private bucket provisioning fails. Neither new migration has been applied. No Production/Mainnet or financial data changes occurred.
+
+## RUN383 — identity and feed-privacy service-role grants (2026-11-24)
+
+Preview runtime logs on the existing `testnet` deployment showed three durable profile upsert failures (HTTP 403). RUN383 adds a held, additive migration with least-privilege `service_role` grants for the server-owned profile, achievement, progress-read and feed mute-list tables while preserving RLS and denying all table privileges to `PUBLIC`, `anon`, and `authenticated`. The supplied feed privacy error may share the missing mute-table grant cause, but that exact runtime error was not found in the recent logs. The live Supabase catalog confirms all four tables lacked service_role table privileges while RLS and client-deny state remained intact; the new migration is `REVIEW_REQUIRED` and has not been applied. Daily-claim and registration-bonus migrations/RPC ACLs are already present in Testnet history. Vercel Preview currently has `GHC_REGISTRATION_BONUS_ENABLED=false`, so the 3 PI welcome bonus is intentionally gated off. RUN383 regression check: 9/9; full static suite passed.
 
 ## RUN382 — Supabase REST JSON content-type correction
 

@@ -17,6 +17,7 @@ import { notifyRewardClaimed } from "@/lib/notifications"
 import { postDailyClaim } from "@/lib/rewards/claim-daily-client"
 import { markDailyClaimedForUi, ghcForCycleDay } from "@/lib/domains/reward-level-domain"
 import { useSessionLock } from "@/contexts/session-lock-context"
+import { IdentityService } from "@/lib/identity/identity-service"
 
 type DoneState = {
   amount?: number
@@ -44,7 +45,15 @@ function formatRedeemable(iso?: string) {
 export function DailyClaimPrompt() {
   const { profile } = useGHCProfile()
   const { isLocked } = useSessionLock()
-  const userId = profile?.id || ""
+  // A transient profile-store failure must not hide the daily-claim entry point
+  // after Pi identity has already been server-verified and canonically mapped.
+  const identityUserId = IdentityService.getCurrentUserId()
+  const profileUserId = String(profile?.id || "").trim()
+  const userId = identityUserId && identityUserId !== "current-user" && identityUserId !== "anonymous"
+    ? identityUserId
+    : profileUserId && profileUserId !== "current-user" && profileUserId !== "anonymous"
+      ? profileUserId
+      : ""
   const { status, refresh } = useDailyClaimStatus(userId)
   const [mounted, setMounted] = useState(false)
   const [open, setOpen] = useState(false)

@@ -20,6 +20,7 @@ type Session = {
 export function FieldDeskClient() {
   const { signOut } = usePiAuth()
   const [session, setSession] = useState<Session | null>(null)
+  const [checkingSession, setCheckingSession] = useState(true)
   const [activeView, setActiveView] = useState<"overview" | "report" | "surveys">("overview")
 
   const [kind, setKind] = useState<"situation" | "result" | "general">("situation")
@@ -48,6 +49,8 @@ export function FieldDeskClient() {
     } catch {
       setSession({ configured: false, authenticated: false, label: null })
       return false
+    } finally {
+      setCheckingSession(false)
     }
   }, [])
 
@@ -213,11 +216,16 @@ export function FieldDeskClient() {
         ))}
       </div>
 
-      {!session?.authenticated ? (
+      {checkingSession ? (
+        <section className="mt-8 rounded-2xl border border-border bg-card p-5" role="status" aria-live="polite">
+          <p className="text-sm font-semibold">Verifying your Pioneer session…</p>
+          <p className="mt-1 text-xs text-muted-foreground">Research tools remain locked until the server confirms your authenticated GreenHaven session.</p>
+        </section>
+      ) : !session?.authenticated ? (
         <section className="mt-8 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5" aria-live="polite">
           <h2 className="text-lg font-semibold">Pi authentication required</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Complete official Pi SDK sign-in in Pi Browser. GreenHaven will then establish and verify your secure Pioneer session before enabling reports, surveys or evidence uploads.</p>
-          <button type="button" onClick={() => void refreshSession()} className="mt-4 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white">Retry secure session check</button>
+          <p className="mt-2 text-sm text-muted-foreground">Complete official Pi SDK sign-in inside Pi Browser. GreenHaven will then establish and verify your secure Pioneer session before enabling reports, surveys or evidence uploads. Other browsers and unverified sessions cannot participate.</p>
+          <button type="button" onClick={() => { setCheckingSession(true); void refreshSession() }} className="mt-4 min-h-11 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white">Retry secure session check</button>
         </section>
       ) : (
         <section className="mt-8 space-y-8">

@@ -88,8 +88,12 @@ export async function POST(request: Request) {
   }
 
   // Only attempt bucket provisioning after the authenticated request is bounded and valid.
+  // Do not continue into signed-URL creation if the private bucket could not be ensured.
   // The diagnostic GET endpoint is read-only and never provisions infrastructure.
-  await ensureMediaBucket(storageBucket)
+  const bucketReady = await ensureMediaBucket(storageBucket)
+  if (!bucketReady.ok) {
+    return jsonNoStore({ ok: false, error: "MEDIA_BUCKET_UNAVAILABLE" }, { status: 503 })
+  }
 
   const ext = isAudio
     ? (mime === "audio/mpeg" ? "mp3" : mime === "audio/mp4" ? "m4a" : mime === "audio/aac" ? "aac" : mime === "audio/ogg" ? "ogg" : mime === "audio/wav" ? "wav" : mime === "audio/flac" ? "flac" : "webm")
