@@ -61,6 +61,7 @@ const reviewRequired = new Set([
   '20261124095500_run383_identity_privacy_service_role_grants.sql',
   '20261124110000_run384_research_foreign_key_indexes.sql',
   '20261124120000_run384_server_rest_table_grants.sql',
+  '20261124143000_run390_marketplace_membership_feed_read_grants.sql',
   '20261124150000_run388_research_atomic_schedule_quota.sql',
   '20261110210001_pi_a2u_ecosystem_qualification.sql',
   '20261110182120_community_chat_membership_revocation_and_reconciliation.sql',
@@ -140,6 +141,7 @@ const reviewRequired = new Set([
 ])
 
 const notes = {
+  '20261124143000_run390_marketplace_membership_feed_read_grants.sql': 'RUN390 restores only service_role SELECT on four server-only tables required by live Membership status, feed mute privacy filtering, and Marketplace catalog reads. Live Testnet catalog inspection confirmed these four tables had no service_role SELECT privileges while RLS was enabled and client roles had no SELECT. Existing write paths remain SECURITY DEFINER RPC-only. REVIEW_REQUIRED: source sync first; apply as a versioned Testnet migration; verify grants, client denial, membership status, feed privacy, and marketplace catalog API before enabling payment acceptance. No payment, entitlement, listing, or mute records are modified.',
   '20261124120000_run384_server_rest_table_grants.sql': 'RUN384 least-privilege server REST access repair for 13 additional public tables referenced by server-side PostgREST call sites. The live catalog showed RLS enabled but no service_role table privileges; source method inspection constrained grants to SELECT/INSERT/UPDATE as required. PUBLIC, anon and authenticated are explicitly revoked. Financial state transitions remain RPC-only. REVIEW_REQUIRED: synchronize source first, verify the live target and rerun the direct-REST privilege audit after application.',
   '20261124150000_run388_research_atomic_schedule_quota.sql': 'RUN388 research study availability and response quota enforcement. Adds a service_role-only SECURITY DEFINER submission RPC that locks the project row, preserves submission idempotency, checks configured start/end times, and enforces response_limit atomically under concurrent submissions. REVIEW_REQUIRED: validate on disposable PostgreSQL, inspect pinned search_path and ACLs, verify lock behavior/idempotency/quota boundaries, then reconcile the exact Testnet migration history before applying. Deploy caller code only after the migration is applied and postflight-verified on Testnet.',
   '20261122133100_gh_call_sessions_conversation_fk_index.sql': 'RUN384 recovered the missing source file for the already-applied Testnet migration version 20261122133100. The live catalog confirms the conversation-leading index on public.gh_call_sessions(conversation_id, created_at DESC). The original SQL was not retrievable; this is a catalog-derived, idempotent reconstruction, not byte-identical original SQL. REVIEW_REQUIRED for any new target; the connected Testnet already records this version and must not replay it.',

@@ -26,5 +26,6 @@ Migration manifests, migration checklists, Testnet reconciliation reports, and o
 - [RUN386 Research Pagination & Complete Export](RUN386-RESEARCH-PAGINATION-AND-COMPLETE-EXPORT-2026-11-24.md)
 - [RUN387 Research Analytics](RUN387-RESEARCH-ANALYTICS-2026-11-24.md)
 - [RUN388 Research Schedule & Quota](RUN388-RESEARCH-SCHEDULE-AND-QUOTA-2026-11-24.md)
+- [RUN390 Membership, Feed and Marketplace Read Repair](RUN390-MEMBERSHIP-FEED-MARKETPLACE-READ-REPAIR-2026-11-24.md)
 - [RUN389 Research Team Roles](RUN389-RESEARCH-TEAM-ROLES-2026-11-24.md)
-- [0.338.110 RUN389 Upgrade Worklog](UPGRADE-WORKLOG-0.338.110.md)
+- [0.338.111 RUN390 Upgrade Worklog](UPGRADE-WORKLOG-0.338.111.md)

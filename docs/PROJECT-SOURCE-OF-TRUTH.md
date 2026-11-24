@@ -1,7 +1,7 @@
 # GreenHaven project source of truth
 
 ## Active authority
-- Current source derivative: RUN389 / `gh-connect@0.338.110`, based on `GREENHAVEN-0.338.106-RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.zip` and the RUN384 audit baseline. RUN386 adds response keyset pagination and bounded complete CSV export; RUN387 adds privacy-suppressed descriptive analytics; RUN388 adds study scheduling and atomically enforced response quotas; RUN389 adds server-enforced team role capabilities and member lifecycle controls. See `docs/SOURCE_OF_TRUTH.md` and the RUN386–RUN389 worklogs.
+- Current source derivative: RUN390 / `gh-connect@0.338.111`, based on `GREENHAVEN-0.338.106-RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.zip` and the RUN384 audit baseline. RUN386 adds response keyset pagination and bounded complete CSV export; RUN387 adds privacy-suppressed descriptive analytics; RUN388 adds study scheduling and atomically enforced response quotas; RUN389 adds server-enforced team role capabilities and member lifecycle controls; RUN390 repairs missing service-role read grants for Membership, Feed privacy and Marketplace catalogs (migration held for review). See `docs/SOURCE_OF_TRUTH.md` and the RUN386–RUN389 worklogs.
 - The RUN388 migration `20261124150000_run388_research_atomic_schedule_quota.sql` is REVIEW_REQUIRED and unapplied. Do not deploy the calling code until the migration is validated and applied to Testnet with postflight evidence.
 - The application source code in this repository is authoritative for implemented behavior.
 - `supabase/migrations/` is the ordered, immutable database change history. Never delete or rewrite applied migrations.

@@ -1,16 +1,20 @@
-# GreenHaven source authority — 0.338.110 RUN389 Research & Field Research readiness (2026-11-24)
+# GreenHaven source authority — 0.338.111 RUN390 Membership, Feed and Marketplace read-path repair (2026-11-24)
 
-**Current source version:** `0.338.110`
+**Current source version:** `0.338.111`
 **Authoritative working baseline:** `GREENHAVEN-0.338.106-RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.zip`  
 **Audit parent:** RUN384 full project audit and live Testnet/Preview reconciliation.  
-**Current working tree:** RUN389 source-only derivative of RUN385. RUN386 adds deterministic keyset pagination and bounded complete CSV export; RUN387 adds privacy-suppressed descriptive analytics; RUN388 adds scheduled study availability and atomic response quotas; RUN389 adds server-enforced owner/editor/reviewer/field-agent capabilities and team lifecycle controls.  
-**Package identity:** `gh-connect@0.338.110` (user-facing brand: GREENHAVEN).
+**Current working tree:** RUN390 source-only derivative of RUN389/RUN385. RUN390 adds a least-privilege read-grant migration for the live Membership, Feed privacy and Marketplace failures; it remains REVIEW_REQUIRED and unapplied. RUN386 adds deterministic keyset pagination and bounded complete CSV export; RUN387 adds privacy-suppressed descriptive analytics; RUN388 adds scheduled study availability and atomic response quotas; RUN389 adds server-enforced owner/editor/reviewer/field-agent capabilities and team lifecycle controls.  
+**Package identity:** `gh-connect@0.338.111` (user-facing brand: GREENHAVEN).
 
 This source remains a candidate, not a deployment. GitHub write permission was previously denied (HTTP 403); no push or Vercel deployment is claimed. The RUN388 migration is `REVIEW_REQUIRED`; do not deploy its calling code before disposable-PostgreSQL validation, Testnet history reconciliation, explicit operator approval, application and postflight verification. No Supabase migration has been applied by this work. No production database or Mainnet mutation occurred; source migration inventory is not evidence of applied migrations. Production, Mainnet, payment state, balances and financial records remain untouched. TypeScript, lint, and Next.js production build on supported Node 24.15.x remain release gates.
 
-Focused RUN385–RUN389 contracts pass 19/19, 17/17, 14/14, 16/16 and 21/21 respectively; full static verification passes 63/63, production-safety checks pass 21/21, and the secret-pattern scan reports zero potential values across 2,804 text files. These checks are source-level and do not replace Node 24.15.x dependency-backed build or live acceptance.
+Focused RUN385–RUN390 contracts pass 19/19, 17/17, 14/14, 16/16, 21/21 and 11/11 respectively; full static verification passes 63/63, production-safety checks pass 21/21, and the secret-pattern scan reports zero potential values across 2,808 text files. These checks are source-level and do not replace Node 24.15.x dependency-backed build or live acceptance.
 
 The established architecture remains authoritative: work only on GitHub `testnet` and Vercel Preview; preserve canonical GreenHaven identity, official Pi SDK authentication and server-side Pi Platform token verification; require durable GreenHaven sessions for Research/Field APIs; keep service-role credentials server-side; preserve RLS and client-deny grants; and do not infer cryptographic Pi Browser attestation from user-agent/referrer values. Node 24.15.x dependency-backed typecheck/lint/build, live Pi Browser and database acceptance remain release gates.
+
+## RUN390 — Membership, Feed Privacy and Marketplace read-path repair
+
+Live Testnet catalog inspection identified missing service_role SELECT privileges on `ghc_membership_entitlements`, `gh_user_mutes`, `gh_marketplace_listings`, and `gh_marketplace_variants`. These explain the three reported Preview failures. RUN390 adds a narrowly scoped migration that preserves RLS, denies client table access and grants service_role SELECT only; existing write RPCs remain the only write path. The migration is REVIEW_REQUIRED and unapplied. See `docs/RUN390-MEMBERSHIP-FEED-MARKETPLACE-READ-REPAIR-2026-11-24.md`.
 
 ## RUN389 — team collaboration and granular roles
 

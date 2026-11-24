@@ -1,13 +1,14 @@
-# Current project truth — 0.338.110 RUN389 Research & Field Research readiness (2026-11-24)
+# Current project truth — 0.338.111 RUN390 Membership, Feed and Marketplace read-path repair (2026-11-24)
 
-**Current source:** `gh-connect@0.338.110`, RUN388, derived from the authoritative RUN385 archive and retaining the RUN384 cross-system audit baseline. Source-only; not pushed or deployed.
+**Current source:** `gh-connect@0.338.111`, RUN390, derived from the authoritative RUN385 archive and retaining the RUN384 cross-system audit baseline. Source-only; not pushed or deployed.
 
-**Current source version:** `0.338.110`  
-**Package identity:** `gh-connect@0.338.110`
+**Current source version:** `0.338.111`  
+**Package identity:** `gh-connect@0.338.111`
 
 - RUN386: deterministic keyset pagination for research responses; 50-row inbox pages; de-duplicated load-more; complete cursor-traversing CSV export with a 20,000-response browser safety cap and formula-injection protection.
 - RUN387: owner-scoped descriptive analytics, numeric summary statistics, choice frequencies, date ranges, review-state counts, suppression of categories below five and exclusion of free-text content. Coverage is explicitly marked complete, bounded or unknown.
 - RUN388: optional study start/end dates and response quotas; database-side row locking and idempotency in a service-role-only submission RPC. Its migration is `REVIEW_REQUIRED` and unapplied. The new public submission caller must not be deployed before migration validation/application and Testnet postflight.
+- RUN390: restores missing Testnet service-role SELECT grants for membership entitlements, feed mute privacy, marketplace listings and marketplace variants. The migration preserves RLS/client denial, grants no write privileges and remains REVIEW_REQUIRED/unapplied.
 - RUN389: server-enforced role capabilities for owners, editors, reviewers and field agents; active/invited collaborator project listings; owner-controlled team invitations and lifecycle management; collaborator exam answer-key stripping; evidence read/attach/review permissions. Exam and election administration remains owner-only.
 - Pi Browser-only verified Pioneer access and durable GreenHaven session requirements remain intact. User-agent/referrer values are not treated as cryptographic proof of Pi Browser identity.
 - Existing research member roles are not yet a fully enforced permission matrix. Inbox and analytics remain project-owner-only; collaborator authorization must not be inferred from membership labels.
@@ -18,6 +19,10 @@
 **Authoritative working archive:** `GREENHAVEN-0.338.106-RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.zip`  
 **Audit parent:** RUN384 full project audit.  
 **Current status:** source candidate only; Testnet/Preview release gates remain outstanding.
+
+## RUN390 — server-side read permission repair
+
+RUN390 identifies the live Testnet causes of the three supplied Preview errors: service_role lacked SELECT on `ghc_membership_entitlements`, `gh_user_mutes`, `gh_marketplace_listings` and `gh_marketplace_variants`. A least-privilege migration grants SELECT only to service_role while preserving RLS and client-role denial. It remains REVIEW_REQUIRED and unapplied.
 
 ## RUN389 — team collaboration and granular permissions
 

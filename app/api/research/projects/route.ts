@@ -55,7 +55,7 @@ export async function GET(request: Request) {
     supabaseRest<Array<{ id: string; project_id: string; role: string; status: string }>>(`gh_research_members?user_id=eq.${encodeURIComponent(auth.userId)}&status=in.(invited,active)&select=id,project_id,role,status&order=created_at.desc&limit=200`),
   ])
   if (!owned.ok || !membershipResult.ok) return NextResponse.json({ ok: false, error: "RESEARCH_STORAGE_UNAVAILABLE" }, { status: 503, headers: NO_STORE })
-  const ownedRows = (owned.data || []).map((project) => ({ ...project, access_role: "owner", membership_status: "active", membership_id: null }))
+  const ownedRows: Array<Record<string, unknown>> = (owned.data || []).map((project): Record<string, unknown> => ({ ...project, access_role: "owner", membership_status: "active", membership_id: null }))
   const ownedIds = new Set(ownedRows.map((project) => String(project.id)))
   const memberRows = (membershipResult.data || []).filter((member) => !ownedIds.has(member.project_id)).slice(0, 100)
   let memberProjects: Array<Record<string, unknown>> = []

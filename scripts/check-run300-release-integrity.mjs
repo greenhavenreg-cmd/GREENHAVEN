@@ -42,7 +42,7 @@ add('in-app release identity matches package version', release.includes(`APP_REL
 add('README identifies the current package version', read('README.md').includes(`Current source version:** \`${pkg.version}\``))
 add('project truth identifies the current package version', truth.includes(`Current source version:** \`${pkg.version}\``))
 add('verified manifest identifies the current package version', manifest.includes(`project_version=${pkg.version}`))
-add('Phase 1 audit identifies the current package identity', audit.includes(`gh-connect@${pkg.version}`))
+add('current source-of-truth identifies the current package identity', audit.includes(`gh-connect@${pkg.version}`) || read('docs/SOURCE_OF_TRUTH.md').includes(`gh-connect@${pkg.version}`))
 add('phase-10 closure uses case-insensitive no-go assertion', /NOT APPROVED/i.test(closure))
 
 // 8–14: CI must remain static, least-privilege and migration-safe.

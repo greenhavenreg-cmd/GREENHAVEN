@@ -1,10 +1,10 @@
 # GreenHaven
 
-**Current source version:** `0.338.110` (RUN389 Research & Field Research readiness candidate)
+**Current source version:** `0.338.111` (RUN390 Membership, Feed and Marketplace read-path repair candidate)
 
 Production status: **NOT APPROVED** — Node 24.15.x dependency-backed typecheck/lint/build, migration validation/application, live Pi Browser/PostgreSQL, browser/device, recovery and operator acceptance remain outstanding.
 
-This repository is the canonical GreenHaven source tree. The working source derives from `GREENHAVEN-0.338.106-RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.zip`, with RUN384 retained as the cross-system audit baseline. RUN386 implements response keyset pagination and bounded complete export; RUN387 adds privacy-aware descriptive analytics; RUN388 adds scheduled studies and an atomic quota RPC held for review; RUN389 adds server-enforced team role capabilities and collaboration controls. No GitHub push, Vercel deployment or Supabase migration application is claimed. See `docs/SOURCE_OF_TRUTH.md`, `docs/PROJECT_TRUTH.md`, and `docs/CURRENT_BUILD_CONTEXT.md` before further release work.
+This repository is the canonical GreenHaven source tree. The working source derives from `GREENHAVEN-0.338.106-RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.zip`, with RUN384 retained as the cross-system audit baseline. RUN386 implements response keyset pagination and bounded complete export; RUN387 adds privacy-aware descriptive analytics; RUN388 adds scheduled studies and an atomic quota RPC held for review; RUN389 adds server-enforced team role capabilities and collaboration controls. RUN390 repairs missing server-only read grants that caused Membership status, feed mute privacy and Marketplace catalog failures; its versioned migration is held for review and unapplied. No GitHub push, Vercel deployment or Supabase migration application is claimed. See `docs/SOURCE_OF_TRUTH.md`, `docs/PROJECT_TRUTH.md`, and `docs/CURRENT_BUILD_CONTEXT.md` before further release work.
 
 ## Pi authentication frame-routing correction — 2026-11-23 / Run 373
 

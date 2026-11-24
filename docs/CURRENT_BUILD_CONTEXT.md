@@ -1,15 +1,19 @@
-# CURRENT BUILD CONTEXT — 0.338.110 RUN389 (2026-11-24)
+# CURRENT BUILD CONTEXT — 0.338.111 RUN390 (2026-11-24)
 
 - **Authoritative working archive:** `GREENHAVEN-0.338.106-RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.zip`; RUN384 remains the full cross-system audit parent.
-- **Current implementation:** RUN386 response keyset pagination and bounded complete CSV export; RUN387 owner/collaborator descriptive analytics with small-category suppression and free-text exclusion; RUN388 adds study scheduling and atomically enforced response quotas using a held database RPC migration; RUN389 adds server-enforced Research team role capabilities for owner/editor/reviewer/field-agent access and team administration.
+- **Current implementation:** RUN386 response keyset pagination and bounded complete CSV export; RUN387 owner/collaborator descriptive analytics with small-category suppression and free-text exclusion; RUN388 adds study scheduling and atomically enforced response quotas using a held database RPC migration; RUN389 adds server-enforced Research team role capabilities for owner/editor/reviewer/field-agent access and team administration. RUN390 repairs Testnet service-role read grants for Membership status, feed mute privacy and Marketplace listing/variant catalogs; the migration remains held.
 - **Held migration:** `20261124150000_run388_research_atomic_schedule_quota.sql` is REVIEW_REQUIRED and unapplied. The new submit caller requires migration approval, disposable PostgreSQL testing, exact Testnet history reconciliation, Testnet application and postflight before release.
 - **Access boundary:** Research and Field remain Pi-authenticated; official Pi SDK sign-in, server-side Pi Platform verification, canonical GreenHaven identity and durable session remain mandatory. Client-supplied identity, shared URLs and access codes do not authorize participation.
 - **Known limits:** research analytics are descriptive and bounded at 20,000 responses; no inferential claims or geographic inference from free text. Collaborator role permissions are not yet enforced consistently; response inbox and analytics remain owner-only. Offline field sync, localization, trusted malware scanner deployment, async exports and full governance automation remain outstanding.
 - **Runtime and release:** Node 22.16.0 is available but project requires `^24.15.0`; dependencies are not installed. Dependency-backed typecheck/lint/build and live Pi Browser/PostgreSQL acceptance remain outstanding. GitHub write permission previously returned HTTP 403; no push or Preview deployment is claimed. No database migration, Production/Mainnet, payment or financial-state change occurred. Production remains NOT APPROVED.
 
+## RUN390 verification scope
+
+The RUN390 read-grant contract passes 14/14. Full static verification passes 63/63; production-safety checks pass 21/21; secret-pattern scan reports zero potential values across 2,808 text files. Migration inventory contains 239 files, including held RUN388 and RUN390 candidates.
+
 ## RUN388 verification scope
 
-RUN385 baseline gate: 19/19. RUN386 response pagination/export: 17/17. RUN387 analytics: 14/14. RUN388 schedule/quota: 16/16. RUN389 team roles: 21/21. Migration inventory is generated from 238 source migration files, including one new held RUN388 candidate; inventory count does not prove application. Full static verification passes 63/63; production-safety checks pass 21/21; secret-pattern scan reports zero potential secret values across 2,804 text files. Node 24.15.x dependency-backed typecheck/lint/build and live database/browser acceptance remain outstanding.
+RUN385 baseline gate: 19/19. RUN386 response pagination/export: 17/17. RUN387 analytics: 14/14. RUN388 schedule/quota: 16/16. RUN389 team roles: 21/21. Migration inventory is generated from 239 source migration files, including the held RUN388 and RUN390 candidates; inventory count does not prove application. Full static verification passes 63/63; production-safety checks pass 21/21; secret-pattern scan reports zero potential secret values across 2,808 text files. Node 24.15.x dependency-backed typecheck/lint/build and live database/browser acceptance remain outstanding.
 
 ## Historical build context — 0.338.99
 

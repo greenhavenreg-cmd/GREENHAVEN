@@ -29,7 +29,7 @@ const checks = [
   ['package, lockfile root, and app release versions agree', /^\d+\.\d+\.\d+$/.test(pkg.version) && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version && release.includes(`APP_RELEASE_VERSION = "${pkg.version}"`)],
   ['verified manifest version matches package', manifest.includes(`project_version=${pkg.version}`)],
   ['README and project truth identify current release', readme.includes(`Current source version:** \`${pkg.version}\``) && truth.includes(`**Current source version:** \`${pkg.version}\``)],
-  ['current build context identifies current baseline', acceptance.includes(`0.338.110 RUN389`) && acceptance.includes('RUN389 adds server-enforced Research team role capabilities')],
+  ['current build context identifies current baseline', acceptance.includes(`0.338.111 RUN390`) && acceptance.includes('RUN390 repairs Testnet service-role read grants')],
   ['source-of-truth identifies current release and blocks unapproved production release', phase12.includes(`Current source version:** \`${pkg.version}\``) && /NOT APPROVED/i.test(phase12)],
   ['Phase 3 recovery documentation exists', hasProjectDoc('docs/PHASE-03-DATABASE-INTEGRITY-RECOVERY.md')],
   ['Phase 4 recovery release gate documentation exists', hasProjectDoc('docs/PHASE-04-RECOVERY-RELEASE-GATE.md')],

@@ -31,3 +31,8 @@ RUN389 adds a server-enforced Research collaboration model on top of RUN386 resp
 ## Release limits
 
 The RUN388 atomic quota migration remains REVIEW_REQUIRED and unapplied; its calling code must not be deployed before Testnet migration validation/application. Current runtime is Node 22.16.0; project requires Node 24.15.0 (`^24.15.0`) and dependencies are not installed. Full Node 24 typecheck/lint/build, live Testnet/PostgreSQL/Pi Browser acceptance, two-account and IDOR testing, scanner-provider acceptance, accessibility, performance, load and recovery testing remain outstanding. No GitHub push, Vercel deployment, Supabase migration, database write, Production or Mainnet action occurred. Production remains NOT APPROVED.
+
+
+## RUN390 follow-up
+
+RUN390 (`0.338.111`) repairs the missing live Testnet service-role SELECT grants behind Membership, feed mute privacy and Marketplace listing/variant catalog reads. See `docs/RUN390-MEMBERSHIP-FEED-MARKETPLACE-READ-REPAIR-2026-11-24.md`. The migration remains REVIEW_REQUIRED and unapplied.

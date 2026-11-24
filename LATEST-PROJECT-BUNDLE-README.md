@@ -1,7 +1,7 @@
 # GreenHaven — Current Project Bundle
 
-**Package:** `gh-connect@0.338.110`  
-**Working increment:** RUN389 — Research & Field Research readiness, derived from RUN385 with RUN384 audit baseline.  
+**Package:** `gh-connect@0.338.111`  
+**Working increment:** RUN390 — Membership, Feed and Marketplace read-path repair, derived from RUN385 with RUN384 audit baseline.  
 **Date:** 2026-11-24  
 **Release status:** **NOT APPROVED** for production.
 
@@ -11,6 +11,8 @@ RUN386 adds deterministic keyset pagination, a 50-row response inbox page, dupli
 
 This remains a source-only candidate. GitHub Contents write access previously returned HTTP 403; no push or Vercel deployment is claimed. No Supabase migration was applied, no database write was made, and Production/Mainnet and all financial state remain untouched. The package requires Node `^24.15.0`; current runtime is Node 22.16.0 without installed dependencies, so dependency-backed typecheck/lint/build and live browser/device acceptance remain release gates. Research analytics remain descriptive and bounded; geographic analysis, collaboration permission matrix, multilingual studies, offline sync, trusted malware scanner integration, async large exports and full accessibility/load/recovery acceptance remain outstanding.
 
+RUN390 adds the exact least-privilege repair for the three observed live Preview failures. Membership reads `ghc_membership_entitlements`; feed privacy reads `gh_user_mutes`; Marketplace reads `gh_marketplace_listings` and `gh_marketplace_variants`. Live Testnet catalog inspection showed service_role SELECT was missing on all four tables. The migration restores only server-side SELECT, preserves RLS and explicitly denies client table access. Membership and Marketplace writes remain mediated by existing server-only atomic RPCs. It is REVIEW_REQUIRED and unapplied.
+
 ## Focused source gates
 
 - RUN385 baseline: 19/19
@@ -18,7 +20,7 @@ This remains a source-only candidate. GitHub Contents write access previously re
 - RUN387 descriptive analytics: 14/14
 - RUN388 schedule/quota source contract: 16/16
 
-Focused RUN385–RUN389 contracts pass 19/19, 17/17, 14/14, 16/16 and 21/21. Full static verification passes 63/63; production-safety checks pass 21/21; secret-pattern scan reports zero potential values across 2,804 text files. Migration inventory: 238 source files, including one new REVIEW_REQUIRED candidate. This does not prove any migration is applied.
+Focused RUN385–RUN390 contracts pass 19/19, 17/17, 14/14, 16/16, 21/21 and 11/11. Full static verification passes 63/63; production-safety checks pass 21/21; secret-pattern scan reports zero potential values across 2,808 text files. Migration inventory: 239 source files, including the held RUN388 quota and RUN390 read-grant candidates. This does not prove any migration is applied.
 
 ## Historical RUN372 — canonical identity principal consolidation
 
@@ -75,6 +77,8 @@ The stored npm audit artifact still reports 29 findings (2 critical, 21 high, 5 
 9. Added the 12-check RUN336 source gate to `verify:static`, `prebuild:checks`, `pretypecheck` and `prelint`.
 
 Dependency warning triage is recorded in `docs/RUN336-GITHUB-VERCEL-BUILD-CLEANUP-2026-11-18.md`. No lockfile integrity data was hand-edited, no Pi SDK transitive package was overridden, and no incompatible ESLint major was forced into Next 15. The RUN337 report documents the exact 29-finding audit artifact and why the dependency lock remains unchanged.
+
+RUN390 repairs the live Testnet privilege gaps behind the Membership status unavailable, `FEED_PRIVACY_FILTER_UNAVAILABLE`, and Marketplace server catalog unavailable states. Its four-table, service_role-SELECT-only migration preserves RLS and client denial; it is REVIEW_REQUIRED and unapplied.
 
 ## Verification
 
