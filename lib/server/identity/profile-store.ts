@@ -76,38 +76,17 @@ function filterPersistableUrls(urls: string[], max: number): string[] {
 }
 
 
-const REQUIRED_ONBOARDING_GENDERS = new Set(["male", "female", "non-binary"])
-const REQUIRED_ONBOARDING_MODES = new Set(["friendship", "dating", "networking"])
-const REQUIRED_CONNECTION_INTENTS = new Set([
-  "friendship", "dating", "networking", "business", "collaboration",
-  "communities", "mentorship",
-])
-
-/** Server-side registration gate. Returns field keys only; never returns profile values. */
+/**
+ * Legacy compatibility helper. General account access no longer depends on
+ * profile completeness: profile fields are progressively collected and any
+ * feature-specific requirements are enforced by that feature's own boundary.
+ * Keep this export for older callers, but never return profile gaps as a
+ * registration/access gate.
+ */
 export function getOnboardingProfileGaps(
-  profile: ServerProfileRecord | null | undefined
+  _profile: ServerProfileRecord | null | undefined
 ): string[] {
-  if (!profile) return ["profile"]
-  const gaps: string[] = []
-  if (!profile.displayName || profile.displayName.trim().length < 2) gaps.push("displayName")
-  if (profile.age == null || !Number.isInteger(profile.age) || profile.age < 18 || profile.age > 120) gaps.push("age")
-  if (!profile.gender || !REQUIRED_ONBOARDING_GENDERS.has(profile.gender.trim().toLowerCase())) gaps.push("gender")
-  if (!profile.city?.trim()) gaps.push("city")
-  if (!profile.country?.trim()) gaps.push("country")
-  if (!profile.primaryMode || !REQUIRED_ONBOARDING_MODES.has(profile.primaryMode.trim().toLowerCase())) gaps.push("primaryMode")
-  const intents = Array.isArray(profile.connectionIntents)
-    ? profile.connectionIntents.map((value) => value.trim().toLowerCase()).filter((value) => REQUIRED_CONNECTION_INTENTS.has(value))
-    : []
-  if (intents.length < 1) gaps.push("connectionIntents")
-  const interests = Array.isArray(profile.interests)
-    ? profile.interests.map((value) => value.trim()).filter(Boolean)
-    : []
-  if (new Set(interests.map((value) => value.toLowerCase())).size < 3) gaps.push("interests")
-  const photos = Array.isArray(profile.photos)
-    ? profile.photos.filter((value) => typeof value === "string" && isPersistableMediaUrl(value) && !/placeholder/i.test(value))
-    : []
-  if (photos.length < 1) gaps.push("photos")
-  return gaps
+  return []
 }
 
 function asStringArray(v: unknown, max: number): string[] {
@@ -124,6 +103,13 @@ function clipStr(v: unknown, max: number): string | null {
   const s = String(v).trim()
   if (!s) return null
   return s.slice(0, max)
+}
+
+/** Omitted fields preserve existing values; explicit empty/null values clear optional text. */
+function mergeOptionalText(input: Record<string, unknown>, keys: string[], max: number, existing: string | null | undefined): string | null {
+  const key = keys.find((candidate) => Object.prototype.hasOwnProperty.call(input, candidate))
+  if (!key) return existing ?? null
+  return clipStr(input[key], max)
 }
 
 
@@ -223,25 +209,18 @@ export function sanitizeProfileInput(
   const t = now()
   return {
     ghUserId,
-    displayName:
-      clipStr(input.displayName ?? input.display_name, MAX_NAME) ??
-      existing?.displayName ??
-      null,
-    username:
-      clipStr(input.username, 40) ?? existing?.username ?? null,
-    bio: clipStr(input.bio, MAX_BIO) ?? existing?.bio ?? null,
-    city: clipStr(input.city, 80) ?? existing?.city ?? null,
-    country: clipStr(input.country, 80) ?? existing?.country ?? null,
-    profession: clipStr(input.profession, 80) ?? existing?.profession ?? null,
-    hometown: clipStr(input.hometown, 80) ?? existing?.hometown ?? null,
-    education: clipStr(input.education, 120) ?? existing?.education ?? null,
-    status: clipStr(input.status, 120) ?? existing?.status ?? null,
+    displayName: mergeOptionalText(input, ["displayName", "display_name"], MAX_NAME, existing?.displayName),
+    username: mergeOptionalText(input, ["username"], 40, existing?.username),
+    bio: mergeOptionalText(input, ["bio"], MAX_BIO, existing?.bio),
+    city: mergeOptionalText(input, ["city"], 80, existing?.city),
+    country: mergeOptionalText(input, ["country"], 80, existing?.country),
+    profession: mergeOptionalText(input, ["profession"], 80, existing?.profession),
+    hometown: mergeOptionalText(input, ["hometown"], 80, existing?.hometown),
+    education: mergeOptionalText(input, ["education"], 120, existing?.education),
+    status: mergeOptionalText(input, ["status"], 120, existing?.status),
     age,
-    gender: clipStr(input.gender, 40) ?? existing?.gender ?? null,
-    primaryMode:
-      clipStr(input.primaryMode ?? input.primary_mode, 40) ??
-      existing?.primaryMode ??
-      null,
+    gender: mergeOptionalText(input, ["gender"], 40, existing?.gender),
+    primaryMode: mergeOptionalText(input, ["primaryMode", "primary_mode"], 40, existing?.primaryMode),
     // Explicit empty arrays clear the field (e.g. user removed all photos).
     // Omitted keys keep existing values.
     interests: Array.isArray(input.interests)

@@ -1,3 +1,5 @@
+> **Historical numbering note (updated 2026-11-24):** This register predates several independent Phase 7/8 roadmaps. Its rows are preserved as historical status evidence, not a single authoritative sequence. Use `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md` for the current cross-domain Phase 7/8 map, ownership boundaries and release gates.
+
 # GreenHaven programme completion register
 
 Allowed states only: `Not started` | `Audited` | `Implemented, awaiting verification` | `Verified complete`

@@ -22,6 +22,7 @@ import {
   isPiIdentityDurable,
 } from "@/lib/server/identity/pi-identity-store"
 import { ensurePublicIdentity } from "@/lib/server/economy/public-id"
+import { getServerProfile, upsertServerProfile } from "@/lib/server/identity/profile-store"
 import { recordPioneerActivity } from "@/lib/server/engagement/pioneer-activity"
 import {
   createSession,
@@ -189,6 +190,27 @@ export async function POST(request: Request) {
     }
 
     void touchLastSeen(record.ghUserId)
+
+    // The Pi username is verified by the Platform /me response above. Keep the
+    // canonical profile username synchronized on every successful Pi login,
+    // while preserving a user's chosen display name and all optional fields.
+    if (record.piUsername) {
+      try {
+        const existingProfile = await getServerProfile(record.ghUserId)
+        const syncedProfile = await upsertServerProfile(record.ghUserId, {
+          username: record.piUsername,
+          displayName: existingProfile?.displayName || record.piUsername,
+        })
+        if (!syncedProfile) {
+          console.warn("[GH_PI_AUTH_STAGE]", { code: "PI_USERNAME_PROFILE_SYNC_DEFERRED", stage: "profile_sync", correlationId })
+        }
+      } catch {
+        // Profile presentation sync is recoverable; verified identity/session
+        // creation must not be blocked by an optional profile projection.
+        console.warn("[GH_PI_AUTH_STAGE]", { code: "PI_USERNAME_PROFILE_SYNC_FAILED", stage: "profile_sync", correlationId })
+      }
+    }
+
     try {
       await ensurePublicIdentity({
         userId: record.ghUserId,
@@ -198,9 +220,11 @@ export async function POST(request: Request) {
       /* public id best-effort — referral still has derived GH- id */
     }
 
-    const isReturning = !isNew && record.onboardingCompleted === true
-    const needsOnboarding = record.onboardingCompleted !== true
-    // Existing mapping row (may still need onboarding form if onboardingCompleted was never stamped)
+    // An existing, Pi-verified identity is a returning user even when an older
+    // release never stamped onboarding_completed. Never force legacy users back
+    // through registration merely because an optional profile form was unfinished.
+    const isReturning = !isNew
+    const needsOnboarding = isNew && record.onboardingCompleted !== true
     const identityExisted = !isNew
 
     // Issue GH server session only after verified Pi identity

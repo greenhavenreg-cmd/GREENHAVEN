@@ -1,26 +1,26 @@
 # GreenHaven — Current Project Bundle
 
-**Package:** `gh-connect@0.338.111`  
-**Working increment:** RUN390 — Membership, Feed and Marketplace read-path repair, derived from RUN385 with RUN384 audit baseline.  
+**Package:** `gh-connect@0.338.119`  
+**Working increment:** Phase 9 coordinated onboarding, identity, wallet-consent and Storage acceptance, derived in place from the user-designated `GREENHAVEN-0.338.118-PHASE-D-COMMUNITIES-STORAGE-2026-11-24-1.zip`.  
 **Date:** 2026-11-24  
 **Release status:** **NOT APPROVED** for production.
 
-## Delivery identity
 
-RUN386 adds deterministic keyset pagination, a 50-row response inbox page, duplicate-safe load-more and a complete cursor-traversing CSV export capped at 20,000 responses. RUN387 adds owner-only descriptive analytics for numeric, categorical, date and review-status data; low-frequency categories are suppressed and free-text content is excluded. RUN388 adds optional study windows and response quotas. RUN389 adds server-enforced owner/editor/reviewer/field-agent capabilities, team invitations, role changes, suspension/reactivation and collaborator-specific data access. Final response submission now calls a row-locked, idempotent service-role-only database RPC so quotas cannot be exceeded by concurrent requests. Its migration `20261124150000_run388_research_atomic_schedule_quota.sql` is REVIEW_REQUIRED and unapplied; do not deploy the caller before migration approval, disposable PostgreSQL validation, exact Testnet history reconciliation, application and postflight.
+## Current Phase 9 delivery — 0.338.119
 
-This remains a source-only candidate. GitHub Contents write access previously returned HTTP 403; no push or Vercel deployment is claimed. No Supabase migration was applied, no database write was made, and Production/Mainnet and all financial state remain untouched. The package requires Node `^24.15.0`; current runtime is Node 22.16.0 without installed dependencies, so dependency-backed typecheck/lint/build and live browser/device acceptance remain release gates. Research analytics remain descriptive and bounded; geographic analysis, collaboration permission matrix, multilingual studies, offline sync, trusted malware scanner integration, async large exports and full accessibility/load/recovery acceptance remain outstanding.
+The current candidate adds `scripts/check-run395-phase9-release-acceptance.mjs`, a 24-assertion cross-workstream gate registered in `verify:static` and `prebuild:checks`. It verifies the already-implemented server-authoritative returning-user classification, optional onboarding/profile enrichment, verified Pi username projection, explicit wallet consent and withdrawal authorization boundary, private owner-scoped Storage lifecycle, safe bucket provisioning and migration non-mutation. Focused Phase A/B/C, Phase 5/6, Phase D and identity/security contracts passed. Node 24.15.x dependency-backed typecheck/lint/build, browser/device acceptance and live Testnet/Mainnet verification remain outstanding. Production is NOT APPROVED. See `GREENHAVEN-0.338.119-PHASE9-COORDINATED-ONBOARDING-IDENTITY-STORAGE-2026-11-24-REPORT.md`.
 
-RUN390 adds the exact least-privilege repair for the three observed live Preview failures. Membership reads `ghc_membership_entitlements`; feed privacy reads `gh_user_mutes`; Marketplace reads `gh_marketplace_listings` and `gh_marketplace_variants`. Live Testnet catalog inspection showed service_role SELECT was missing on all four tables. The migration restores only server-side SELECT, preserves RLS and explicitly denies client table access. Membership and Marketplace writes remain mediated by existing server-only atomic RPCs. It is REVIEW_REQUIRED and unapplied.
+## Current delivery identity
 
-## Focused source gates
+This candidate preserves the GreenHaven application and its canonical identity, financial, community, commerce and media authorities. Phase 9 coordinates the previously implemented onboarding and identity repairs with progressive profile completion, explicit wallet-consent boundaries and the private Supabase Storage lifecycle. The canonical Phase 7/8 domain register remains `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`; its historical numbering is not a single sequential release plan.
 
-- RUN385 baseline: 19/19
-- RUN386 response pagination/export: 17/17
-- RUN387 descriptive analytics: 14/14
-- RUN388 schedule/quota source contract: 16/16
+The new RUN395 release gate passes 24/24 assertions, and the full `npm run verify:static` suite passes. Focused upstream contracts are recorded in the Phase 9 delivery report. The project requires Node `^24.15.0`; this workspace has Node 22.16.0 and no installed dependencies. Typecheck, lint and production build were stopped by the runtime guard; browser/device acceptance remains outstanding.
 
-Focused RUN385–RUN390 contracts pass 19/19, 17/17, 14/14, 16/16, 21/21 and 11/11. Full static verification passes 63/63; production-safety checks pass 21/21; secret-pattern scan reports zero potential values across 2,808 text files. Migration inventory: 239 source files, including the held RUN388 quota and RUN390 read-grant candidates. This does not prove any migration is applied.
+The migration inventory contains 239 synchronized source files. No migration was added, edited, replayed or applied. No live database or Storage mutation, payment, payout, refund, reward issuance, membership entitlement, wallet balance change, Pi authorization, Mainnet operation, GitHub push or Vercel deployment occurred. Production remains **NOT APPROVED**.
+
+## Historical implementation records
+
+Phase D work is recorded in `docs/PHASE-D-COMMUNITIES-STORAGE-2026-11-24.md`; the focused source gates are `check-phaseD-communities-completion.mjs`, `test-phaseD-community-policy.mjs` and `check-phaseD-storage-completion.mjs`. The detailed RUN390, RUN383, RUN372 and earlier sections below are retained as historical evidence only. Their package versions and baseline references do not supersede the current 0.338.119 release pointer.
 
 ## Historical RUN372 — canonical identity principal consolidation
 

@@ -13,7 +13,7 @@ import {
   markOnboardingCompleted,
   findOrCreateFromVerifiedPi,
 } from "@/lib/server/identity/pi-identity-store"
-import { getServerProfile, getOnboardingProfileGaps, upsertServerProfile } from "@/lib/server/identity/profile-store"
+import { upsertServerProfile } from "@/lib/server/identity/profile-store"
 import { recordPioneerActivity } from "@/lib/server/engagement/pioneer-activity"
 import { enforceUserMutationRateLimit } from "@/lib/server/security/user-rate-limit"
 
@@ -49,22 +49,9 @@ export async function POST(request: Request) {
       }
     }
 
-    // Registration is complete only when every required field is durably saved.
-    // This is checked server-side so a modified client cannot skip onboarding steps.
-    const savedProfile = await getServerProfile(ghUserId)
-    const missingFields = getOnboardingProfileGaps(savedProfile)
-    if (missingFields.length > 0) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "ONBOARDING_PROFILE_INCOMPLETE",
-          missingFields,
-          detail: "Save all required profile details before completing registration.",
-        },
-        { status: 422, headers: { "Cache-Control": "no-store" } }
-      )
-    }
-
+    // Onboarding now establishes the GreenHaven experience, not a mandatory
+    // profile questionnaire. Optional profile fields are saved independently;
+    // feature-specific age, safety and wallet checks remain at their own gates.
     const updated = await markOnboardingCompleted(ghUserId)
     if (!updated) {
       console.error("[auth/onboarding-complete] IDENTITY_NOT_FOUND", {

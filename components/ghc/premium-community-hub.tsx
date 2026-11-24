@@ -425,9 +425,36 @@ export function PremiumCommunityHub({
   const tags = community.tags?.length
     ? community.tags
     : [community.category, community.region].filter(Boolean) as string[]
-  const isMod =
-    community.role === "owner" || community.role === "admin" || community.role === "moderator"
   const ghcSession = useGHC() as any
+  const roleIdentityKey = String(ghcSession.profile?.id || IdentityService.getCurrentUserId() || "")
+  const [verifiedCommunityRole, setVerifiedCommunityRole] = useState<string | null>(null)
+  const roleCheckRequestRef = useRef(0)
+  useEffect(() => {
+    const requestId = ++roleCheckRequestRef.current
+    setVerifiedCommunityRole(null)
+    let active = true
+    if (!roleIdentityKey) {
+      setVerifiedCommunityRole("guest")
+      return () => { active = false; roleCheckRequestRef.current += 1 }
+    }
+    void fetch(`/api/communities/${encodeURIComponent(community.id)}/roles`, { credentials: "include", cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => null)
+        if (!active || requestId !== roleCheckRequestRef.current) return
+        if (response.ok && payload?.ok === true && payload?.durable === true && ["owner", "admin", "moderator", "member", "guest"].includes(payload.role)) {
+          setVerifiedCommunityRole(payload.role)
+        } else {
+          setVerifiedCommunityRole("guest")
+        }
+      })
+      .catch(() => {
+        if (active && requestId === roleCheckRequestRef.current) setVerifiedCommunityRole("guest")
+      })
+    return () => { active = false; roleCheckRequestRef.current += 1 }
+  }, [community.id, roleIdentityKey])
+  // A locally cached role is display-only. Moderator controls require a fresh,
+  // authenticated server decision; unavailable role checks fail closed.
+  const isMod = verifiedCommunityRole === "owner" || verifiedCommunityRole === "admin" || verifiedCommunityRole === "moderator"
   const meId = IdentityService.getCurrentUserId()
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteBusy, setInviteBusy] = useState<string | null>(null)
@@ -1704,13 +1731,13 @@ export function PremiumCommunityHub({
             {isMod && pendingJoinRequests.length > 0 ? (
               <section aria-label="Pending join requests" className="space-y-2">
                 <h3 className="text-[12px] font-bold text-foreground">Pending join requests</h3>
-                {pendingJoinRequests.map((uid) => (
+                {pendingJoinRequests.map((uid, index) => (
                   <div
                     key={uid}
                     className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200/80 bg-amber-50/80 px-3 py-2 dark:border-amber-900/40 dark:bg-amber-950/30"
                   >
                     <p className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
-                      {uid === "current-user" ? "You" : uid}
+                      {`Applicant ${index + 1}`}
                     </p>
                     <button
                       type="button"
@@ -1900,9 +1927,9 @@ export function PremiumCommunityHub({
                 <p className="mt-2 text-[12px] text-muted-foreground">No pending join requests.</p>
               ) : (
                 <ul className="mt-2 space-y-2">
-                  {pendingJoinRequests.map((uid) => (
+                  {pendingJoinRequests.map((uid, index) => (
                     <li key={uid} className="flex items-center justify-between gap-2 rounded-xl border border-border/60 px-3 py-2">
-                      <span className="truncate text-[12px] font-medium text-foreground">{uid.slice(0, 16)}</span>
+                      <span className="truncate text-[12px] font-medium text-foreground">{`Applicant ${index + 1}`}</span>
                       <div className="flex shrink-0 gap-1.5">
                         {onApproveRequest ? (
                           <button

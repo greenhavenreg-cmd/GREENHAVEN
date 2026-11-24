@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server"
 import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
 import { readGhcServerEnv } from "@/lib/server/economy/env"
+import { MEDIA_BUCKET_POLICY, matchesMediaBucketPolicy } from "@/lib/server/media/path-policy.mjs"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -29,6 +30,7 @@ export async function GET(request: Request) {
   let bucketError: string | null = null
   let bucketPublic: boolean | null = null
   let fileSizeLimit: number | null = null
+  let bucketConfigMatches: boolean | null = null
 
   if (hasUrl && hasKey) {
     try {
@@ -51,10 +53,12 @@ export async function GET(request: Request) {
         const info = (await res.json().catch(() => null)) as {
           public?: boolean
           file_size_limit?: number
+          allowed_mime_types?: unknown
         } | null
         if (info) {
-          bucketPublic = Boolean(info.public)
+          bucketPublic = typeof info.public === "boolean" ? info.public : null
           fileSizeLimit = typeof info.file_size_limit === "number" ? info.file_size_limit : null
+          bucketConfigMatches = matchesMediaBucketPolicy(info)
         }
       }
     } catch {
@@ -106,7 +110,7 @@ export async function GET(request: Request) {
     signProbe = { attempted: true, ok: false, error: "PROBE_EXCEPTION" }
   }
 
-  const ready = hasUrl && hasKey && bucketReachable === true
+  const ready = hasUrl && hasKey && bucketReachable === true && bucketConfigMatches === true
 
   return NextResponse.json(
     {
@@ -124,6 +128,8 @@ export async function GET(request: Request) {
       /** Operator expects private=true for GreenHaven. Public buckets still work via signed facade. */
       bucketPublic,
       fileSizeLimitBytes: fileSizeLimit,
+      bucketConfigMatches,
+      allowedMimeTypes: MEDIA_BUCKET_POLICY.allowedMimeTypes,
       signProbe,
       privacy: "private-bucket-via-authorized-facade",
       folders: ["avatars", "images", "videos", "audio", "documents"],
@@ -131,7 +137,7 @@ export async function GET(request: Request) {
       limits: {
         proxyMaxMb: 4,
         imageMaxMb: 50,
-        videoMaxMb: 50,
+        videoMaxMb: 40,
         audioMaxMb: 50,
         fileMaxMb: 50,
         bucketMaxMb: 50,
@@ -147,6 +153,10 @@ export async function GET(request: Request) {
       },
       migrationsRequired: [
         "20261022010049_gh_media_assets.sql",
+        "20261023040001_gh_pulse_media_platform_v2.sql",
+        "20261027010001_gh_media_upload_session_immutable_identity.sql",
+        "20261027010002_gh_media_asset_create_immutable_identity.sql",
+        "20261027010003_gh_media_upload_finalize_identity.sql",
         "20261022010087_gh_private_media_references_and_viewer_authz.sql",
         "20261022010089_gh_comment_media_attachments.sql",
       ],
@@ -155,8 +165,10 @@ export async function GET(request: Request) {
         : !hasUrl || !hasKey
           ? "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on Vercel (server secrets), plus GH_MEDIA_BUCKET."
           : bucketReachable !== true
-            ? "Bucket not reachable — create private bucket matching GH_MEDIA_BUCKET and apply media migrations."
-            : ready
+            ? "Bucket not reachable — verify GH_MEDIA_BUCKET and server-side Storage credentials."
+            : bucketConfigMatches !== true
+              ? "Bucket settings do not match the required private visibility, size limit and MIME allowlist; reconcile manually after auditing existing consumers."
+              : ready
               ? "Media pipeline looks ready. Uploads use owner folders; display uses /api/media/{id}/content (auth required)."
               : "Check migrations and bucket privacy settings.",
     },

@@ -4,8 +4,14 @@
 
 - [`SECURITY.md`](../SECURITY.md) — private vulnerability reporting and release-boundary policy.
 
+- [`SOURCE_OF_TRUTH.md`](SOURCE_OF_TRUTH.md) — current 0.338.119 source authority and release boundaries.
+- [`UPGRADE-WORKLOG-0.338.119.md`](UPGRADE-WORKLOG-0.338.119.md) — Phase 9 coordinated acceptance and delivery log.
+- [`../GREENHAVEN-0.338.119-PHASE9-COORDINATED-ONBOARDING-IDENTITY-STORAGE-2026-11-24-REPORT.md`](../GREENHAVEN-0.338.119-PHASE9-COORDINATED-ONBOARDING-IDENTITY-STORAGE-2026-11-24-REPORT.md) — Phase 9 delivery report and outstanding operator acceptance.
+- [`PHASE-D-COMMUNITIES-STORAGE-2026-11-24.md`](PHASE-D-COMMUNITIES-STORAGE-2026-11-24.md) — Phase D product and infrastructure completion record.
+- [`UPGRADE-WORKLOG-0.338.118.md`](UPGRADE-WORKLOG-0.338.118.md) — Phase D implementation and verification log.
+- [`PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`](PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md) — canonical register for reused Phase 7/8 workstream labels and domain dependencies.
+- [`UPGRADE-WORKLOG-0.338.117.md`](UPGRADE-WORKLOG-0.338.117.md) — historical source-only harmonization worklog.
 - [`RUN384-FULL-PROJECT-AUDIT-2026-11-24.md`](RUN384-FULL-PROJECT-AUDIT-2026-11-24.md) — cross-system GitHub, Vercel and Supabase audit baseline.
-- [`SOURCE_OF_TRUTH.md`](SOURCE_OF_TRUTH.md) — current RUN388 authority, migration hold and release boundaries.
 
 1. [`SOURCE_OF_TRUTH.md`](SOURCE_OF_TRUTH.md) — sole source/archive authority and release boundaries.
 2. [`PROJECT_TRUTH.md`](PROJECT_TRUTH.md) — current verified project state and explicit acceptance limits.

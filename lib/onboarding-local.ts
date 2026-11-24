@@ -259,31 +259,15 @@ export function resolveClientOnboardingStatus(input: {
   username?: string | null
   candidateUserIds?: Array<string | null | undefined>
 }): ClientOnboardingStatus {
+  // Once the Pi identity bridge has verified a durable identity, its result is
+  // authoritative. Device-local profiles/stamps must never override a server
+  // decision: shared devices and account switching can otherwise leak one
+  // account's onboarding state into another account.
   if (!input.serverVerified) return "unknown"
-  // Server says finished
-  if (input.isReturning || input.needsOnboarding === false) return "complete"
-
-  const candidates = [input.userId, ...(input.candidateUserIds || [])]
-  if (
-    hasLocalOnboardingStampForUser({
-      userId: input.userId,
-      username: input.username,
-      candidateUserIds: candidates,
-    })
-  ) {
+  if (input.isReturning || input.identityExisted === true || input.needsOnboarding === false) {
     return "complete"
   }
-
-  const local = findCompletedLocalProfileForUser({
-    userId: input.userId,
-    username: input.username,
-    candidateUserIds: candidates,
-  })
-  if (local && isStrongCompletedProfileShape(local)) return "complete"
-  // Existing Pi identity + any completed local profile → do not re-register
-  if (input.identityExisted && local) return "complete"
-
-  if (input.needsOnboarding) return "required"
+  if (input.needsOnboarding === true) return "required"
   return "unknown"
 }
 
@@ -299,71 +283,13 @@ export function resolveUiOnboardingGate(input: {
   username?: string | null
   candidateUserIds?: Array<string | null | undefined>
 }): ClientOnboardingStatus {
-  const pi = input.piOnboardingStatus
+  const status = input.piOnboardingStatus
 
-  if (pi === "unavailable") return "unavailable"
-  if (pi === "complete") return "complete"
-
-  // Explicit onboarded flag on in-memory profile
-  if (input.profile && (input.profile as { onboarded?: boolean }).onboarded === true) {
-    return "complete"
-  }
-
-  const profileStrong = isStrongCompletedProfileShape(input.profile)
-  if (profileStrong) return "complete"
-
-  const uid =
-    input.userId || (input.profile as { id?: string } | undefined)?.id || null
-  const un =
-    input.username ||
-    (input.profile as { username?: string } | undefined)?.username ||
-    (input.profile as { displayName?: string } | undefined)?.displayName ||
-    null
-  const candidates = [
-    uid,
-    ...(input.candidateUserIds || []),
-    (input.profile as { id?: string } | undefined)?.id,
-  ]
-
-  // Device stamp from a previous successful finish on this phone
-  if (
-    hasLocalOnboardingStampForUser({
-      userId: uid,
-      username: un,
-      candidateUserIds: candidates,
-    })
-  ) {
-    return "complete"
-  }
-
-  // Phase 4 — sole-device stamp: if onboarding was finished here and profile has a name,
-  // do not force registration while auth ids are still reconciling (Pi uid vs GH id).
-  const stamp = readLocalOnboardingStamp()
-  if (stamp && stamp.at > 0) {
-    const name =
-      (typeof input.profile?.displayName === "string" && input.profile.displayName.trim()) ||
-      (typeof un === "string" && un.trim()) ||
-      ""
-    if (name.length > 1) return "complete"
-    // Stamp exists with no conflicting identity yet
-    const anyId = candidates.some((c) => normId(c).length > 0)
-    if (!anyId) return "complete"
-  }
-
-  // Device-local completed profile for this same user
-  if (pi === "required" || input.serverVerified) {
-    const local = findCompletedLocalProfileForUser({
-      userId: uid,
-      username: un,
-      candidateUserIds: candidates,
-    })
-    if (local && (isStrongCompletedProfileShape(local) || isCompletedProfileShape(local))) {
-      return "complete"
-    }
-  }
-
-  if (pi === "required") return "required"
-
-  // unknown: keep loading shell — never force registration from userId alone
+  if (status === "unavailable") return "unavailable"
+  // No profile shape, local-storage stamp, display name or cached identity is
+  // proof of the currently authenticated Pi account. Wait for the server bridge.
+  if (!input.serverVerified) return "unknown"
+  if (status === "complete") return "complete"
+  if (status === "required") return "required"
   return "unknown"
 }

@@ -4,7 +4,7 @@
  */
 export const MEDIA_BUCKET_MAX_BYTES = 50 * 1024 * 1024
 export const MEDIA_IMAGE_MAX_BYTES = 50 * 1024 * 1024
-export const MEDIA_VIDEO_MAX_BYTES = 50 * 1024 * 1024
+export const MEDIA_VIDEO_MAX_BYTES = 40 * 1024 * 1024
 export const MEDIA_AUDIO_MAX_BYTES = 50 * 1024 * 1024
 export const MEDIA_FILE_MAX_BYTES = 50 * 1024 * 1024
 /** Vercel serverless body ceiling — larger files must use direct-to-storage. */

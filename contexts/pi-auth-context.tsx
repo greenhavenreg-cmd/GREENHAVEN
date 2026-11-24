@@ -608,11 +608,13 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
               const completed = bridgeIdentity.onboardingCompleted === true
               needsOnboarding = completed ? false : Boolean(bridge.needsOnboarding)
               isReturning = Boolean(bridge.isReturning) || completed
+              // ghUserId is present for both newly-created and returning
+              // identities; its presence alone must never classify a new user
+              // as returning. Trust only the explicit server classification.
               identityExisted =
                 bridge.identityExisted === true ||
                 bridge.isReturning === true ||
-                completed ||
-                Boolean(bridgeIdentity.ghUserId)
+                completed
               if (bridge.durabilityWarning) {
                 console.warn(
                   "[PiAuth] identity/session not durable on this deployment:",

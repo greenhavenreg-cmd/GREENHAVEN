@@ -226,19 +226,19 @@ export function Onboarding() {
 
   useEffect(() => {
     if (phase !== "splash") return
-    const timer = window.setTimeout(() => setPhase("welcome"), 2200)
+    const timer = window.setTimeout(() => setPhase("welcome"), 650)
     return () => window.clearTimeout(timer)
   }, [phase])
   const [step, setStep] = useState<OnboardingStep>(1)
   const [formData, setFormData] = useState({
     firstName: (() => {
       const n = (safeProfile.displayName || "").trim()
-      if (!n) return ""
+      if (!n || n.toLowerCase() === piUsername.trim().toLowerCase()) return ""
       return n.split(/\s+/)[0] || ""
     })(),
     lastName: (() => {
       const n = (safeProfile.displayName || "").trim()
-      if (!n) return ""
+      if (!n || n.toLowerCase() === piUsername.trim().toLowerCase()) return ""
       const parts = n.split(/\s+/)
       return parts.length > 1 ? parts.slice(1).join(" ") : ""
     })(),
@@ -262,55 +262,41 @@ export function Onboarding() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [finishing, setFinishing] = useState(false)
 
+  const finishSetupForNow = async () => {
+    if (finishing) return
+    setFinishing(true)
+    setErrors((current) => ({ ...current, persistence: "" }))
+    try {
+      const completed = await completeOnboarding()
+      if (!completed) {
+        setErrors((current) => ({ ...current, persistence: "We could not confirm your account setup. Check your connection and try again." }))
+      }
+    } finally {
+      setFinishing(false)
+    }
+  }
+
   const validateStep = () => {
     const nextErrors: Record<string, string> = {}
-    const composedName = `${formData.firstName} ${formData.lastName}`.trim().replace(/\s+/g, " ")
-    const cleanName = composedName || formData.displayName.trim().replace(/\s+/g, " ")
-    const cleanCity = formData.city.trim().replace(/\s+/g, " ")
-    const cleanCountry = formData.country.trim()
-    const cleanState = formData.state.trim()
-    const cleanBio = formData.bio.trim().replace(/\s+/g, " ")
     const looksLikeWords = (value: string) => /^[\p{L}][\p{L}\s'.-]*$/u.test(value)
-    const hasMeaningfulText = (value: string, min: number) =>
-      value.length >= min && new Set(value.toLowerCase().split(/\s+/)).size > 1 && !/(.)\1{4,}/u.test(value)
-
     if (step === 1) {
       const first = formData.firstName.trim().replace(/\s+/g, " ")
       const last = formData.lastName.trim().replace(/\s+/g, " ")
-      if (first.length < 1 || first.length > 40 || !looksLikeWords(first))
-        nextErrors.firstName = "Enter your first name (letters only)."
-      if (last.length < 1 || last.length > 40 || !looksLikeWords(last))
-        nextErrors.lastName = "Enter your surname / last name (letters only)."
-      if (cleanName.length < 2 || cleanName.length > 60 || !looksLikeWords(cleanName))
-        nextErrors.displayName = "First name and surname must form a valid full name."
-      const derived = formData.bornDate ? ageFromBornDate(formData.bornDate) : null
-      if (!formData.bornDate) nextErrors.age = "Enter your date of birth to continue."
-      else if (derived === null || !isAdultFromBornDate(formData.bornDate)) nextErrors.age = "You must be at least 18 years old and enter a valid date."
-      if (
-        !formData.structuredLocation?.countryId ||
-        !formData.structuredLocation?.admin1Id ||
-        !(formData.structuredLocation?.localityName || formData.structuredLocation?.admin2Name || formData.city)
-      ) {
-        nextErrors.location = "Select your country, region, and city or town."
-      } else if (
-        formData.structuredLocation?.countryId === "ng" &&
-        formData.structuredLocation?.admin1Id &&
-        !formData.structuredLocation?.admin2Id &&
-        !formData.structuredLocation?.admin2Name
-      ) {
-        nextErrors.location = "Select your Local Government Area (LGA), then your city or town."
-      }
-      if (!formData.gender || formData.gender === "prefer-not-to-say") {
-        nextErrors.gender = "Please select your gender to continue."
-      }
+      // Names, birth date, gender and location enrich the profile; none is a
+      // general account-entry requirement. Validate only values the user chose to provide.
+      if ((first || last) && (!first || !last))
+        nextErrors.displayName = "Add both first name and surname, or leave both blank for now."
+      if (first && (first.length > 40 || !looksLikeWords(first)))
+        nextErrors.firstName = "Use a valid first name (up to 40 characters)."
+      if (last && (last.length > 40 || !looksLikeWords(last)))
+        nextErrors.lastName = "Use a valid surname (up to 40 characters)."
+      if (formData.bornDate && (!ageFromBornDate(formData.bornDate) || !isAdultFromBornDate(formData.bornDate)))
+        nextErrors.age = "Enter a valid date. Age-restricted features apply their own eligibility checks."
+      if (formData.structuredLocation && (!formData.structuredLocation.countryId || !formData.structuredLocation.admin1Id))
+        nextErrors.location = "Choose a complete location or leave it blank for now."
     }
-    if (step === 2) {
-      const intents = normalizeIntents(formData.connectionIntents)
-      if (intents.length < 1) nextErrors.connectionIntents = "Choose at least one connection goal."
-      if (!["friendship", "dating", "networking"].includes(formData.primaryMode)) nextErrors.primaryMode = "Choose a valid primary connection mode."
-    }
-    if (step === 3 && formData.interests.length < 3) nextErrors.interests = "Choose at least 3 interests."
-    if (step === 4 && formData.photos.length < 1) nextErrors.photos = "Add a profile photo to continue."
+    // Connection goals, interests and photos are optional profile enhancements.
+    // Feature-specific eligibility remains enforced at the feature boundary.
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -319,25 +305,29 @@ export function Onboarding() {
     if (!validateStep()) return
     if (step === 1) {
       const fullName = `${formData.firstName} ${formData.lastName}`.trim().replace(/\s+/g, " ")
-      const saved = await updateProfile({
-        displayName: fullName,
-        age: formData.bornDate ? (ageFromBornDate(formData.bornDate) ?? formData.age) : formData.age,
-        bornDate: formData.bornDate,
-        gender: formData.gender as Gender,
-        city: formData.city.trim().replace(/\s+/g, " "),
-        country: formData.country.trim(),
-        homeLocation: formData.structuredLocation || null,
-        locationPrivacy: "locality",
-        bio: formData.bio.trim().replace(/\s+/g, " "),
-      })
+      const profilePatch = {
+        ...(fullName ? { displayName: fullName } : {}),
+        ...(formData.bornDate ? { age: ageFromBornDate(formData.bornDate) ?? undefined, bornDate: formData.bornDate } : {}),
+        ...(formData.gender ? { gender: formData.gender as Gender } : {}),
+        ...(formData.structuredLocation ? {
+          city: formData.city.trim().replace(/\s+/g, " "),
+          country: formData.country.trim(),
+          homeLocation: formData.structuredLocation,
+          locationPrivacy: "locality" as const,
+        } : {}),
+        ...(formData.bio.trim() ? { bio: formData.bio.trim().replace(/\s+/g, " ") } : {}),
+      }
+      const saved = Object.keys(profilePatch).length ? await updateProfile(profilePatch) : true
       if (!saved) { setErrors((p) => ({ ...p, persistence: "We could not securely save these details. Check your connection and try again." })); return }
       setErrors((p) => ({ ...p, persistence: "" }))
       setStep(2)
     } else if (step === 2) {
-      const saved = await updateProfile({
-        primaryMode: formData.primaryMode as PrimaryMode,
-        connectionIntents: normalizeIntents((formData as { connectionIntents?: string[] }).connectionIntents),
-      } as Partial<import("@/lib/ghc-types").Profile>)
+      const intents = normalizeIntents(formData.connectionIntents)
+      const choicesPatch = {
+        ...(formData.primaryMode ? { primaryMode: formData.primaryMode as PrimaryMode } : {}),
+        ...(intents.length ? { connectionIntents: intents } : {}),
+      } as Partial<import("@/lib/ghc-types").Profile>
+      const saved = Object.keys(choicesPatch).length ? await updateProfile(choicesPatch) : true
       if (!saved) { setErrors((p) => ({ ...p, persistence: "Your connection choices were not saved. Please retry." })); return }
       setErrors((p) => ({ ...p, persistence: "" }))
       try {
@@ -345,32 +335,37 @@ export function Onboarding() {
       } catch { /* */ }
       setStep(3)
     } else if (step === 3) {
-      const saved = await updateProfile({ interests: formData.interests })
+      const saved = formData.interests.length ? await updateProfile({ interests: formData.interests }) : true
       if (!saved) { setErrors((p) => ({ ...p, persistence: "Your interests were not saved. Please retry." })); return }
       setErrors((p) => ({ ...p, persistence: "" }))
       setStep(4)
     } else if (step === 4) {
-      const saved = await updateProfile({ photos: formData.photos })
+      const saved = formData.photos.length ? await updateProfile({ photos: formData.photos }) : true
       if (!saved) { setErrors((p) => ({ ...p, persistence: "Your profile photo was not saved. Please retry." })); return }
       setErrors((p) => ({ ...p, persistence: "" }))
       setStep(5)
     } else if (step === 5) {
       setFinishing(true)
       try {
-        const saved = await updateProfile({
-          photos: formData.photos,
-          city: formData.city,
-          country: formData.country,
-          homeLocation: formData.structuredLocation || null,
-          locationPrivacy: "locality",
-          bio: formData.bio,
-          interests: formData.interests,
-          displayName: `${formData.firstName} ${formData.lastName}`.trim().replace(/\s+/g, " "),
-          age: formData.bornDate ? (ageFromBornDate(formData.bornDate) ?? undefined) : undefined,
-          gender: formData.gender as Gender,
-          primaryMode: formData.primaryMode as PrimaryMode,
-          connectionIntents: normalizeIntents(formData.connectionIntents),
-        })
+        const finalName = `${formData.firstName} ${formData.lastName}`.trim().replace(/\s+/g, " ")
+        const finalIntents = normalizeIntents(formData.connectionIntents)
+        const finalProfilePatch = {
+          ...(formData.photos.length ? { photos: formData.photos } : {}),
+          ...(formData.structuredLocation ? {
+            city: formData.city,
+            country: formData.country,
+            homeLocation: formData.structuredLocation,
+            locationPrivacy: "locality" as const,
+          } : {}),
+          ...(formData.bio.trim() ? { bio: formData.bio.trim() } : {}),
+          ...(formData.interests.length ? { interests: formData.interests } : {}),
+          ...(finalName ? { displayName: finalName } : {}),
+          ...(formData.bornDate ? { age: ageFromBornDate(formData.bornDate) ?? undefined, bornDate: formData.bornDate } : {}),
+          ...(formData.gender ? { gender: formData.gender as Gender } : {}),
+          ...(formData.primaryMode ? { primaryMode: formData.primaryMode as PrimaryMode } : {}),
+          ...(finalIntents.length ? { connectionIntents: finalIntents } : {}),
+        }
+        const saved = Object.keys(finalProfilePatch).length ? await updateProfile(finalProfilePatch) : true
         if (!saved) { setErrors((p) => ({ ...p, persistence: "Your profile details could not be confirmed on the server. Nothing has been marked complete; please retry." })); return }
         setErrors((p) => ({ ...p, persistence: "" }))
         const completed = await completeOnboarding()
@@ -474,10 +469,11 @@ export function Onboarding() {
               <BrandLogo onDark size="bar" className="object-left opacity-90" />
               <button
                 type="button"
-                onClick={() => setPhase("flow")}
-                className="text-[12px] font-semibold text-white/50 hover:text-white/80"
+                onClick={() => void finishSetupForNow()}
+                disabled={finishing}
+                className="text-[12px] font-semibold text-white/50 hover:text-white/80 disabled:opacity-40"
               >
-                Skip
+                {finishing ? "Entering…" : "Enter GreenHaven"}
               </button>
             </div>
 
@@ -517,6 +513,7 @@ export function Onboarding() {
             </div>
 
             <div className="mt-auto space-y-3 pt-6">
+              {errors.persistence ? <p role="alert" className="rounded-xl border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-center text-xs text-rose-200">{errors.persistence}</p> : null}
               <PrimaryButton
                 onClick={() => {
                   if (isLast) setPhase("flow")
@@ -534,10 +531,11 @@ export function Onboarding() {
               {!isLast ? (
                 <button
                   type="button"
-                  onClick={() => setPhase("flow")}
-                  className="w-full py-2 text-center text-[12px] font-semibold text-white/45"
+                  onClick={() => void finishSetupForNow()}
+                  disabled={finishing}
+                  className="w-full py-2 text-center text-[12px] font-semibold text-white/45 disabled:opacity-40"
                 >
-                  Skip intro
+                  Enter GreenHaven now
                 </button>
               ) : (
                 <p className="text-center text-[12px] text-white/40">
@@ -568,9 +566,19 @@ export function Onboarding() {
           {step === 1 && (
             <div className="space-y-5 animate-in fade-in duration-300">
               <div className="text-center">
-                <h1 className="text-[1.45rem] font-black tracking-tight text-white">Let&apos;s set up your profile</h1>
-                <p className="mt-1 text-[13px] text-white/50">Tell us a little about yourself</p>
+                <h1 className="text-[1.45rem] font-black tracking-tight text-white">Make GreenHaven yours</h1>
+                <p className="mt-1 text-[13px] text-white/50">A few optional details can personalize your experience. You can enter GreenHaven now and finish anytime.</p>
               </div>
+              {piUsername ? (
+                <div className="flex items-center gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.08] px-4 py-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-300"><Shield size={18} /></div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-300/75">Pi identity connected</p>
+                    <p className="truncate text-sm font-bold text-white">@{piUsername}</p>
+                  </div>
+                  <Check size={17} className="text-emerald-300" aria-label="Verified Pi identity" />
+                </div>
+              ) : null}
 
               {/* Live profile preview */}
               <div className="rounded-2xl border border-emerald-400/20 bg-gradient-to-br from-emerald-500/10 to-transparent p-3">
@@ -595,10 +603,9 @@ export function Onboarding() {
               <div className="space-y-3.5 rounded-3xl border border-white/8 bg-white/[0.04] p-4 backdrop-blur-sm">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1.5 block text-[12px] font-bold text-white/60">First name *</label>
+                    <label className="mb-1.5 block text-[12px] font-bold text-white/60">First name <span className="font-normal text-white/35">(optional)</span></label>
                     <input
                       type="text"
-                      required
                       value={formData.firstName}
                       onChange={(e) => {
                         const firstName = e.target.value
@@ -616,10 +623,9 @@ export function Onboarding() {
                     {errors.firstName && <p className="mt-1 text-xs text-rose-400">{errors.firstName}</p>}
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-[12px] font-bold text-white/60">Surname *</label>
+                    <label className="mb-1.5 block text-[12px] font-bold text-white/60">Surname <span className="font-normal text-white/35">(optional)</span></label>
                     <input
                       type="text"
-                      required
                       value={formData.lastName}
                       onChange={(e) => {
                         const lastName = e.target.value
@@ -641,11 +647,9 @@ export function Onboarding() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1.5 block text-[12px] font-bold text-white/60">Date of birth *</label>
+                    <label className="mb-1.5 block text-[12px] font-bold text-white/60">Date of birth <span className="font-normal text-white/35">(optional)</span></label>
                     <input
                       type="date"
-                      required
-                      aria-required="true"
                       max={maxBornDateForMinAge(18)}
                       value={formData.bornDate}
                       onChange={(e) => {
@@ -658,11 +662,9 @@ export function Onboarding() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-[12px] font-bold text-white/60">Gender</label>
+                    <label className="mb-1.5 block text-[12px] font-bold text-white/60">Gender <span className="font-normal text-white/35">(optional)</span></label>
                     <select
                       value={formData.gender}
-                      required
-                      aria-required="true"
                       onChange={(e) => {
                         const v = e.target.value as Gender
                         setFormData((p) => ({ ...p, gender: v }))
@@ -689,7 +691,7 @@ export function Onboarding() {
                 )}
 
                 <div>
-                  <p className="mb-2 text-[12px] font-bold text-white/60">Location *</p>
+                  <p className="mb-2 text-[12px] font-bold text-white/60">Location <span className="font-normal text-white/35">(optional)</span></p>
                   <LocationPicker
                     variant="dark"
                     idPrefix="onboard"
@@ -742,7 +744,7 @@ export function Onboarding() {
             <div className="space-y-4 animate-in fade-in duration-300">
               <div className="text-center">
                 <h1 className="text-[1.45rem] font-black tracking-tight text-white">What brings you here?</h1>
-                <p className="mt-1 text-[13px] text-white/50">Select all that apply — change anytime in Profile</p>
+                <p className="mt-1 text-[13px] text-white/50">Choose what interests you. This is optional and can be changed anytime.</p>
               </div>
               <div className="grid grid-cols-2 gap-2.5">
                 {[
@@ -866,7 +868,7 @@ export function Onboarding() {
                   <Camera size={26} />
                 </div>
                 <h1 className="text-[1.45rem] font-black tracking-tight text-white">Add photos</h1>
-                <p className="mt-1 text-[13px] text-white/50">Add a profile photo. You can add up to 6 photos.</p>
+                <p className="mt-1 text-[13px] text-white/50">Add up to 6 photos, or leave this for later.</p>
                 {errors.photos && <p className="mt-1 text-xs text-rose-400">{errors.photos}</p>}
               </div>
 
@@ -929,7 +931,7 @@ export function Onboarding() {
                 </div>
                 <h1 className="text-[1.65rem] font-black tracking-tight text-white">Review your profile</h1>
                 <p className="mx-auto mt-2 max-w-xs text-[14px] text-white/50">
-                  Check your details below, then finish registration to enter GreenHaven.
+                  Review your details, or enter GreenHaven now and complete your profile later.
                 </p>
               </div>
 
@@ -979,7 +981,17 @@ export function Onboarding() {
 
       {/* Footer nav */}
       <div className="relative z-10 border-t border-white/8 bg-[#050a08]/90 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md">
-        <div className="mx-auto flex w-full max-w-md gap-3">
+        <div className="mx-auto w-full max-w-md">
+          {errors.persistence ? <p role="alert" className="mb-2 rounded-xl border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-center text-xs text-rose-200">{errors.persistence}</p> : null}
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => void finishSetupForNow()}
+            disabled={finishing}
+            className="min-h-11 rounded-xl px-3 text-[12px] font-semibold text-white/55 transition hover:bg-white/5 hover:text-white/85 disabled:opacity-40"
+          >
+            {finishing ? "Saving…" : "Skip for now"}
+          </button>
           {step > 1 && step < 5 && (
             <SecondaryButton onClick={() => setStep((s) => (s - 1) as OnboardingStep)}>Back</SecondaryButton>
           )}
@@ -989,21 +1001,12 @@ export function Onboarding() {
           <div className="flex-[1.4]">
             <PrimaryButton
               onClick={() => void handleNext()}
-              disabled={
-                finishing ||
-                (step === 2 && (normalizeIntents(formData.connectionIntents).length < 1 || !["friendship", "dating", "networking"].includes(formData.primaryMode))) ||
-                (step === 3 && formData.interests.length < 3) ||
-                (step === 1 && (
-                  !formData.gender ||
-                  !formData.displayName.trim() ||
-                  !(formData.structuredLocation?.countryId && formData.structuredLocation?.admin1Id)
-                )) ||
-                (step === 4 && formData.photos.length < 1)
-              }
+              disabled={finishing || uploading}
             >
               {step === 5 ? (finishing ? "Starting…" : "Enter GreenHaven →") : "Next →"}
             </PrimaryButton>
           </div>
+        </div>
         </div>
       </div>
     </Shell>

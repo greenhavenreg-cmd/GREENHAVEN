@@ -1,24 +1,21 @@
-# Current project truth — 0.338.111 RUN390 Membership, Feed and Marketplace read-path repair (2026-11-24)
+# Current project truth — 0.338.119 Phase 9 Coordinated Acceptance (2026-11-24)
 
-**Current source:** `gh-connect@0.338.111`, RUN390, derived from the authoritative RUN385 archive and retaining the RUN384 cross-system audit baseline. Source-only; not pushed or deployed.
+**Current source:** `gh-connect@0.338.119`, a source-only derivative of the user-designated `GREENHAVEN-0.338.118-PHASE-D-COMMUNITIES-STORAGE-2026-11-24-1.zip`. No rewrite, push or deployment occurred.
 
-**Current source version:** `0.338.111`  
-**Package identity:** `gh-connect@0.338.111`
+**Current source version:** `0.338.119`  
+**Package identity:** `gh-connect@0.338.119`  
+**Baseline:** `GREENHAVEN-0.338.118-PHASE-D-COMMUNITIES-STORAGE-2026-11-24-1.zip`  
+**Delivery report:** `GREENHAVEN-0.338.119-PHASE9-COORDINATED-ONBOARDING-IDENTITY-STORAGE-2026-11-24-REPORT.md`
 
-- RUN386: deterministic keyset pagination for research responses; 50-row inbox pages; de-duplicated load-more; complete cursor-traversing CSV export with a 20,000-response browser safety cap and formula-injection protection.
-- RUN387: owner-scoped descriptive analytics, numeric summary statistics, choice frequencies, date ranges, review-state counts, suppression of categories below five and exclusion of free-text content. Coverage is explicitly marked complete, bounded or unknown.
-- RUN388: optional study start/end dates and response quotas; database-side row locking and idempotency in a service-role-only submission RPC. Its migration is `REVIEW_REQUIRED` and unapplied. The new public submission caller must not be deployed before migration validation/application and Testnet postflight.
-- RUN390: restores missing Testnet service-role SELECT grants for membership entitlements, feed mute privacy, marketplace listings and marketplace variants. The migration preserves RLS/client denial, grants no write privileges and remains REVIEW_REQUIRED/unapplied.
-- RUN389: server-enforced role capabilities for owners, editors, reviewers and field agents; active/invited collaborator project listings; owner-controlled team invitations and lifecycle management; collaborator exam answer-key stripping; evidence read/attach/review permissions. Exam and election administration remains owner-only.
-- Pi Browser-only verified Pioneer access and durable GreenHaven session requirements remain intact. User-agent/referrer values are not treated as cryptographic proof of Pi Browser identity.
-- Existing research member roles are not yet a fully enforced permission matrix. Inbox and analytics remain project-owner-only; collaborator authorization must not be inferred from membership labels.
-- Geographic analytics, multilingual instruments, offline synchronization, asynchronous large exports, trusted malware-scanner deployment, advanced retention automation and full WCAG/device/load/recovery acceptance remain outstanding.
-- Runtime is Node 22.16.0, while the project requires Node `^24.15.0`; dependencies are not installed. Dependency-backed typecheck/lint/Next build and live Pi Browser/PostgreSQL acceptance are not certified.
-- No production database, GitHub push, Vercel deployment, payment, wallet, balance or Mainnet mutation was performed. No migration has been applied; source migration inventory is not evidence of applied migrations. TypeScript, lint, and Next.js production build on supported Node 24.15.x remain release gates. Production remains NOT APPROVED.
+- Phase 9 adds a consolidated 24-assertion release gate covering canonical Pi identity, returning-user onboarding, optional profile enrichment, verified username projection, explicit wallet consent, withdrawal authorization boundaries and private Supabase Storage lifecycle.
+- Existing Phase A/B/C onboarding and identity work, Phase 5/6 profile and Storage changes, and Phase D community/storage work are preserved. No SQL migration was added or changed; the inventory contains 239 synchronized migration files.
+- Focused onboarding, Pi identity, wallet consent, Storage, community and harmonization contracts passed. The new Phase 9 gate passes 24/24.
+- Node 22.16.0 is available in this workspace; the project requires Node `^24.15.0`. Dependencies are not installed. Full dependency-backed typecheck, lint, production build and browser/device acceptance remain unverified.
+- No live Supabase bucket/policy mutation, database migration application, payment, payout, reward, entitlement, wallet balance mutation, Pi authorization, Mainnet change, Git push or Vercel deployment occurred. Production remains **NOT APPROVED**.
 
-**Authoritative working archive:** `GREENHAVEN-0.338.106-RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.zip`  
-**Audit parent:** RUN384 full project audit.  
-**Current status:** source candidate only; Testnet/Preview release gates remain outstanding.
+## Historical RUN390 project-truth snapshot (0.338.111)
+
+The detailed RUN390 and earlier records below are retained as historical implementation evidence. Their original version/archive references are not the current release pointer.
 
 ## RUN390 — server-side read permission repair
 

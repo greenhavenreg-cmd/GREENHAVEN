@@ -1,10 +1,10 @@
 # GreenHaven
 
-**Current source version:** `0.338.111` (RUN390 Membership, Feed and Marketplace read-path repair candidate)
+**Current source version:** `0.338.119` (Phase 9 coordinated onboarding, Pi identity, wallet-consent and Storage acceptance candidate, derived in place from 0.338.118)
 
-Production status: **NOT APPROVED** — Node 24.15.x dependency-backed typecheck/lint/build, migration validation/application, live Pi Browser/PostgreSQL, browser/device, recovery and operator acceptance remain outstanding.
+Production status: **NOT APPROVED** — Node 24.15.x dependency-backed typecheck/lint/build, browser/device testing, live Pi Browser, Testnet/Mainnet Storage verification and target-specific migration reconciliation remain outstanding.
 
-This repository is the canonical GreenHaven source tree. The working source derives from `GREENHAVEN-0.338.106-RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.zip`, with RUN384 retained as the cross-system audit baseline. RUN386 implements response keyset pagination and bounded complete export; RUN387 adds privacy-aware descriptive analytics; RUN388 adds scheduled studies and an atomic quota RPC held for review; RUN389 adds server-enforced team role capabilities and collaboration controls. RUN390 repairs missing server-only read grants that caused Membership status, feed mute privacy and Marketplace catalog failures; its versioned migration is held for review and unapplied. No GitHub push, Vercel deployment or Supabase migration application is claimed. See `docs/SOURCE_OF_TRUTH.md`, `docs/PROJECT_TRUTH.md`, and `docs/CURRENT_BUILD_CONTEXT.md` before further release work.
+This repository is the canonical GreenHaven source tree. The current source is derived from the user-designated `GREENHAVEN-0.338.118-PHASE-D-COMMUNITIES-STORAGE-2026-11-24-1.zip`. Phase 9 adds a consolidated 24-assertion release acceptance gate for the existing Phase A/B/C onboarding and identity repairs, progressive profile completion, explicit wallet consent and private `gh-media` lifecycle; the Phase D community and Storage work is preserved. See `GREENHAVEN-0.338.119-PHASE9-COORDINATED-ONBOARDING-IDENTITY-STORAGE-2026-11-24-REPORT.md`, `docs/SOURCE_OF_TRUTH.md` and `docs/UPGRADE-WORKLOG-0.338.119.md`. No SQL migration, live database/Storage mutation, financial action, Pi authorization, Git push or Vercel deployment was performed.
 
 ## Pi authentication frame-routing correction — 2026-11-23 / Run 373
 

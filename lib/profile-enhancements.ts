@@ -15,48 +15,48 @@ export interface ProfileCompletionMetrics {
 }
 
 export function calculateProfileCompletionMetrics(profile: any): ProfileCompletionMetrics {
+  const hasText = (value: unknown, minimum = 1) =>
+    typeof value === "string" && value.trim().length >= minimum
+  const hasPhoto = Array.isArray(profile?.photos) && profile.photos.some(
+    (value: unknown) => typeof value === "string" && value.trim().length > 0 && !value.includes("placeholder")
+  )
+  // This is a progress aid for optional profile enrichment only. Verified Pi
+  // identity, date of birth, age, wallet state and feature eligibility are not
+  // profile-completion tasks and never affect general app access.
   const metrics = {
-  displayName: { weight: 10, completed: typeof profile.displayName === "string" && profile.displayName.trim().length > 2 },
-  bio: { weight: 15, completed: typeof profile.bio === "string" && profile.bio.trim().length >= 20 },
-  photos: { weight: 20, completed: Array.isArray(profile.photos) && typeof profile.photos[0] === "string" && profile.photos[0].trim().length > 0 && !profile.photos[0].includes("placeholder") },
-  location: { weight: 10, completed: typeof profile.city === "string" && profile.city.trim().length > 0 && typeof profile.country === "string" && profile.country.trim().length > 0 },
-  interests: { weight: 15, completed: Array.isArray(profile.interests) && profile.interests.length >= 3 },
-  education: { weight: 10, completed: profile.education && profile.education.length > 0 },
-  profession: { weight: 10, completed: profile.profession && profile.profession.length > 0 },
-  verified: { weight: 5, completed: profile.verified },
-  bornDate: { weight: 5, completed: profile.bornDate && profile.bornDate.length > 0 },
+    displayName: { weight: 15, completed: hasText(profile?.displayName, 3) },
+    bio: { weight: 20, completed: hasText(profile?.bio, 20) },
+    photos: { weight: 20, completed: hasPhoto },
+    location: { weight: 15, completed: hasText(profile?.city) && hasText(profile?.country) },
+    interests: { weight: 15, completed: Array.isArray(profile?.interests) && profile.interests.some((x: unknown) => hasText(x)) },
+    education: { weight: 7, completed: hasText(profile?.education) },
+    profession: { weight: 8, completed: hasText(profile?.profession) },
   }
 
   const missing = Object.entries(metrics)
-    .filter(([, m]) => !m.completed)
+    .filter(([, metric]) => !metric.completed)
     .map(([key]) => key)
-
-  const completed = Object.entries(metrics)
-    .filter(([, m]) => m.completed)
-    .reduce((sum, [, m]) => sum + m.weight, 0)
-
-  const percentage = Math.round(completed)
-  const level =
-    percentage >= 90
-      ? "complete"
-      : percentage >= 70
-        ? "advanced"
-        : percentage >= 40
-          ? "intermediate"
-          : "beginner"
-
-  const fieldLabels: Record<string, string> = { displayName: "Display name", bio: "Bio (20+ characters)", photos: "Profile photo", location: "City and country", interests: "Interests (3+)", education: "Education", profession: "Profession", verified: "Verification", bornDate: "Birth date" }
+  const percentage = Object.entries(metrics)
+    .filter(([, metric]) => metric.completed)
+    .reduce((sum, [, metric]) => sum + metric.weight, 0)
+  const level = percentage >= 90 ? "complete" : percentage >= 70 ? "advanced" : percentage >= 40 ? "intermediate" : "beginner"
+  const fieldLabels: Record<string, string> = {
+    displayName: "Display name",
+    bio: "Bio (20+ characters)",
+    photos: "Profile photo",
+    location: "City and country",
+    interests: "Interests",
+    education: "Education",
+    profession: "Profession",
+  }
   const labeledMissing = missing.map((field) => fieldLabels[field] || field)
-  const nextMilestone = labeledMissing.length > 0 ? labeledMissing[0] : "Profile complete!"
-  const estimatedTime = missing.length * 3 // ~3 min per missing field
-
   return {
     percentage,
     missing: labeledMissing,
     score: percentage,
     level,
-    nextMilestone,
-    estimatedTimeToComplete: estimatedTime,
+    nextMilestone: labeledMissing[0] || "Profile enhanced!",
+    estimatedTimeToComplete: missing.length * 2,
   }
 }
 
@@ -233,7 +233,7 @@ export function validateInterest(interest: string): boolean {
 }
 
 export function countEndorsements(profile: any): number {
-  return Object.values(profile.endorsements || {}).reduce((sum: number, count: any) => sum + (count || 0), 0)
+  return Object.values(profile.endorsements || {}).reduce<number>((sum, count) => sum + (typeof count === "number" && Number.isFinite(count) ? count : 0), 0)
 }
 
 // ===== SOCIAL LINKS MANAGEMENT =====

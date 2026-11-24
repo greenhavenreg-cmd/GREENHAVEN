@@ -59,9 +59,6 @@ import {
 import { IdentityService } from "@/lib/identity/identity-service"
 import { startUserToAppPayment } from "@/lib/pi-u2a-payment"
 import {
-  findCompletedLocalProfileForUser,
-  isCompletedProfileShape,
-  hasLocalOnboardingStampForUser,
   stampLocalOnboardingComplete,
   isStrongCompletedProfileShape,
 } from "@/lib/onboarding-local"
@@ -685,12 +682,9 @@ export function GHCProvider({ children }: { children: ReactNode }) {
           if (!profile.username) profile.username = d.username
           if (!profile.displayName) profile.displayName = d.username
         }
-        // Server-authoritative onboarding (Phase 2A):
-        // profile.onboarded is UI/cache only — never security proof.
-        // When serverVerified AND durable, server mapping wins.
-        // If the user already completed local profile registration this session,
-        // do not force them back through onboarding solely because a non-durable
-        // (memory) identity store still has needsOnboarding=true after PIN unlock / Pi reinit.
+        // The verified server identity bridge is authoritative. A local profile
+        // or onboarding stamp may belong to another Pi account on a shared device;
+        // never let cached local state override an explicit server "required".
         if (d.serverVerified) {
           if (
             d.onboardingStatus === "complete" ||
@@ -699,65 +693,10 @@ export function GHCProvider({ children }: { children: ReactNode }) {
           ) {
             profile.onboarded = true
           } else if (d.onboardingStatus === "required" || d.needsOnboarding === true) {
-            // Phase 4 — never re-force registration when this device already finished setup
-            let alreadyLocal = false
-            try {
-              if (
-                hasLocalOnboardingStampForUser({
-                  userId: String(d.uid || profile.id || ""),
-                  username: d.username || (profile.username as string) || null,
-                  candidateUserIds: [d.uid, (d as { piUid?: string }).piUid, profile.id],
-                })
-              ) {
-                alreadyLocal = true
-                profile.onboarded = true
-              }
-            } catch {
-              /* */
-            }
-            alreadyLocal =
-              alreadyLocal ||
-              profile.onboarded === true ||
-              (typeof profile.displayName === "string" &&
-                profile.displayName.trim().length > 0 &&
-                Array.isArray(profile.photos) &&
-                profile.photos.length > 0)
-            // Also consult local profile store (PIN unlock / cold start race)
-            if (!alreadyLocal) {
-              try {
-                if (isCompletedProfileShape(profile as never)) alreadyLocal = true
-                const found = findCompletedLocalProfileForUser({
-                  userId: String(d.uid || profile.id || ""),
-                  username: d.username || (profile.username as string) || null,
-                  candidateUserIds: [d.uid, profile.id],
-                })
-                if (found) {
-                  alreadyLocal = true
-                  profile.onboarded = true
-                  // Merge stable fields so UI is not empty
-                  if (!profile.displayName && found.displayName) profile.displayName = found.displayName
-                  if ((!profile.photos || profile.photos.length === 0) && found.photos) {
-                    profile.photos = found.photos
-                  }
-                  if ((!profile.interests || !(profile.interests as unknown[]).length) && found.interests) {
-                    profile.interests = found.interests
-                  }
-                  if (!profile.city && found.city) profile.city = found.city
-                  if (!profile.primaryMode && found.primaryMode) profile.primaryMode = found.primaryMode
-                  if (!profile.bio && found.bio) profile.bio = found.bio
-                  if (!profile.coverPhoto && found.coverPhoto) profile.coverPhoto = found.coverPhoto
-                }
-              } catch {
-                /* */
-              }
-            }
-            if (!alreadyLocal) {
-              profile.onboarded = false
-            } else {
-              profile.onboarded = true
-            }
+            profile.onboarded = false
           }
         }
+
         return { ...prev, profile }
       })
     }
@@ -2493,11 +2432,10 @@ export function GHCProvider({ children }: { children: ReactNode }) {
 
   const completeOnboarding = useCallback(async (): Promise<boolean> => {
     try {
-      // Persist on server identity bridge first. The server independently checks
-      // every required registration field before changing the identity lifecycle.
-      // Client state advances only after authoritative success (or local-dev fallback).
+      // Persist onboarding completion against the verified server identity.
+      // Profile enrichment is optional and is saved independently; feature-specific
+      // eligibility checks remain enforced by the features that require them.
       let serverOk = false
-      let serverRejectedIncompleteProfile = false
       try {
         const headers = {
           "Content-Type": "application/json",
@@ -2510,7 +2448,6 @@ export function GHCProvider({ children }: { children: ReactNode }) {
         })
         const body = await res.json().catch(() => ({}))
         serverOk = Boolean(res.ok && body?.ok && body?.identity?.onboardingCompleted === true)
-        serverRejectedIncompleteProfile = res.status === 422 || body?.error === "ONBOARDING_PROFILE_INCOMPLETE"
         if (!serverOk) {
           console.warn("[completeOnboarding] server did not confirm", body?.error || res.status)
         }
@@ -2519,13 +2456,8 @@ export function GHCProvider({ children }: { children: ReactNode }) {
       }
 
       const { allowLocalAuthFallback } = await import("@/lib/system-config")
-      if (!serverOk && (serverRejectedIncompleteProfile || !allowLocalAuthFallback())) {
-        addToast(
-          serverRejectedIncompleteProfile
-            ? "Some required registration details are still missing. Return to the indicated steps and complete them."
-            : "Could not save onboarding on the server. Please check your connection and try again.",
-          "error"
-        )
+      if (!serverOk && !allowLocalAuthFallback()) {
+        addToast("Could not save onboarding on the server. Please check your connection and try again.", "error")
         return false
       }
 

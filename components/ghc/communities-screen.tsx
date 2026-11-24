@@ -1720,6 +1720,7 @@ export function CommunitiesScreen() {
                   onAcceptInvite={membershipStatus === "invited" ? () => handleAcceptCommunityInvitation(community.id) : undefined}
                   onDeclineInvite={membershipStatus === "invited" ? () => handleDeclineCommunityInvitation(community.id) : undefined}
                   category={community.category || "community"}
+                  privacy={community.privacy}
                   region={community.region}
                   role={role}
                   isSample={isSample}

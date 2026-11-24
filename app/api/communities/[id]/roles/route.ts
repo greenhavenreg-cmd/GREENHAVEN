@@ -10,11 +10,35 @@ import { socialDbConfigured, socialRpc } from "@/lib/server/social/rpc"
 import { nonDurableWriteResponse } from "@/lib/server/production-guard"
 import { enforceUserMutationRateLimit } from "@/lib/server/security/user-rate-limit"
 import { sanitizeCommunityId } from "@/lib/server/community/community-integrity"
+import { communityRole } from "@/lib/server/community/governance-store"
+import { checkDurableRateLimit, durableRateLimitCode, durableRateLimitStatus } from "@/lib/server/security/control-plane"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 type Ctx = { params: Promise<{ id: string }> }
+
+
+const NO_STORE = { "Cache-Control": "no-store, private" }
+
+/** GET /api/communities/[id]/roles — return only the caller's server-verified role. */
+export async function GET(request: Request, ctx: Ctx) {
+  const auth = await resolveAuthenticatedUser(request.headers)
+  if (!auth) return NextResponse.json({ ok: false, error: "AUTH_REQUIRED" }, { status: 401, headers: NO_STORE })
+  const rate = await checkDurableRateLimit(`community-role:${auth.userId}`, 90, 60_000, { onUnavailable: "deny" })
+  if (!rate.ok) return NextResponse.json({ ok: false, error: durableRateLimitCode(rate), retryAfterSec: rate.retryAfterSec }, { status: durableRateLimitStatus(rate), headers: { ...NO_STORE, "Retry-After": String(rate.retryAfterSec) } })
+  const { id } = await ctx.params
+  const communityId = sanitizeCommunityId(id)
+  if (!communityId) return NextResponse.json({ ok: false, error: "INVALID_ID" }, { status: 400, headers: NO_STORE })
+  if (!socialDbConfigured()) return NextResponse.json({ ok: false, error: "STORE_UNAVAILABLE" }, { status: 503, headers: NO_STORE })
+  try {
+    const role = await communityRole(communityId, auth.userId)
+    const allowed = ["owner", "admin", "moderator", "member"]
+    return NextResponse.json({ ok: true, durable: true, role: typeof role === "string" && allowed.includes(role) ? role : "guest" }, { headers: NO_STORE })
+  } catch {
+    return NextResponse.json({ ok: false, error: "ROLE_LOOKUP_UNAVAILABLE" }, { status: 503, headers: NO_STORE })
+  }
+}
 
 export async function POST(request: Request, ctx: Ctx) {
   const auth = await resolveAuthenticatedUser(request.headers)

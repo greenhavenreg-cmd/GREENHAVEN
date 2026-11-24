@@ -9,6 +9,7 @@ import { useState, memo } from "react"
 import { Users, MessageSquare, LayoutGrid, ChevronRight } from "lucide-react"
 import { LazyImage } from "./lazy-image"
 import { formatCommunityRole, communityRoleBadgeClass } from "@/lib/community/role-labels"
+import { communityPrivacyLabel, normalizeCommunityPrivacy } from "@/lib/community/discovery"
 
 interface GroupCardProps {
   id: string
@@ -27,6 +28,7 @@ interface GroupCardProps {
   groupAvatar?: string
   coverImage?: string
   category?: string
+  privacy?: string
   isJoined?: boolean
   onClick: () => void
   onToggleMute?: () => void
@@ -69,6 +71,7 @@ function GroupCardContent({
   groupAvatar,
   coverImage,
   category = "community",
+  privacy = "public",
   isJoined = true,
   onClick,
   onJoin,
@@ -133,6 +136,7 @@ function GroupCardContent({
       </button>
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${normalizeCommunityPrivacy(privacy) === "public" ? "border-emerald-200 bg-emerald-50/80 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200" : normalizeCommunityPrivacy(privacy) === "invite" ? "border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200" : "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"}`} aria-label={`Community access: ${communityPrivacyLabel(privacy)}`}>{communityPrivacyLabel(privacy)}</span>
         {isJoined ? (
           <span className="rounded-full border border-emerald-200 bg-emerald-50/80 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">Joined</span>
         ) : null}

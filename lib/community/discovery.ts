@@ -14,6 +14,14 @@ export function normalizeCommunityPrivacy(raw?: string | null): "public" | "requ
   return "public"
 }
 
+export function communityPrivacyLabel(raw?: string | null): "Open join" | "Approval" | "Invite only" | "Private" {
+  const normalized = normalizeCommunityPrivacy(raw)
+  if (normalized === "request") return "Approval"
+  if (normalized === "invite") return "Invite only"
+  if (normalized === "private") return "Private"
+  return "Open join"
+}
+
 export function privacyFilterLabel(f: CommunityPrivacyFilter): string {
   switch (f) {
     case "public":

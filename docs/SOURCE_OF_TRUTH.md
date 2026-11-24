@@ -1,16 +1,20 @@
-# GreenHaven source authority — 0.338.111 RUN390 Membership, Feed and Marketplace read-path repair (2026-11-24)
+# GreenHaven source authority — 0.338.119 Phase 9 Coordinated Acceptance (2026-11-24)
 
-**Current source version:** `0.338.111`
-**Authoritative working baseline:** `GREENHAVEN-0.338.106-RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.zip`  
-**Audit parent:** RUN384 full project audit and live Testnet/Preview reconciliation.  
-**Current working tree:** RUN390 source-only derivative of RUN389/RUN385. RUN390 adds a least-privilege read-grant migration for the live Membership, Feed privacy and Marketplace failures; it remains REVIEW_REQUIRED and unapplied. RUN386 adds deterministic keyset pagination and bounded complete CSV export; RUN387 adds privacy-suppressed descriptive analytics; RUN388 adds scheduled study availability and atomic response quotas; RUN389 adds server-enforced owner/editor/reviewer/field-agent capabilities and team lifecycle controls.  
-**Package identity:** `gh-connect@0.338.111` (user-facing brand: GREENHAVEN).
+**Current source version:** `0.338.119`
+**User-designated baseline archive:** `GREENHAVEN-0.338.118-PHASE-D-COMMUNITIES-STORAGE-2026-11-24-1.zip`  
+**Parent candidate:** `0.338.118` Phase D Communities + Supabase Storage  
+**Current working tree:** source-only Phase 9 coordinated acceptance increment; see `docs/UPGRADE-WORKLOG-0.338.119.md` and the Phase 9 delivery report.  
+**Package identity:** `gh-connect@0.338.119` (user-facing brand: GREENHAVEN).
 
-This source remains a candidate, not a deployment. GitHub write permission was previously denied (HTTP 403); no push or Vercel deployment is claimed. The RUN388 migration is `REVIEW_REQUIRED`; do not deploy its calling code before disposable-PostgreSQL validation, Testnet history reconciliation, explicit operator approval, application and postflight verification. No Supabase migration has been applied by this work. No production database or Mainnet mutation occurred; source migration inventory is not evidence of applied migrations. Production, Mainnet, payment state, balances and financial records remain untouched. TypeScript, lint, and Next.js production build on supported Node 24.15.x remain release gates.
+The Phase 7/8 domain register remains `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`; RUN385 research/field-research work remains retained. The current source preserves the Phase A identity/onboarding gate repair, Phase B onboarding UX, Phase C Pi identity and explicit wallet consent, progressive profile completion, private Supabase Storage lifecycle and Phase D community/storage work. Phase 9 adds a 24-assertion cross-workstream acceptance gate registered in both static and prebuild pipelines.
 
-Focused RUN385–RUN390 contracts pass 19/19, 17/17, 14/14, 16/16, 21/21 and 11/11 respectively; full static verification passes 63/63, production-safety checks pass 21/21, and the secret-pattern scan reports zero potential values across 2,808 text files. These checks are source-level and do not replace Node 24.15.x dependency-backed build or live acceptance.
+This source remains a candidate, not a deployment. Node 24.15.x dependency-backed typecheck/lint/build, browser/device QA, live Pi Browser and Testnet/Mainnet Storage acceptance, and exact target-specific migration reconciliation remain outstanding. Production remains **NOT APPROVED**. Explicit operator approval is required before any live migration, Storage provisioning, provider or financial action. No migration application, live database or Storage mutation, financial action, Pi authorization action, Mainnet change, GitHub push or Vercel deployment was performed. No production database mutation occurred. The source migration inventory is not evidence of applied migrations.
 
-The established architecture remains authoritative: work only on GitHub `testnet` and Vercel Preview; preserve canonical GreenHaven identity, official Pi SDK authentication and server-side Pi Platform token verification; require durable GreenHaven sessions for Research/Field APIs; keep service-role credentials server-side; preserve RLS and client-deny grants; and do not infer cryptographic Pi Browser attestation from user-agent/referrer values. Node 24.15.x dependency-backed typecheck/lint/build, live Pi Browser and database acceptance remain release gates.
+The established architecture remains authoritative: preserve canonical GreenHaven identity, official Pi SDK authentication and server-side Pi Platform token verification; require durable GreenHaven sessions; keep service-role credentials server-side; preserve RLS and client-deny grants; keep wallet consent separate from sign-in and withdrawal destination authorization; and retain private viewer-authorized media delivery. Server-authoritative order, reward, wallet, ledger, payout and settlement boundaries remain unchanged.
+
+## Historical RUN390 source snapshot (0.338.111)
+
+The records below retain the RUN390 implementation history. Their original version/archive references are historical and do not override the current 0.338.119 source pointer.
 
 ## RUN390 — Membership, Feed Privacy and Marketplace read-path repair
 
