@@ -5,7 +5,8 @@
 1. [`SOURCE_OF_TRUTH.md`](SOURCE_OF_TRUTH.md) — sole source/archive authority and release boundaries.
 2. [`PROJECT_TRUTH.md`](PROJECT_TRUTH.md) — current verified project state and explicit acceptance limits.
 3. [`CURRENT_BUILD_CONTEXT.md`](CURRENT_BUILD_CONTEXT.md) — current build/runtime context.
-4. [`PROJECT-WIDE-AUDIT-RUN379-2026-11-24.md`](PROJECT-WIDE-AUDIT-RUN379-2026-11-24.md) — latest project-wide audit findings and required access-control upgrade plan.
+4. [`RUN382-SUPABASE-REST-JSON-CONTENT-TYPE-2026-11-24.md`](RUN382-SUPABASE-REST-JSON-CONTENT-TYPE-2026-11-24.md) — latest Supabase REST transport correction and verification status.
+5. [`PROJECT-WIDE-AUDIT-RUN379-2026-11-24.md`](PROJECT-WIDE-AUDIT-RUN379-2026-11-24.md) — project-wide audit findings and access-control upgrade plan.
 
 ## Historical implementation records
 

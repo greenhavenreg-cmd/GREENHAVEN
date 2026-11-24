@@ -1,13 +1,17 @@
-# GreenHaven source authority — 0.338.105 RUN381 Pi-only Research access control (2026-11-24)
+# GreenHaven source authority — 0.338.105 RUN382 Supabase REST JSON transport correction (2026-11-24)
 
 **Current source version:** `0.338.105`
 **Authoritative parent archive:** `GREENHAVEN-0.338.104-RUN379-ACCESS-AUDIT-RECONCILED-2026-11-24.zip`
-**Current working tree:** RUN381 source-only CSP correction on RUN380, which is a derivative of the reconciled RUN379 archive. Pi-only Research/Field access controls and the exact-origin Pi authentication CSP correction are source implemented; targeted checks pass. Not pushed or deployed.
+**Current working tree:** RUN382 source-only Supabase REST JSON content-type correction on RUN381/RUN380, derived from the reconciled RUN379 archive. Pi-only Research/Field access controls, exact-origin Pi CSP correction and shared JSON transport correction are source implemented; static verification passes. GitHub write access is currently denied; not pushed or deployed.
 **Package identity:** `gh-connect@0.338.105` (user-facing brand: GREENHAVEN).
 
 The reconciled RUN379 archive uploaded on 2026-11-24 is the sole authoritative parent baseline for this derivative. RUN375–RUN377 are inherited historical implementation increments, not alternative current baselines. Preserve the established architecture, canonical GreenHaven identity principal, financial authority boundaries, server-side Pi token verification, and dedicated release checks. Do not use an older archive or historical document to override the RUN379 source.
 
-The RUN331/RUN332/RUN364 notes and earlier RUN worklogs below are historical implementation records only. The current executable source and this RUN380 authority header take precedence.
+The RUN331/RUN332/RUN364 notes and earlier RUN worklogs below are historical implementation records only. The current executable source and this RUN382 authority header take precedence.
+
+## RUN382 — Supabase REST JSON content-type correction
+
+Pi SDK authentication now reaches the server with a valid access token, but canonical identity insertion failed because the shared Supabase REST helper omitted `Content-Type: application/json` for JSON string bodies. RUN382 centralizes this policy in `lib/server/supabase/rest-headers.ts`, preserves explicit content types and non-string bodies, and adds a five-case behavior test. Full static verification passes 63/63. GitHub write operations returned HTTP 403, so this is not yet in the remote `testnet` branch and is not deployed. No database or environment changes were made.
 
 ## RUN381 — Pi authentication CSP correction
 

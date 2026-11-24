@@ -1,4 +1,4 @@
-# Current project truth — 0.338.105 RUN381 Pi-only Research access control (2026-11-24)
+# Current project truth — 0.338.105 RUN382 Supabase REST JSON transport correction (2026-11-24)
 
 - User-designated parent baseline is `GREENHAVEN-0.338.104-RUN379-ACCESS-AUDIT-RECONCILED-2026-11-24.zip`. RUN379 includes the inherited RUN377 identity/session ACL work and adds token-safe requested-scope/CSP diagnostics. The current audit edits are local source changes only; no push or deployment is claimed.
 - Inherited RUN373–RUN375 checks remain part of the supplied parent baseline. RUN377 ACL source contract 17/17; RUN376 readiness-policy regression 14 assertions; project-truth 11/11; release hygiene 17/17; migration inventory 232/232 synchronized. The 2026-11-24 RUN379 audit records `npm run verify:static` completing with exit code 0, 4,738 PASS lines, and zero FAIL lines. This is static verification only; it does not certify dependency-backed typecheck/lint/build or live acceptance.
@@ -14,8 +14,12 @@
 **Current source version:** `0.338.105`  
 **Package identity:** `gh-connect@0.338.105`  
 **Authoritative parent archive:** RUN379 access-audit reconciled archive  
-**Current local working tree:** RUN381 exact-origin Pi authentication CSP correction on RUN380; not pushed or deployed.  
+**Current local working tree:** RUN382 Supabase REST JSON content-type correction on RUN381; GitHub write access denied; not pushed or deployed.  
 **Current status:** **NOT APPROVED** for production.
+
+## RUN382 — Supabase REST JSON content-type correction
+
+Pi SDK sign-in and access-token return now succeed in App CDN frame context with no CSP violations. The subsequent server verification failed while inserting the canonical Pi identity because `supabaseRest()` sent a JSON string body as `text/plain;charset=UTF-8`. RUN382 adds a shared JSON-aware header policy, preserving explicit content types, non-string bodies, server-only service-role authorization, no-store behavior, and existing identity immutability. `npm run verify:static` passes 63/63; the focused header test passes 5/5. The change is local only because GitHub write operations returned HTTP 403. Preview retest is pending.
 
 ## RUN381 — Pi authentication CSP correction
 

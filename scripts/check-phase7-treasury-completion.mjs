@@ -10,6 +10,7 @@ const page = read("app/admin/treasury/page.tsx")
 const summary = read("app/api/admin/treasury/summary/route.ts")
 const operatorKey = read("lib/server/security/operator-key.ts")
 const restClient = read("lib/server/supabase/rest-client.ts")
+const restHeaders = read("lib/server/supabase/rest-headers.ts")
 const checks = [
  ["seller payout requests are aggregated separately by PI/GHC", /SELECT DISTINCT upper\(currency\) currency FROM public\.gh_marketplace_orders UNION SELECT DISTINCT upper\(currency\) FROM public\.gh_seller_payout_requests/.test(migration) && /sellerPayoutsByAsset/.test(migration)],
  ["unallocated completed verified orders are exposed as a distinct snapshot", /unallocatedCompletedVerifiedOrderGrossCurrentSnapshot/.test(migration) && /payment_status='verified'/.test(migration)],
@@ -26,7 +27,7 @@ const checks = [
  ["case endpoint is operator protected and bounded", /operatorDiagnosticsAuthorized\(request\)/.test(cases) && /OPERATOR_KEY_MIN_BYTES\s*=\s*32/.test(operatorKey) && /readBoundedJson\(request, 32 \* 1024\)/.test(cases) && /text\(body.note, 2000\)/.test(cases)],
  ["dashboard provides reporting and investigation history", /Treasury operations/.test(page) && /Investigation history/.test(page)],
  ["summary degrades if report or durable case source is unavailable", /financialReport\?\.ok !== true/.test(summary) && /operatorCases\?\.ok === true/.test(summary)],
- ["server adapter uses service-role RPC and timeout", /hasPrivilegedDatabase/.test(helper) && /supabaseRpc\(name, body, \{ timeoutMs: 10000 \}\)/.test(helper) && /serviceHeaders\(config\.serviceRoleKey/.test(restClient) && /AbortSignal\.timeout\(options\.timeoutMs \?\? 15_000\)/.test(restClient)],
+ ["server adapter uses service-role RPC and timeout", /hasPrivilegedDatabase/.test(helper) && /supabaseRpc\(name, body, \{ timeoutMs: 10000 \}\)/.test(helper) && /export function serviceHeaders/.test(restHeaders) && /AbortSignal\.timeout\(options\.timeoutMs \?\? 15_000\)/.test(restClient)],
 ]
 let failed=0; for (const [name,ok] of checks) { console.log(`${ok?"PASS":"FAIL"} ${name}`); if(!ok) failed++ }
 console.log(`Phase 7 completion: ${checks.length-failed}/${checks.length}`); process.exit(failed?1:0)

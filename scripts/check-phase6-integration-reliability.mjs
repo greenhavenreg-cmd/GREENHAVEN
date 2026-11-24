@@ -22,6 +22,7 @@ const economyDb = read('lib/server/economy/db.ts')
 const fulfillment = read('app/api/payments/fulfill/route.ts')
 const rpc = read('lib/server/social/rpc.ts')
 const restClient = read('lib/server/supabase/rest-client.ts')
+const restHeaders = read('lib/server/supabase/rest-headers.ts')
 const sessions = read('lib/server/identity/session-store.ts')
 const piIdentity = read('lib/server/identity/pi-identity-store.ts')
 const messaging = read('app/api/messaging/conversations/[conversationId]/messages/route.ts')
@@ -47,7 +48,7 @@ const checks = [
   ['payment fulfillment requires authenticated owner match', /resolveAuthenticatedUser\(request\.headers\)/.test(fulfillment) && /intent\.userId !== auth\.userId/.test(fulfillment)],
   ['payment fulfillment requires durable completed intent before settlement', /intent\.status !== "COMPLETED"/.test(fulfillment) && /PAYMENT_NOT_COMPLETED/.test(fulfillment)],
   ['payment fulfillment has explicit idempotent fulfilled path', /intent\.status === "FULFILLED"/.test(fulfillment) && /idempotent: true/.test(fulfillment)],
-  ['social RPC keeps service-role key server-side and no-store', /supabaseRpc\(fn, body, \{ timeoutMs: SOCIAL_UPSTREAM_TIMEOUT_MS \}\)/.test(rpc) && /serviceHeaders\(config\.serviceRoleKey/.test(restClient) && /Authorization.*Bearer/.test(restClient) && /cache:\s*"no-store"/.test(restClient) && /AbortSignal\.timeout\(options\.timeoutMs \?\? 15_000\)/.test(restClient)],
+  ['social RPC keeps service-role key server-side and no-store', /supabaseRpc\(fn, body, \{ timeoutMs: SOCIAL_UPSTREAM_TIMEOUT_MS \}\)/.test(rpc) && /export function serviceHeaders/.test(restHeaders) && /Authorization.*Bearer/.test(restHeaders) && /cache:\s*"no-store"/.test(restClient) && /AbortSignal\.timeout\(options\.timeoutMs \?\? 15_000\)/.test(restClient)],
   ['social RPC does not probe legacy RPC variants after canonical failure', /return socialRpcOnce\(fn, body\)/.test(rpc)],
   ['production session creation rejects memory-only durability', /SESSION_DURABILITY_UNAVAILABLE/.test(sessions) && /if \(isProd\)/.test(sessions)],
   ['production Pi identity rejects memory-only durability', /IDENTITY_DURABILITY_UNAVAILABLE/.test(piIdentity) && /isProductionRuntime\(\)/.test(piIdentity)],

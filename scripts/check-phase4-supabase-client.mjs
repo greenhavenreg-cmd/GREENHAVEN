@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url"
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..")
 const clientPath = join(root, "lib/server/supabase/rest-client.ts")
+const headersPath = join(root, "lib/server/supabase/rest-headers.ts")
 
 const checks = []
 const ok = (name, pass, detail = "") => checks.push({ name, pass: Boolean(pass), detail })
@@ -18,7 +19,18 @@ if (existsSync(clientPath)) {
   ok("exports supabaseRpc", /export async function supabaseRpc/.test(src))
   ok("exports supabaseRest", /export async function supabaseRest/.test(src))
   ok("exports getServiceSupabaseConfig", /export function getServiceSupabaseConfig/.test(src))
+  ok("uses shared Supabase header policy", /import \{ serviceHeaders \} from \"\.\/rest-headers\"/.test(src))
+  ok("REST helper passes body into header policy", /serviceHeaders\(config\.serviceRoleKey, fetchInit\.headers, fetchInit\.body\)/.test(src))
   ok("timeouts via AbortSignal", /AbortSignal\.timeout/.test(src))
+}
+
+if (existsSync(headersPath)) {
+  const headers = readFileSync(headersPath, "utf8")
+  ok("JSON string bodies are detected safely", /function isJsonStringBody[\s\S]*?JSON\.parse\(body\)/.test(headers))
+  ok("JSON content type is defaulted only when absent", /!headers\.has\("Content-Type"\) && isJsonStringBody\(body\)[\s\S]*?headers\.set\("Content-Type", "application\/json"\)/.test(headers))
+  ok("explicit content types remain caller-controlled", /new Headers\(extra\)[\s\S]*?!headers\.has\("Content-Type"\)/.test(headers))
+} else {
+  ok("shared header policy module exists", false)
 }
 
 // Count remaining raw /rest/v1/ outside the client module

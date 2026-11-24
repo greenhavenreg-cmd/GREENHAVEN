@@ -1,6 +1,7 @@
 # GreenHaven project source of truth
 
 ## Active authority
+- Current source derivative: RUN382 / `gh-connect@0.338.105`, based on the reconciled RUN379 parent through RUN380/RUN381. The latest local change corrects JSON content-type handling in the server-side Supabase REST transport. It is not yet pushed to GitHub because the connected integration currently denies write access.
 - The application source code in this repository is authoritative for implemented behavior.
 - `supabase/migrations/` is the ordered, immutable database change history. Never delete or rewrite applied migrations.
 - `.env.example` is the single canonical environment-variable name inventory. It contains safe defaults and blank placeholders, never credentials.

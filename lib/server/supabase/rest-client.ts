@@ -6,6 +6,7 @@
  * never leave the server.
  */
 import { readGhcServerEnv } from "@/lib/server/economy/env"
+import { serviceHeaders } from "./rest-headers"
 
 export type SupabaseRestConfig = {
   baseUrl: string
@@ -23,14 +24,6 @@ export function getServiceSupabaseConfig(): SupabaseRestConfig | null {
     baseUrl: env.supabaseUrl.replace(/\/$/, ""),
     serviceRoleKey: env.supabaseServiceRoleKey,
   }
-}
-
-function serviceHeaders(key: string, extra?: HeadersInit): Headers {
-  const h = new Headers(extra)
-  h.set("apikey", key)
-  h.set("Authorization", `Bearer ${key}`)
-  if (!h.has("Accept")) h.set("Accept", "application/json")
-  return h
 }
 
 /** POST /rest/v1/rpc/{fn} with JSON body. */
@@ -79,7 +72,7 @@ export async function supabaseRest<T = unknown>(
     return { ok: false, status: 400, error: "INVALID_RESPONSE_LIMIT", headers: new Headers() }
   }
   try {
-    const headers = serviceHeaders(config.serviceRoleKey, fetchInit.headers)
+    const headers = serviceHeaders(config.serviceRoleKey, fetchInit.headers, fetchInit.body)
     const res = await fetch(`${config.baseUrl}/rest/v1/${rel}`, {
       ...fetchInit,
       headers,
