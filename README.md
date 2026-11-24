@@ -1,10 +1,10 @@
 # GreenHaven
 
-**Current source version:** `0.338.105` (RUN380 Pi-only Research and Field access-control derivative)
+**Current source version:** `0.338.105` (RUN381 Pi authentication CSP correction on RUN380)
 
 Production status: **NOT APPROVED** — supported Node 24.15.0 dependency-backed typecheck/lint/build, browser/device, live database/provider and operator acceptance remain outstanding.
 
-This repository is the canonical GreenHaven source tree. The authoritative parent archive is `GREENHAVEN-0.338.104-RUN379-ACCESS-AUDIT-RECONCILED-2026-11-24.zip`; RUN380 is a source-only derivative. See `docs/SOURCE_OF_TRUTH.md`, `docs/PROJECT_TRUTH.md`, `docs/RUN380-PI-ONLY-RESEARCH-ACCESS-CONTROL.md`, and `docs/PROJECT-WIDE-AUDIT-RUN379-2026-11-24.md` before implementation or release work. Older RUN/phase notes are historical evidence, not current implementation instructions.
+This repository is the canonical GreenHaven source tree. The authoritative parent archive is `GREENHAVEN-0.338.104-RUN379-ACCESS-AUDIT-RECONCILED-2026-11-24.zip`; RUN380 and RUN381 are source-only derivatives. See `docs/SOURCE_OF_TRUTH.md`, `docs/PROJECT_TRUTH.md`, `docs/RUN380-PI-ONLY-RESEARCH-ACCESS-CONTROL.md`, and `docs/PROJECT-WIDE-AUDIT-RUN379-2026-11-24.md` before implementation or release work. Older RUN/phase notes are historical evidence, not current implementation instructions.
 
 ## Pi authentication frame-routing correction — 2026-11-23 / Run 373
 
@@ -153,6 +153,10 @@ RUN328 coordinates the user-selected Identity & Authentication, Community discus
 
 RUN377 repairs and verifies the Testnet service-role ACLs for Pi identity/session storage, reconciles the source migration filename to the exact remote version `20261123145603`, and upgrades `/api/health` to perform bounded live PostgREST read probes of both table contracts. The updated source remains pending Node 24.15.x build and deployed Preview / real Pi Browser acceptance. Mainnet remains untouched. See `docs/UPGRADE-WORKLOG-0.338.104.md`.
 
+
+## RUN381 — Pi authentication CSP correction
+
+The 2026-11-24 Testnet Pi Browser diagnostics showed enforced `connect-src` blocks for the exact host `socialchain.app` immediately before `Pi.authenticate()` rejected. RUN381 adds only `https://socialchain.app` to the enforced `connect-src` directive; it does not add a wildcard or weaken other CSP directives. Live Pi Browser acceptance on the Testnet Preview remains required. See `docs/RUN381-PI-AUTH-CSP-CONNECT-SOURCE-FIX-2026-11-24.md`.
 
 ## RUN380 — Pi-only Research and Field access
 

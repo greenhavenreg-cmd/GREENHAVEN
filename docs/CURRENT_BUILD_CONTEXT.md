@@ -1,4 +1,4 @@
-# CURRENT BUILD CONTEXT — 0.338.105 RUN380 (2026-11-24)
+# CURRENT BUILD CONTEXT — 0.338.105 RUN381 (2026-11-24)
 
 - **Authoritative parent archive:** `GREENHAVEN-0.338.104-RUN379-ACCESS-AUDIT-RECONCILED-2026-11-24.zip`. RUN380 is a source-only derivative; older archives are historical context only.
 - **Latest work:** all Research share pages, submission/evidence/exam APIs, Field reporting, surveys and Field evidence/admin APIs now require the durable GreenHaven account-security context created after official Pi SDK authentication and server-side Pi Platform verification. The public code-only Field Desk unlock is retired; `/field` retains the reporting UI inside the authenticated shell. Anonymous Research participation is disabled.

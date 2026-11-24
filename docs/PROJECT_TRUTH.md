@@ -1,4 +1,4 @@
-# Current project truth — 0.338.105 RUN380 Pi-only Research access control (2026-11-24)
+# Current project truth — 0.338.105 RUN381 Pi-only Research access control (2026-11-24)
 
 - User-designated parent baseline is `GREENHAVEN-0.338.104-RUN379-ACCESS-AUDIT-RECONCILED-2026-11-24.zip`. RUN379 includes the inherited RUN377 identity/session ACL work and adds token-safe requested-scope/CSP diagnostics. The current audit edits are local source changes only; no push or deployment is claimed.
 - Inherited RUN373–RUN375 checks remain part of the supplied parent baseline. RUN377 ACL source contract 17/17; RUN376 readiness-policy regression 14 assertions; project-truth 11/11; release hygiene 17/17; migration inventory 232/232 synchronized. The 2026-11-24 RUN379 audit records `npm run verify:static` completing with exit code 0, 4,738 PASS lines, and zero FAIL lines. This is static verification only; it does not certify dependency-backed typecheck/lint/build or live acceptance.
@@ -14,8 +14,12 @@
 **Current source version:** `0.338.105`  
 **Package identity:** `gh-connect@0.338.105`  
 **Authoritative parent archive:** RUN379 access-audit reconciled archive  
-**Current local working tree:** RUN380 Pi-only Research/Field access-control derivative; not pushed or deployed.  
+**Current local working tree:** RUN381 exact-origin Pi authentication CSP correction on RUN380; not pushed or deployed.  
 **Current status:** **NOT APPROVED** for production.
+
+## RUN381 — Pi authentication CSP correction
+
+The 2026-11-24 Testnet Pi Browser diagnostics recorded enforced `connect-src` blocks for `socialchain.app` immediately before authentication rejection. The parent CSP allowed this origin in frame directives but not `connect-src`. RUN381 adds only `https://socialchain.app` to `connect-src`, with no wildcard. The updated regression gate checks both conditions. Live Testnet Preview authentication retest remains outstanding.
 
 ## RUN380 — Pi-only Research and Field access control
 
