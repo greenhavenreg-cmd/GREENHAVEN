@@ -11,7 +11,7 @@ const checks = [
   ['revoked membership can only be re-invited through a revoked-status guarded update', /status=eq\.revoked/.test(collection)],
   ['membership actions are bounded and rate limited', /readBoundedJson\(request, 2 \* 1024\)/.test(member) && /checkDurableRateLimit/.test(member)],
   ['invitee can only accept their own pending invitation', /isInvitee && action === "accept"/.test(member) && /member\.status !== "invited"/.test(member)],
-  ['invitation acceptance uses a conditional status update to prevent revoke/accept races', /statusGuard = action === "accept" \? "&status=eq\.invited"/.test(member)],
+  ['membership updates use conditional current-status guards to prevent concurrent lifecycle races', /statusGuard = `&status=eq\.\$\{encodeURIComponent\(String\(member\.status\)\)\}`/.test(member) && /member\.status !== "invited"/.test(member)],
   ['only project owner can revoke, suspend, reactivate or change roles', /if \(!isOwner && !\(isInvitee && action === "accept"\)\)/.test(member)],
   ['database failures are surfaced as unavailable instead of false not-found responses', /if \(!memberResult\.ok\)[\s\S]*?status: 503/.test(member) && /if \(!ownerResult\.ok\)[\s\S]*?status: 503/.test(member)],
   ['membership endpoints use private no-store responses', /private, no-store/.test(collection) && /private, no-store/.test(member)],

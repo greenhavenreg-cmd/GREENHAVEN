@@ -1,17 +1,36 @@
-# GreenHaven source authority — 0.338.106 RUN385 Research & Field Research upgrade (2026-11-24)
+# GreenHaven source authority — 0.338.110 RUN389 Research & Field Research readiness (2026-11-24)
 
-**Current source version:** `0.338.106`
-**Authoritative parent archive:** `GREENHAVEN-0.338.104-RUN379-ACCESS-AUDIT-RECONCILED-2026-11-24.zip`
-**Current working tree:** RUN385 source-only Research & Field Research upgrade derived from the RUN384 full project audit archive. It adds a Testnet network fence, explicit feature-off precedence, fail-closed example feature flags, a canonical-identity fallback for the daily-claim FAB, media bucket failure handling, two catalog-recovered historical migration sources, a held 17-index performance migration, and held method-scoped grants for 13 additional server REST tables. RUN383/RUN384 are not yet pushed or deployed.
-**Package identity:** `gh-connect@0.338.106` (user-facing brand: GREENHAVEN).
+**Current source version:** `0.338.110`
+**Authoritative working baseline:** `GREENHAVEN-0.338.106-RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.zip`  
+**Audit parent:** RUN384 full project audit and live Testnet/Preview reconciliation.  
+**Current working tree:** RUN389 source-only derivative of RUN385. RUN386 adds deterministic keyset pagination and bounded complete CSV export; RUN387 adds privacy-suppressed descriptive analytics; RUN388 adds scheduled study availability and atomic response quotas; RUN389 adds server-enforced owner/editor/reviewer/field-agent capabilities and team lifecycle controls.  
+**Package identity:** `gh-connect@0.338.110` (user-facing brand: GREENHAVEN).
 
-Any Testnet migration application, GitHub push, Vercel Preview deployment or Production/Mainnet change requires its own explicit operator approval and verified target. No Production database, balances, payments, orders, entitlements or Mainnet migrations are changed by RUN385. The reconciled RUN379 archive uploaded on 2026-11-24 is the sole authoritative parent baseline for this derivative. RUN375–RUN377 are inherited historical implementation increments, not alternative current baselines. Preserve the established architecture, canonical GreenHaven identity principal, financial authority boundaries, server-side Pi token verification, and dedicated release checks. Do not use an older archive or historical document to override the RUN379 source.
+This source remains a candidate, not a deployment. GitHub write permission was previously denied (HTTP 403); no push or Vercel deployment is claimed. The RUN388 migration is `REVIEW_REQUIRED`; do not deploy its calling code before disposable-PostgreSQL validation, Testnet history reconciliation, explicit operator approval, application and postflight verification. No Supabase migration has been applied by this work. No production database or Mainnet mutation occurred; source migration inventory is not evidence of applied migrations. Production, Mainnet, payment state, balances and financial records remain untouched. TypeScript, lint, and Next.js production build on supported Node 24.15.x remain release gates.
 
-The RUN331/RUN332/RUN364 notes and earlier RUN worklogs below are historical implementation records only. The current executable source and this RUN382 authority header take precedence.
+Focused RUN385–RUN389 contracts pass 19/19, 17/17, 14/14, 16/16 and 21/21 respectively; full static verification passes 63/63, production-safety checks pass 21/21, and the secret-pattern scan reports zero potential values across 2,804 text files. These checks are source-level and do not replace Node 24.15.x dependency-backed build or live acceptance.
 
-## RUN385 — Research & Field Research workspace upgrade (2026-11-24)
+The established architecture remains authoritative: work only on GitHub `testnet` and Vercel Preview; preserve canonical GreenHaven identity, official Pi SDK authentication and server-side Pi Platform token verification; require durable GreenHaven sessions for Research/Field APIs; keep service-role credentials server-side; preserve RLS and client-deny grants; and do not infer cryptographic Pi Browser attestation from user-agent/referrer values. Node 24.15.x dependency-backed typecheck/lint/build, live Pi Browser and database acceptance remain release gates.
 
-RUN385 reorganizes the Research Studio home with project lifecycle metrics, search and status filters; adds a guarded CSV export for the latest 200 owner-inbox responses; corrects Pioneer share-link messaging to state the Pi Browser and server-verified identity requirement; adds a Field Desk session-verification loading state; and marks the private Studio page no-index/no-follow. The RUN385 gate passes 19/19 and is included in static/prebuild checks. See `docs/RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.md`. This is a source-only increment; no push, deployment or database migration occurred.
+## RUN389 — team collaboration and granular roles
+
+Adds a centralized server-side Research capability matrix. Owners retain full project administration; editors can read responses/analytics and attach their own evidence; reviewers can read and review scanner-cleared evidence; field agents receive no Research Studio data access and must use separately assigned Field Desk scopes. Project lists include active/invited collaborations, collaborator schemas omit exam answer keys, and the owner team workspace supports invitations, role changes, suspension, reactivation and revocation. Exam/election management remains owner-only until every API surface adopts the permission matrix. See `docs/RUN389-RESEARCH-TEAM-ROLES-2026-11-24.md`.
+
+## RUN388 — scheduled studies and atomic response quotas
+
+Study creation now accepts optional opening/closing timestamps and a response quota. The public form checks study availability, while final submission calls `gh_research_submit_response`, a service-role-only SECURITY DEFINER RPC that locks the project row, preserves idempotent retries, validates schedule/quota configuration and enforces the response limit under concurrent submissions. Migration `20261124150000_run388_research_atomic_schedule_quota.sql` is held `REVIEW_REQUIRED` and unapplied. Do not deploy the caller until the migration is approved, validated and installed on Testnet.
+
+## RUN387 — privacy-aware descriptive research analytics
+
+Adds owner-scoped, rate-limited descriptive analytics for review status, numeric distributions, choice counts and valid date ranges. Free-text content is never returned; categorical groups below five are suppressed. Analysis is bounded to 20,000 records and labels incomplete coverage. Geographic analysis is deliberately not inferred from free-text answers; canonical geography and privacy governance remain a separate stage.
+
+## RUN386 — paginated response management and complete bounded export
+
+Replaces the fixed 200-row inbox query with deterministic keyset pagination (`submitted_at DESC, id DESC`), validated opaque cursors, bounded page sizes and no-store responses. The UI supports load-more and traverses the complete cursor before creating a CSV. Export aborts without a partial file if a page fails and is capped at 20,000 responses in the browser.
+
+## RUN385 — Research & Field Research workspace upgrade
+
+RUN385 reorganizes the Research Studio home with project lifecycle metrics, study search/status filters, improved response inbox controls, Pi Browser-only participation messaging, Field Desk session-verification UX and no-index metadata. See `docs/RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.md`.
 
 ## RUN384 — full project audit and targeted hardening (2026-11-24)
 

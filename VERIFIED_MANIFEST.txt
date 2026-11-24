@@ -2,13 +2,13 @@ GH-CONNECT VERIFIED SOURCE MANIFEST
 ==================================
 inventory_status=OK
 duplicate_version_prefixes=
-project_version=0.338.106
+project_version=0.338.110
 manifest_format_version=1
-canonical_migrations=237
+canonical_migrations=238
 classification_required=122
 classification_requires_approval=1
 classification_proposal=2
-classification_review_required=112
+classification_review_required=113
 source=supabase/migrations/*.sql
 
 IMPORTANT: This manifest inventories repository files only. It does NOT prove migrations are applied to any Supabase project.
@@ -259,3 +259,4 @@ ALL_MIGRATIONS_ORDERED_FOR_REVIEW:
 [REVIEW_REQUIRED] size=1304 path=supabase/migrations/20261124095500_run383_identity_privacy_service_role_grants.sql
 [REVIEW_REQUIRED] size=2440 path=supabase/migrations/20261124110000_run384_research_foreign_key_indexes.sql
 [REVIEW_REQUIRED] size=3206 path=supabase/migrations/20261124120000_run384_server_rest_table_grants.sql
+[REVIEW_REQUIRED] size=5194 path=supabase/migrations/20261124150000_run388_research_atomic_schedule_quota.sql

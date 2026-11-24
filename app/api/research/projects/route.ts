@@ -50,9 +50,34 @@ export async function GET(request: Request) {
   const rate = await checkDurableRateLimit(`research-project-list:${auth.userId}`, 60, 60_000, { onUnavailable: "deny" })
   if (!rate.ok) return NextResponse.json({ ok: false, error: durableRateLimitCode(rate) }, { status: durableRateLimitStatus(rate), headers: NO_STORE })
   if (!getServiceSupabaseConfig()) return NextResponse.json({ ok: false, error: "RESEARCH_STORAGE_UNAVAILABLE" }, { status: 503, headers: NO_STORE })
-  const result = await supabaseRest<Array<Record<string, unknown>>>(`gh_research_projects?owner_user_id=eq.${encodeURIComponent(auth.userId)}&select=id,slug,title,description,project_type,status,form_schema,created_at,updated_at,published_at&order=updated_at.desc&limit=100`)
-  if (!result.ok) return NextResponse.json({ ok: false, error: "RESEARCH_STORAGE_UNAVAILABLE" }, { status: 503, headers: NO_STORE })
-  return NextResponse.json({ ok: true, projects: result.data }, { headers: NO_STORE })
+  const [owned, membershipResult] = await Promise.all([
+    supabaseRest<Array<Record<string, unknown>>>(`gh_research_projects?owner_user_id=eq.${encodeURIComponent(auth.userId)}&select=id,slug,title,description,project_type,status,form_schema,created_at,updated_at,published_at&order=updated_at.desc&limit=100`),
+    supabaseRest<Array<{ id: string; project_id: string; role: string; status: string }>>(`gh_research_members?user_id=eq.${encodeURIComponent(auth.userId)}&status=in.(invited,active)&select=id,project_id,role,status&order=created_at.desc&limit=200`),
+  ])
+  if (!owned.ok || !membershipResult.ok) return NextResponse.json({ ok: false, error: "RESEARCH_STORAGE_UNAVAILABLE" }, { status: 503, headers: NO_STORE })
+  const ownedRows = (owned.data || []).map((project) => ({ ...project, access_role: "owner", membership_status: "active", membership_id: null }))
+  const ownedIds = new Set(ownedRows.map((project) => String(project.id)))
+  const memberRows = (membershipResult.data || []).filter((member) => !ownedIds.has(member.project_id)).slice(0, 100)
+  let memberProjects: Array<Record<string, unknown>> = []
+  if (memberRows.length) {
+    const ids = [...new Set(memberRows.map((member) => member.project_id))]
+    const byId = await supabaseRest<Array<Record<string, unknown>>>(`gh_research_projects?id=in.(${ids.map(encodeURIComponent).join(",")})&select=id,slug,title,description,project_type,status,form_schema,created_at,updated_at,published_at&order=updated_at.desc&limit=100`)
+    if (!byId.ok) return NextResponse.json({ ok: false, error: "RESEARCH_STORAGE_UNAVAILABLE" }, { status: 503, headers: NO_STORE })
+    const memberByProject = new Map(memberRows.map((member) => [member.project_id, member]))
+    memberProjects = (byId.data || []).map((project) => {
+      const membership = memberByProject.get(String(project.id))!
+      if (membership.status === "invited") return {
+        id: project.id, slug: "", title: project.title, description: project.description,
+        project_type: project.project_type, status: project.status, created_at: project.created_at,
+        updated_at: project.updated_at, access_role: membership.role,
+        membership_status: membership.status, membership_id: membership.id,
+      }
+      const schema = project.form_schema && typeof project.form_schema === "object" ? project.form_schema as { questions?: Array<Record<string, unknown>> } : {}
+      const safeSchema = { ...schema, questions: Array.isArray(schema.questions) ? schema.questions.map((question) => { const { correctAnswer: _correctAnswer, answerKey: _answerKey, points: _points, ...safeQuestion } = question; return safeQuestion }) : [] }
+      return { ...project, form_schema: safeSchema, access_role: membership.role, membership_status: membership.status, membership_id: membership.id }
+    })
+  }
+  return NextResponse.json({ ok: true, projects: [...ownedRows, ...memberProjects] }, { headers: NO_STORE })
 }
 
 export async function POST(request: Request) {
@@ -68,6 +93,16 @@ export async function POST(request: Request) {
   const projectType = String(value.projectType || "custom")
   const questions = cleanQuestions(value.questions, projectType === "examination")
   const examInput = value.examConfig && typeof value.examConfig === "object" && !Array.isArray(value.examConfig) ? value.examConfig as Record<string, unknown> : {}
+  const scheduleInput = value.schedule && typeof value.schedule === "object" && !Array.isArray(value.schedule) ? value.schedule as Record<string, unknown> : {}
+  const parseSchedule = (input: unknown) => {
+    if (input === null || input === undefined || input === "") return null
+    if (typeof input !== "string" || input.length > 64 || !Number.isFinite(Date.parse(input))) return false
+    return new Date(input).toISOString()
+  }
+  const startsAt = parseSchedule(scheduleInput.startsAt)
+  const endsAt = parseSchedule(scheduleInput.endsAt)
+  const responseLimit = value.responseLimit === null || value.responseLimit === undefined || value.responseLimit === "" ? null : Number(value.responseLimit)
+  if (startsAt === false || endsAt === false || (startsAt && endsAt && Date.parse(endsAt) <= Date.parse(startsAt)) || (responseLimit !== null && (!Number.isSafeInteger(responseLimit) || responseLimit < 1 || responseLimit > 10000000))) return NextResponse.json({ ok: false, error: "INVALID_STUDY_SCHEDULE_OR_QUOTA" }, { status: 400, headers: NO_STORE })
   const durationSeconds = Number(examInput.durationSeconds ?? 1800)
   const maxAttempts = Number(examInput.maxAttempts ?? 1)
   const passPercentage = Number(examInput.passPercentage ?? 50)
@@ -78,7 +113,7 @@ export async function POST(request: Request) {
   const id = randomUUID()
   const slug = randomBytes(18).toString("base64url")
   const now = new Date().toISOString()
-  const row = { id, owner_user_id: auth.userId, slug, title, description, project_type: projectType, status: "draft", form_schema: { version: 1, questions }, settings: { allow_anonymous: false, allow_evidence_uploads: true, response_limit: null, ...(projectType === "examination" ? { exam: { enabled: true, durationSeconds, maxAttempts, passPercentage, shuffleQuestions: examInput.shuffleQuestions !== false, shuffleChoices: examInput.shuffleChoices !== false, resultRelease: examInput.resultRelease === "immediate" ? "immediate" : "manual" } } : {}) }, created_at: now, updated_at: now }
+  const row = { id, owner_user_id: auth.userId, slug, title, description, project_type: projectType, status: "draft", form_schema: { version: 1, questions }, settings: { allow_anonymous: false, allow_evidence_uploads: true, response_limit: responseLimit, ...(startsAt ? { starts_at: startsAt } : {}), ...(endsAt ? { ends_at: endsAt } : {}), ...(projectType === "examination" ? { exam: { enabled: true, durationSeconds, maxAttempts, passPercentage, shuffleQuestions: examInput.shuffleQuestions !== false, shuffleChoices: examInput.shuffleChoices !== false, resultRelease: examInput.resultRelease === "immediate" ? "immediate" : "manual" } } : {}) }, created_at: now, updated_at: now }
   const saved = await supabaseRest<Array<Record<string, unknown>>>("gh_research_projects?select=id,slug,title,description,project_type,status,form_schema,created_at,updated_at", { method: "POST", headers: { "Content-Type": "application/json", Prefer: "return=representation" }, body: JSON.stringify(row), timeoutMs: 10_000 })
   if (!saved.ok || !saved.data?.[0]) return NextResponse.json({ ok: false, error: "RESEARCH_CREATE_FAILED" }, { status: 503, headers: NO_STORE })
   return NextResponse.json({ ok: true, project: saved.data[0] }, { status: 201, headers: NO_STORE })

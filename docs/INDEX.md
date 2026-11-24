@@ -4,7 +4,8 @@
 
 - [`SECURITY.md`](../SECURITY.md) — private vulnerability reporting and release-boundary policy.
 
-- [`RUN384-FULL-PROJECT-AUDIT-2026-11-24.md`](RUN384-FULL-PROJECT-AUDIT-2026-11-24.md) — latest archive, GitHub, Vercel and Supabase audit with targeted hardening and live acceptance limits.
+- [`RUN384-FULL-PROJECT-AUDIT-2026-11-24.md`](RUN384-FULL-PROJECT-AUDIT-2026-11-24.md) — cross-system GitHub, Vercel and Supabase audit baseline.
+- [`SOURCE_OF_TRUTH.md`](SOURCE_OF_TRUTH.md) — current RUN388 authority, migration hold and release boundaries.
 
 1. [`SOURCE_OF_TRUTH.md`](SOURCE_OF_TRUTH.md) — sole source/archive authority and release boundaries.
 2. [`PROJECT_TRUTH.md`](PROJECT_TRUTH.md) — current verified project state and explicit acceptance limits.
@@ -22,4 +23,8 @@ Older RUN, phase, maintenance, audit, and worklog documents are evidence of earl
 Migration manifests, migration checklists, Testnet reconciliation reports, and operator runbooks are historical or target-specific evidence. Before any database operation, reconcile the exact target project and migration history. Source presence is not proof of remote application.
 
 - [RUN385 Research & Field Research Upgrade — 24 November 2026](RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.md)
-- [0.338.106 RUN385 Upgrade Worklog](UPGRADE-WORKLOG-0.338.106.md)
+- [RUN386 Research Pagination & Complete Export](RUN386-RESEARCH-PAGINATION-AND-COMPLETE-EXPORT-2026-11-24.md)
+- [RUN387 Research Analytics](RUN387-RESEARCH-ANALYTICS-2026-11-24.md)
+- [RUN388 Research Schedule & Quota](RUN388-RESEARCH-SCHEDULE-AND-QUOTA-2026-11-24.md)
+- [RUN389 Research Team Roles](RUN389-RESEARCH-TEAM-ROLES-2026-11-24.md)
+- [0.338.110 RUN389 Upgrade Worklog](UPGRADE-WORKLOG-0.338.110.md)

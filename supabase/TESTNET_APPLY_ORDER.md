@@ -1,7 +1,7 @@
 # GreenHaven Testnet migration review order
 
 **Generated from:** `supabase/migrations/*.sql` and the canonical classification policy in `scripts/generate-migration-inventory.mjs`.
-**Current source inventory:** 237 migrations.
+**Current source inventory:** 238 migrations.
 
 > **This is a review order, not permission to apply.** It does not prove remote migration history, database compatibility, or Testnet/Mainnet readiness. See docs/RUN384-FULL-PROJECT-AUDIT-2026-11-24.md for the current live target reconciliation; RUN278 and 2026-11-10 records are historical snapshots. Never run `supabase db push` while any pending migration is held for review, approval, validation, or marked proposal. Supabase CLI does not enforce these classifications.
 
@@ -257,6 +257,7 @@ The rows are sorted by the canonical migration identifier for review. Dependenci
 | 235 | `20261124095500_run383_identity_privacy_service_role_grants.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
 | 236 | `20261124110000_run384_research_foreign_key_indexes.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
 | 237 | `20261124120000_run384_server_rest_table_grants.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 238 | `20261124150000_run388_research_atomic_schedule_quota.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
 
 ## Classification meanings
 

@@ -1,16 +1,24 @@
 # GreenHaven — Current Project Bundle
 
-**Package:** `gh-connect@0.338.106`  
-**Working increment:** RUN385 — Research & Field Research workspace upgrade, derived from the RUN384 full project audit archive  
-**Baseline:** RUN384 full project audit archive; RUN385 is a source-only derivative. RUN379–RUN384 are retained as parent and audit history.  
+**Package:** `gh-connect@0.338.110`  
+**Working increment:** RUN389 — Research & Field Research readiness, derived from RUN385 with RUN384 audit baseline.  
 **Date:** 2026-11-24  
 **Release status:** **NOT APPROVED** for production.
 
 ## Delivery identity
 
-This RUN385 source bundle is package `gh-connect@0.338.106`, derived from `GREENHAVEN-0.338.105-RUN384-FULL-PROJECT-AUDIT-2026-11-24.zip`. RUN385 upgrades the Research Studio dashboard with lifecycle totals, study search and status filtering; adds a guarded CSV export for the latest 200 owner-inbox responses; corrects Pioneer share-link messaging to require Pi Browser and verified Pi identity; adds a Field Desk session-verification loading state; and marks the private Studio page no-index/no-follow. The RUN385 static gate passes 15/15 and is registered in static and prebuild verification.
+RUN386 adds deterministic keyset pagination, a 50-row response inbox page, duplicate-safe load-more and a complete cursor-traversing CSV export capped at 20,000 responses. RUN387 adds owner-only descriptive analytics for numeric, categorical, date and review-status data; low-frequency categories are suppressed and free-text content is excluded. RUN388 adds optional study windows and response quotas. RUN389 adds server-enforced owner/editor/reviewer/field-agent capabilities, team invitations, role changes, suspension/reactivation and collaborator-specific data access. Final response submission now calls a row-locked, idempotent service-role-only database RPC so quotas cannot be exceeded by concurrent requests. Its migration `20261124150000_run388_research_atomic_schedule_quota.sql` is REVIEW_REQUIRED and unapplied; do not deploy the caller before migration approval, disposable PostgreSQL validation, exact Testnet history reconciliation, application and postflight.
 
-This remains a source-only candidate. GitHub Contents write access was previously denied (HTTP 403); no push or Vercel deployment is claimed. No Supabase migration was applied, no database write was made, and Production/Mainnet and all financial state remain untouched. The package requires Node `^24.15.0`; the current working runtime is Node 22.16.0 without installed dependencies, so dependency-backed typecheck/lint/build and live browser/device acceptance remain release gates. Production remains NOT APPROVED.
+This remains a source-only candidate. GitHub Contents write access previously returned HTTP 403; no push or Vercel deployment is claimed. No Supabase migration was applied, no database write was made, and Production/Mainnet and all financial state remain untouched. The package requires Node `^24.15.0`; current runtime is Node 22.16.0 without installed dependencies, so dependency-backed typecheck/lint/build and live browser/device acceptance remain release gates. Research analytics remain descriptive and bounded; geographic analysis, collaboration permission matrix, multilingual studies, offline sync, trusted malware scanner integration, async large exports and full accessibility/load/recovery acceptance remain outstanding.
+
+## Focused source gates
+
+- RUN385 baseline: 19/19
+- RUN386 response pagination/export: 17/17
+- RUN387 descriptive analytics: 14/14
+- RUN388 schedule/quota source contract: 16/16
+
+Focused RUN385–RUN389 contracts pass 19/19, 17/17, 14/14, 16/16 and 21/21. Full static verification passes 63/63; production-safety checks pass 21/21; secret-pattern scan reports zero potential values across 2,804 text files. Migration inventory: 238 source files, including one new REVIEW_REQUIRED candidate. This does not prove any migration is applied.
 
 ## Historical RUN372 — canonical identity principal consolidation
 

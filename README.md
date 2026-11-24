@@ -1,10 +1,10 @@
 # GreenHaven
 
-**Current source version:** `0.338.106` (RUN385 Research & Field Research workspace upgrade on RUN384)
+**Current source version:** `0.338.110` (RUN389 Research & Field Research readiness candidate)
 
-Production status: **NOT APPROVED** — supported Node 24.15.0 dependency-backed typecheck/lint/build, browser/device, live database/provider and operator acceptance remain outstanding.
+Production status: **NOT APPROVED** — Node 24.15.x dependency-backed typecheck/lint/build, migration validation/application, live Pi Browser/PostgreSQL, browser/device, recovery and operator acceptance remain outstanding.
 
-This repository is the canonical GreenHaven source tree. The current working source is RUN385, derived from RUN384. The latest delivered archive is recorded in `docs/SOURCE_OF_TRUTH.md`. RUN384 and earlier RUNs remain historical parent context. See `docs/SOURCE_OF_TRUTH.md`, `docs/PROJECT_TRUTH.md`, `docs/RUN380-PI-ONLY-RESEARCH-ACCESS-CONTROL.md`, and `docs/PROJECT-WIDE-AUDIT-RUN379-2026-11-24.md` before implementation or release work. Older RUN/phase notes are historical evidence, not current implementation instructions.
+This repository is the canonical GreenHaven source tree. The working source derives from `GREENHAVEN-0.338.106-RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.zip`, with RUN384 retained as the cross-system audit baseline. RUN386 implements response keyset pagination and bounded complete export; RUN387 adds privacy-aware descriptive analytics; RUN388 adds scheduled studies and an atomic quota RPC held for review; RUN389 adds server-enforced team role capabilities and collaboration controls. No GitHub push, Vercel deployment or Supabase migration application is claimed. See `docs/SOURCE_OF_TRUTH.md`, `docs/PROJECT_TRUTH.md`, and `docs/CURRENT_BUILD_CONTEXT.md` before further release work.
 
 ## Pi authentication frame-routing correction — 2026-11-23 / Run 373
 

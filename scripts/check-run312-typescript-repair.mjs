@@ -7,7 +7,7 @@ const checks = [
   ['scanner distinguishes research and field evidence rows', /type ResearchEvidenceRow[\s\S]*type FieldEvidenceRow/.test(read('app/api/internal/evidence/scan-queue/route.ts'))],
   ['scanner narrows storage fields by evidence type', /row\.evidence_type === "research" \? row\.storage_bucket/.test(read('app/api/internal/evidence/scan-queue/route.ts'))],
   ['evidence completion routes avoid duplicate ok properties', !/\{\s*ok:\s*true,\s*\.\.\.result\s*\}/.test(['app/api/field/reports/[id]/evidence/complete/route.ts','app/api/field/reports/[id]/evidence/intent/route.ts','app/api/research/public/[slug]/evidence/complete/route.ts','app/api/research/public/[slug]/evidence/intent/route.ts'].map(read).join('\n'))],
-  ['public research idempotency fallback narrows REST result', /fallbackResponse\?\.ok \? fallbackResponse\.data\[0\]/.test(read('app/api/research/public/[slug]/route.ts'))],
+  ['public research atomic submission RPC result is narrowed before response use', /if \(!submitted\.ok \|\| !submitted\.data\)/.test(read('app/api/research/public/[slug]/route.ts')) && /submitted\.data\.response_id/.test(read('app/api/research/public/[slug]/route.ts'))],
   ['challenge RPC errors are narrowed before data access', /if \(!joined\.ok\)[\s\S]*if \(joined\.data\?\.ok !== true\)/.test(read('app/api/social/challenges/route.ts'))],
   ['challenge durable ID is initialized before its effect', /const durableId[\s\S]*useEffect\(\(\) => \{/.test(read('components/ghc/challenge-inline.tsx'))],
   ['touch lists are accessed through the DOM TouchList API', /e\.touches\.item\(/.test(read('components/ghc/enhanced-feed-screen.tsx'))],

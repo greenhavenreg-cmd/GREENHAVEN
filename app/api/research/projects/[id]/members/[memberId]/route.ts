@@ -33,6 +33,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const isInvitee = String(member.user_id) === auth.userId
   if (!isOwner && !(isInvitee && action === "accept")) return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403, headers: NO_STORE })
   if (action === "accept" && (member.status !== "invited" || !isInvitee)) return NextResponse.json({ ok: false, error: "INVITATION_NOT_ACCEPTABLE" }, { status: 409, headers: NO_STORE })
+  if (action === "revoke" && member.status === "revoked") return NextResponse.json({ ok: false, error: "MEMBER_ALREADY_REVOKED" }, { status: 409, headers: NO_STORE })
+  if (action === "suspend" && !["active", "invited"].includes(String(member.status))) return NextResponse.json({ ok: false, error: "MEMBER_NOT_SUSPENDABLE" }, { status: 409, headers: NO_STORE })
+  if (action === "reactivate" && member.status !== "suspended") return NextResponse.json({ ok: false, error: "MEMBER_NOT_REACTIVATABLE" }, { status: 409, headers: NO_STORE })
+  if (action === "change_role" && member.status === "revoked") return NextResponse.json({ ok: false, error: "MEMBER_ALREADY_REVOKED" }, { status: 409, headers: NO_STORE })
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (action === "accept") patch.status = "active"
   if (action === "revoke") patch.status = "revoked"
@@ -43,7 +47,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!ROLE.has(role)) return NextResponse.json({ ok: false, error: "INVALID_MEMBER_ROLE" }, { status: 400, headers: NO_STORE })
     patch.role = role
   }
-  const statusGuard = action === "accept" ? "&status=eq.invited" : ""
+  const statusGuard = `&status=eq.${encodeURIComponent(String(member.status))}`
   const updated = await supabaseRest<Array<Record<string, unknown>>>(`gh_research_members?id=eq.${encodeURIComponent(memberId)}&project_id=eq.${encodeURIComponent(id)}${statusGuard}&select=id,user_id,role,status,updated_at`, { method: "PATCH", headers: { "Content-Type": "application/json", Prefer: "return=representation" }, body: JSON.stringify(patch) })
   if (!updated.ok) return NextResponse.json({ ok: false, error: "RESEARCH_MEMBER_UPDATE_FAILED" }, { status: 503, headers: NO_STORE })
   if (!updated.data?.[0]) return NextResponse.json({ ok: false, error: action === "accept" ? "INVITATION_NOT_ACCEPTABLE" : "NOT_FOUND" }, { status: action === "accept" ? 409 : 404, headers: NO_STORE })

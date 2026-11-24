@@ -17,7 +17,7 @@ test("application release version matches package", read("lib/app-release.ts").i
 test("verified manifest version matches package", read("VERIFIED_MANIFEST.txt").includes(`project_version=${pkg.version}`))
 test("Phase 1–12 consolidation report exists", hasProjectDoc("docs/PHASE-1-12-SYSTEM-WIDE-ACCEPTANCE.md"))
 const consolidationReport = readProjectDoc("docs/PHASE-1-12-SYSTEM-WIDE-ACCEPTANCE.md")
-test("current build context identifies the current package baseline", read("docs/CURRENT_BUILD_CONTEXT.md").includes(`${pkg.version} RUN385`))
+test("current build context identifies the current package baseline", read("docs/CURRENT_BUILD_CONTEXT.md").includes(`${pkg.version} RUN389`))
 test("consolidation report labels prior release notes as historical", /Historical v0\.152\.0 hardening delta/.test(consolidationReport))
 test("project-truth current version agrees with package", read("docs/PROJECT_TRUTH.md").includes(`**Current source version:** \`${pkg.version}\``))
 test("Phase 3 recovery report exists", hasProjectDoc("docs/PHASE-03-DATABASE-INTEGRITY-RECOVERY.md"))

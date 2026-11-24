@@ -3,6 +3,7 @@ import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
 import { readGhcServerEnv } from "@/lib/server/economy/env"
 import { supabaseRest } from "@/lib/server/supabase/rest-client"
 import { checkDurableRateLimit, durableRateLimitCode, durableRateLimitStatus } from "@/lib/server/security/control-plane"
+import { authorizeResearchProject } from "@/lib/server/research/access"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export async function GET(request: Request, context: { params: Promise<{ evidenceId: string }> }) {
@@ -14,10 +15,11 @@ export async function GET(request: Request, context: { params: Promise<{ evidenc
   if (!/^[0-9a-f-]{36}$/i.test(evidenceId)) return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 })
   const row = await supabaseRest<Array<Record<string, unknown>>>(`gh_research_evidence?id=eq.${evidenceId}&select=id,project_id,storage_bucket,object_path,verification_status,scan_status&limit=1`)
   const evidence = row.ok ? row.data[0] : null
-  if (!evidence || evidence.scan_status !== "clean" || ["rejected", "quarantined"].includes(String(evidence.verification_status))) return NextResponse.json({ ok: false, error: "EVIDENCE_QUARANTINED" }, { status: 423, headers: { "Cache-Control": "no-store" } })
-  const owner = await supabaseRest<Array<{ id: string }>>(`gh_research_projects?id=eq.${encodeURIComponent(String(evidence.project_id))}&owner_user_id=eq.${encodeURIComponent(auth.userId)}&select=id&limit=1`)
+  if (!evidence) return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404, headers: { "Cache-Control": "no-store" } })
+  const access = await authorizeResearchProject(String(evidence.project_id), auth.userId, "evidence.read")
   const isCentralAdmin = Boolean(String(process.env.GHC_FIELD_ADMIN_USER_ID || "").trim() && auth.userId === String(process.env.GHC_FIELD_ADMIN_USER_ID || "").trim())
-  if ((!owner.ok || !owner.data.length) && !isCentralAdmin) return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404, headers: { "Cache-Control": "no-store" } })
+  if (!access.ok && !isCentralAdmin) return NextResponse.json({ ok: false, error: access.reason === "unavailable" ? "STORAGE_UNAVAILABLE" : "NOT_FOUND" }, { status: access.reason === "unavailable" ? 503 : 404, headers: { "Cache-Control": "no-store" } })
+  if (evidence.scan_status !== "clean" || ["rejected", "quarantined"].includes(String(evidence.verification_status))) return NextResponse.json({ ok: false, error: "EVIDENCE_QUARANTINED" }, { status: 423, headers: { "Cache-Control": "no-store" } })
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return NextResponse.json({ ok: false, error: "STORAGE_UNAVAILABLE" }, { status: 503 })
   const bucket = encodeURIComponent(String(evidence.storage_bucket))
