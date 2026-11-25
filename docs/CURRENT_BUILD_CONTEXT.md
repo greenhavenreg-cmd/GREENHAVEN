@@ -1,4 +1,4 @@
-## Latest implementation — 0.338.134 Run 406 Server-Read and Wallet Repair
+## Latest implementation — 0.338.137 Phase 9 Coordinated Acceptance
 
 - User-designated source archive: `GREENHAVEN-0.338.119-PHASE9-COORDINATED-ONBOARDING-IDENTITY-STORAGE-2026-11-24-3.zip`.
 - Preserves Phase A/B/C onboarding and Pi identity, profile and private Storage work, Phase D communities, wallet security, separate Pi/GHC rails, authoritative membership entitlements and server-side reward claims.
@@ -12,10 +12,10 @@
 
 # CURRENT BUILD CONTEXT — 0.338.134 Run 406 Server-Read and Wallet Repair (2026-11-25)
 
-## Current release overlay — 0.338.137 (Run 414)
-The current package baseline is `gh-connect@0.338.137`; package.json, package-lock.json, and `lib/app-release.ts` carry this release identity. Run 414 synchronizes release metadata and adds the versioned current worklog required by Phase 24. Older implementation summaries below retain their original version numbers and are historical context, not claims that the package is still at those versions. The latest Vercel log passed Phase 22 marketplace atomic-transition and Phase 23 migration-integrity checks, then stopped at Phase 24 because `docs/UPGRADE-WORKLOG-0.338.137.md` was missing. The source-only repair adds that worklog and does not claim the remaining prebuild checks, Next.js build, deployment, or live payout acceptance have passed. Production remains NOT APPROVED.
+## Current release overlay — 0.338.137 (Run 417)
+The current package baseline is `gh-connect@0.338.137`; package.json, package-lock.json, and `lib/app-release.ts` carry this release identity. Runs 413–416 repaired release metadata and stale version assertions; Run 417 repairs the Run 405 handoff contract and clarifies local-source versus live-operations status. Older implementation summaries below retain their original version numbers as historical context, not as claims that the package is still at those versions. The latest supplied Vercel log stopped at prebuild check 440/445 because the Run 405 gate hard-coded version 0.338.136 and expected a stale handoff version reference. The source-only repair makes the check version-dynamic and updates the handoff evidence. Remaining prebuild checks, Next.js build, deployment, and live payout acceptance are not claimed as passed. Production remains NOT APPROVED.
 
-Release metadata remains synchronized with the 0.338.134 Phase 9 Coordinated Acceptance baseline; Run 406 is the current additive increment.
+The current package release remains 0.338.137. The Phase 9 Coordinated Acceptance programme and Run 406 source changes remain part of the retained baseline; the numbered release and handoff checks must validate current metadata dynamically.
 
 Current source is a source-only derivative of `GREENHAVEN-0.338.132-RUN406-SERVER-READ-WALLET-REPAIR-2026-11-25-2.zip`, integrated as Run 408 (`0.338.133`) and polished in Run 409 (`0.338.134`). See `docs/SOURCE_OF_TRUTH.md`, `docs/PROJECT_TRUTH.md`, `docs/RUN406-SERVER-READ-WALLET-REPAIR-2026-11-25.md`, `docs/RUN405-LOCAL-PROJECT-HANDOFF-AND-RECONCILIATION-2026-11-25.md`, and the prior Run 405 worklog. Historical records below remain historical evidence and do not override the current source authority.
 
@@ -35,7 +35,7 @@ Current source is a source-only derivative of `GREENHAVEN-0.338.132-RUN406-SERVE
 
 ## Historical prompts and worklogs
 
-This file is the current build context for the 0.338.93 remediation candidate. Earlier prompts, task plans, release worklogs and archived notes are historical context only; they do not override the current executable source, `docs/SOURCE_OF_TRUTH.md`, or the explicit safety boundaries above. Do not treat historical plans as proof that a feature is implemented, a migration is applied, or a release is approved.
+This file retains historical build context for earlier remediation candidates; the current source authority is `docs/SOURCE_OF_TRUTH.md` and the release overlay above. Earlier prompts, task plans, release worklogs and archived notes are historical context only; they do not override the current executable source, `docs/SOURCE_OF_TRUTH.md`, or the explicit safety boundaries above. Do not treat historical plans as proof that a feature is implemented, a migration is applied, or a release is approved.
 
 
 ## 0.338.96 audit derivative
@@ -53,7 +53,7 @@ The current local candidate adds 30 responsive layout, focus, safe-area, touch a
 
 ## Historical prompts and worklogs
 
-This file is the current build context for the 0.338.93 remediation candidate. Earlier prompts, task plans, release worklogs and archived notes are historical context only; they do not override the current executable source, `docs/SOURCE_OF_TRUTH.md`, or the explicit safety boundaries above. Do not treat historical plans as proof that a feature is implemented, a migration is applied, or a release is approved.
+This file retains historical build context for earlier remediation candidates; the current source authority is `docs/SOURCE_OF_TRUTH.md` and the release overlay above. Earlier prompts, task plans, release worklogs and archived notes are historical context only; they do not override the current executable source, `docs/SOURCE_OF_TRUTH.md`, or the explicit safety boundaries above. Do not treat historical plans as proof that a feature is implemented, a migration is applied, or a release is approved.
 
 
 ## 0.338.96 audit derivative

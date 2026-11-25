@@ -1,7 +1,7 @@
 # Run 405 — Local project handoff and reconciliation readiness
 
-**Source version:** `gh-connect@0.338.131`  
-**Purpose:** local implementation package for GitHub Desktop handoff. No remote push, Vercel deployment, or database mutation is performed by preparing this source tree.
+**Source version:** `gh-connect@0.338.137`  
+**Purpose:** local source-only implementation package for GitHub Desktop review and handoff. Preparing this tree does not push to GitHub, deploy to Vercel, apply migrations, mutate the live database, or verify live provider/runtime behavior. Source presence and passing local contract checks are not evidence that remote operations occurred or that live services are healthy.
 
 ## Included source changes
 
@@ -31,6 +31,10 @@
 - GHC balances are derived from posted transactions and existing spend/hold rules. Never overwrite balances with client/localStorage snapshots.
 - A missing Pi identity is a mapping blocker, not permission to attach another user's identity or transactions.
 - A 100 PI database ledger entry is not an on-chain Pi transfer.
+
+## Local-source versus live-operations boundary
+
+This archive contains local source and documentation only. It does not establish that GitHub contains these changes, that Vercel is running this version, or that any database migration has been applied. Live Testnet results described in the broader project history are historical evidence for the specific operations recorded there; they must not be generalized to this candidate. A passing source check validates its stated source contract only, not remote deployment, Pi authentication, payment, withdrawal, reward settlement, or database state.
 
 ## Validation status
 

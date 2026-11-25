@@ -49,3 +49,5 @@ Migration manifests, migration checklists, Testnet reconciliation reports, and o
 - [0.338.111 RUN390 Upgrade Worklog](UPGRADE-WORKLOG-0.338.111.md)
 
 - [Run 406 — Server-read and wallet repair](RUN406-SERVER-READ-WALLET-REPAIR-2026-11-25.md)
+
+- [RUN412 Testnet Pi Withdrawal PIN-Proof Readiness — 25 November 2026](RUN412-TESTNET-PI-WITHDRAWAL-PIN-PROOF-READINESS-2026-11-25.md)
