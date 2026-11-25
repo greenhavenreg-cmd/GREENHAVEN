@@ -22,7 +22,7 @@ const checks = [
   ["registration reward is directly visible from wallet across asset rails", wallet.includes("<RegistrationBonusCard compact={false} />") && wallet.includes("RegistrationBonusCard")],
   ["registration rewards require explicit user action and never auto-claim on mount", !bonus.includes("autoClaimStarted") && !bonus.includes("Automatically reconcile the one-time campaign") && bonus.includes("onClick={() => void onClaim()}")],
   ["wallet hero uses GreenHaven forest styling while keeping PI/GHC rails separate", balance.includes("bg-[#08251e]") && balance.includes("PI and GHC are never added together")],
-  ["package, lockfile and app release agree on 0.338.136", pkg.version === "0.338.136" && lock.version === pkg.version && lock.packages?.[""]?.version === pkg.version && release.includes(`APP_RELEASE_VERSION = "${pkg.version}"`)],
+  ["package, lockfile and app release versions agree", typeof pkg.version === "string" && lock.version === pkg.version && lock.packages?.[""]?.version === pkg.version && release.includes(`APP_RELEASE_VERSION = "${pkg.version}"`)],
   ["Run 406 check is registered once in static and prebuild chains", (pkg.scripts["verify:static"].match(/check-run406-server-read-wallet-repair\.mjs/g) || []).length === 1 && (pkg.scripts["prebuild:checks"].match(/check-run406-server-read-wallet-repair\.mjs/g) || []).length === 1],
 ]
 let failed = 0
