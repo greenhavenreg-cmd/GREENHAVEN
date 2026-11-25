@@ -23,7 +23,7 @@ const checks = [
  ['request API requires authenticated user', /resolveAuthenticatedUser/.test(route)],
  ['request API uses bounded JSON parsing', /readBoundedJson\(request, 8 \* 1024\)/.test(route)],
  ['request API is disabled unless explicitly enabled for Testnet', /PI_EARNINGS_PAYOUT_REQUESTS_ENABLED !== \"true\"/.test(route) && /PI_NETWORK !== \"testnet\"/.test(route)],
- ['request API calculates quote server-side', /quoteWithdrawal\(\{ userId: auth.userId, grossAtomic: body.amountAtomic \}\)/.test(route)],
+ ['request API calculates quote server-side', /grossForRequestedNetAtomic\(body.amountAtomic, 300\)/.test(route) && /quoteWithdrawal\(\{ userId: auth.userId, grossAtomic \}\)/.test(route)],
  ['request API fingerprints server-derived recipient and amounts', /createHash\(\"sha256\"\)/.test(route) && /quote.recipientPiAppUid/.test(route)],
  ['request API never reports a transfer as submitted', /transferSubmitted: false/.test(route)],
  ['ledger exposes durable request RPC wrapper', /gh_pi_earnings_payout_create/.test(ledger)],

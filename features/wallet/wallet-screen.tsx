@@ -68,6 +68,7 @@ import { PaymentRecoveryPanel } from "@/components/ghc/payment-recovery-panel"
 import { PiPaymentUtilityStatus } from "@/components/ghc/pi-payment-utility-status"
 import { PiCashbackSummary } from "@/components/ghc/pi-cashback-summary"
 import { UnifiedEarningsDashboard } from "@/components/ghc/unified-earnings-dashboard"
+import { RegistrationBonusCard } from "@/components/ghc/registration-bonus-card"
 import { PiWithdrawSheet } from "@/components/ghc/pi-withdraw-sheet"
 import { FilterSummary } from "@/components/ghc/filtering/filter-summary"
 import { FilterPanel } from "@/components/ghc/filtering/filter-panel"
@@ -101,6 +102,19 @@ function formatDay(ts: number) {
     })
   } catch {
     return ""
+  }
+}
+
+function formatPiAtomicDisplay(value: string): string {
+  if (!/^\d{1,38}$/.test(value)) return "—"
+  try {
+    const atomic = BigInt(value)
+    const scale = 10_000_000n
+    const whole = (atomic / scale).toLocaleString()
+    const fraction = (atomic % scale).toString().padStart(7, "0").replace(/0+$/, "")
+    return fraction ? `${whole}.${fraction}` : whole
+  } catch {
+    return "—"
   }
 }
 
@@ -377,6 +391,14 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
     paymentId?: string
   }
   const [piIntents, setPiIntents] = useState<PiIntentRow[]>([])
+  type PiPayoutHistoryRow = {
+    id: string; status: "reserved" | "processing" | "uncertain" | "paid" | "failed" | "released";
+    grossAtomic: string; feeAtomic: string; netAtomic: string; network: string; providerTxid: string | null;
+    createdAt: string | null; updatedAt: string | null; settledAt: string | null;
+  }
+  const [piPayoutHistory, setPiPayoutHistory] = useState<PiPayoutHistoryRow[]>([])
+  const [piPayoutHistoryLoading, setPiPayoutHistoryLoading] = useState(false)
+  const [piPayoutHistoryError, setPiPayoutHistoryError] = useState<string | null>(null)
   const [piStatusFilter, setPiStatusFilter] = useState<"all" | "pending" | "completed" | "failed">("all")
   const [selectedPiIntent, setSelectedPiIntent] = useState<PiIntentRow | null>(null)
   const [piIntentsLoading, setPiIntentsLoading] = useState(false)
@@ -638,6 +660,55 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
   const [showRequestsPanel, setShowRequestsPanel] = useState(false)
   const [showFullHistory, setShowFullHistory] = useState(false)
   const [historyRail, setHistoryRail] = useState<"ghc" | "pi">("ghc")
+
+  useEffect(() => {
+    if (!showFullHistory || historyRail !== "pi") return
+    const controller = new AbortController()
+    let cancelled = false
+    const timeout = window.setTimeout(() => controller.abort(), 10_000)
+    setPiPayoutHistoryLoading(true)
+    setPiPayoutHistoryError(null)
+    void (async () => {
+      try {
+        const res = await fetch("/api/economy/earnings/withdrawals", {
+          method: "GET", credentials: "include", cache: "no-store",
+          headers: { Accept: "application/json" }, signal: controller.signal,
+        })
+        const body = await res.json().catch(() => null) as { ok?: boolean; error?: string; items?: unknown } | null
+        if (cancelled) return
+        if (!res.ok || body?.ok !== true || !Array.isArray(body.items)) {
+          setPiPayoutHistoryError(res.status === 401
+            ? "Sign in again to view your Pi withdrawal history."
+            : "Pi withdrawal history is temporarily unavailable. Your requests and balance have not been changed.")
+          return
+        }
+        const rows = body.items.flatMap((raw: unknown) => {
+          if (!raw || typeof raw !== "object" || Array.isArray(raw)) return []
+          const row = raw as Record<string, unknown>
+          const statuses = ["reserved", "processing", "uncertain", "paid", "failed", "released"]
+          const validAtomic = (v: unknown) => typeof v === "string" && /^\d{1,38}$/.test(v)
+          if (typeof row.id !== "string" || !statuses.includes(String(row.status)) ||
+              !validAtomic(row.grossAtomic) || !validAtomic(row.feeAtomic) || !validAtomic(row.netAtomic)) return []
+          return [{
+            id: row.id, status: row.status as PiPayoutHistoryRow["status"],
+            grossAtomic: row.grossAtomic as string, feeAtomic: row.feeAtomic as string, netAtomic: row.netAtomic as string,
+            network: typeof row.network === "string" ? row.network : "Unknown network",
+            providerTxid: typeof row.providerTxid === "string" ? row.providerTxid : null,
+            createdAt: typeof row.createdAt === "string" ? row.createdAt : null,
+            updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : null,
+            settledAt: typeof row.settledAt === "string" ? row.settledAt : null,
+          }]
+        })
+        setPiPayoutHistory(rows)
+      } catch {
+        if (!cancelled) setPiPayoutHistoryError("Could not connect to Pi withdrawal history. Check your connection and retry.")
+      } finally {
+        window.clearTimeout(timeout)
+        if (!cancelled) setPiPayoutHistoryLoading(false)
+      }
+    })()
+    return () => { cancelled = true; window.clearTimeout(timeout); controller.abort() }
+  }, [showFullHistory, historyRail, tick])
   useEffect(() => {
     const applyWalletTarget = (detail: Record<string, unknown>) => {
       const paymentIntentId = String(detail.paymentIntentId || "").trim()
@@ -1408,6 +1479,9 @@ const lowBalance = balance === 0 && displayPending === 0
             </div>
           </div>
         )}
+
+        {/* First-class explicit claim entry, visible on both GHC and PI rails. */}
+        <RegistrationBonusCard compact={false} />
 
         {/* ZONE: BALANCE — hero carries title; no redundant label */}
         <div className="mt-2">
@@ -2676,25 +2750,47 @@ const lowBalance = balance === 0 && displayPending === 0
                 )}
               </div>
             ) : (
-              <div className="space-y-2">
-                {(piIntents || []).length === 0 ? (
-                  <p className="py-10 text-center text-sm text-muted-foreground">No π payment intents for this account.</p>
-                ) : (
-                  (piIntents || []).filter((intent: any) => !query.trim() || `${intent.id || ""} ${intent.referenceId || ""} ${intent.paymentId || ""} ${intent.purpose || ""} ${intent.status || ""}`.toLowerCase().includes(query.trim().toLowerCase())).map((intent: any) => (
-                    <button
-                      key={intent.id}
-                      type="button"
-                      onClick={() => setSelectedPiIntent?.(intent)}
-                      className="flex w-full items-center justify-between rounded-2xl border border-border bg-card px-3 py-3 text-left"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{intent.memo || intent.purpose || intent.id}</p>
-                        <p className="text-[11px] text-muted-foreground">{intent.status} · {intent.amountPi != null ? `${intent.amountPi} π` : ""}</p>
+              <div className="space-y-5">
+                <section aria-labelledby="pi-withdrawal-history-title" className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 id="pi-withdrawal-history-title" className="text-sm font-bold">Pi withdrawals</h3>
+                      <p className="text-[11px] text-muted-foreground">Requests, fees, settlement status and verified transaction IDs.</p>
+                    </div>
+                    <button type="button" onClick={() => setTick((n) => n + 1)} disabled={piPayoutHistoryLoading} className="min-h-9 shrink-0 rounded-xl border border-border px-3 text-xs font-bold disabled:opacity-50">{piPayoutHistoryLoading ? "Refreshing…" : "Refresh"}</button>
+                  </div>
+                  {piPayoutHistoryLoading && piPayoutHistory.length === 0 ? <p className="rounded-xl border border-border p-4 text-sm text-muted-foreground" role="status">Loading authoritative withdrawal requests…</p> : null}
+                  {piPayoutHistoryError ? <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100" role="alert">{piPayoutHistoryError}<button type="button" onClick={() => setTick((n) => n + 1)} className="ml-2 font-bold underline">Retry</button></div> : null}
+                  {!piPayoutHistoryLoading && !piPayoutHistoryError && piPayoutHistory.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No Pi withdrawal requests found for this account.</p> : null}
+                  {piPayoutHistory.filter((item) => !query.trim() || `${item.id} ${item.status} ${item.network} ${item.providerTxid || ""}`.toLowerCase().includes(query.trim().toLowerCase())).map((item) => {
+                    const statusTone = item.status === "paid" ? "text-emerald-700 dark:text-emerald-300" : ["failed", "released"].includes(item.status) ? "text-muted-foreground" : item.status === "uncertain" ? "text-amber-700 dark:text-amber-300" : "text-violet-700 dark:text-violet-300"
+                    return <article key={item.id} className="rounded-2xl border border-border bg-card p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0"><p className="text-sm font-bold">{item.status === "paid" ? "Withdrawal completed" : item.status === "released" ? "Reservation released" : item.status === "failed" ? "Withdrawal failed" : item.status === "uncertain" ? "Confirmation pending review" : item.status === "processing" ? "Processing withdrawal" : "Withdrawal requested"}</p><p className="mt-0.5 text-[11px] text-muted-foreground">{item.network} · {item.createdAt ? new Date(item.createdAt).toLocaleString() : "Date unavailable"}</p></div>
+                        <span className={`shrink-0 text-xs font-extrabold uppercase ${statusTone}`}>{item.status}</span>
                       </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-muted/50 p-2">
+                        <div><p className="text-[10px] text-muted-foreground">Gross</p><p className="text-xs font-bold tabular-nums">{formatPiAtomicDisplay(item.grossAtomic)} π</p></div>
+                        <div><p className="text-[10px] text-muted-foreground">Fee</p><p className="text-xs font-bold tabular-nums">{formatPiAtomicDisplay(item.feeAtomic)} π</p></div>
+                        <div><p className="text-[10px] text-muted-foreground">Net</p><p className="text-xs font-bold tabular-nums">{formatPiAtomicDisplay(item.netAtomic)} π</p></div>
+                      </div>
+                      {item.status === "uncertain" ? <p className="mt-2 text-xs leading-relaxed text-amber-800 dark:text-amber-200">Do not submit another withdrawal. The provider result must be reconciled before funds can be released or marked paid.</p> : null}
+                      {item.status !== "paid" && item.status !== "released" && item.status !== "failed" ? <p className="mt-2 text-[11px] text-muted-foreground">Reserved funds remain protected until an authoritative settlement or release is recorded.</p> : null}
+                      {item.providerTxid ? <p className="mt-2 break-all text-[11px] text-muted-foreground">Verified transaction ID: {item.providerTxid}</p> : null}
+                    </article>
+                  })}
+                </section>
+                <section aria-labelledby="pi-payment-history-title" className="space-y-2">
+                  <div><h3 id="pi-payment-history-title" className="text-sm font-bold">Pi payments & purchases</h3><p className="text-[11px] text-muted-foreground">Payment intents are shown separately from withdrawals.</p></div>
+                  {(piIntents || []).filter((intent: any) => !query.trim() || `${intent.id || ""} ${intent.referenceId || ""} ${intent.paymentId || ""} ${intent.purpose || ""} ${intent.status || ""}`.toLowerCase().includes(query.trim().toLowerCase())).length === 0 ? (
+                    <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No Pi payment intents for this account.</p>
+                  ) : (piIntents || []).filter((intent: any) => !query.trim() || `${intent.id || ""} ${intent.referenceId || ""} ${intent.paymentId || ""} ${intent.purpose || ""} ${intent.status || ""}`.toLowerCase().includes(query.trim().toLowerCase())).map((intent: any) => (
+                    <button key={intent.id} type="button" onClick={() => setSelectedPiIntent?.(intent)} className="flex w-full items-center justify-between rounded-2xl border border-border bg-card px-3 py-3 text-left">
+                      <div className="min-w-0"><p className="truncate text-sm font-semibold">{intent.memo || intent.purpose || intent.id}</p><p className="text-[11px] text-muted-foreground">{intent.status} · {intent.amountPi != null ? `${intent.amountPi} π` : ""}</p></div>
                       <ChevronRight size={16} className="text-muted-foreground" />
                     </button>
-                  ))
-                )}
+                  ))}
+                </section>
               </div>
             )}
           </div>
@@ -2724,11 +2820,9 @@ const lowBalance = balance === 0 && displayPending === 0
           }, 50)
         }}
         onCompleted={() => {
-          setPiWithdrawOpen(false)
-          try {
-            window.dispatchEvent(new CustomEvent("ghc:earnings-refresh"))
-            window.dispatchEvent(new CustomEvent("ghc:wallet-refresh"))
-          } catch { /* */ }
+          // Keep the sheet open so a terminal success/release message remains visible.
+          // Wallet/earnings refresh events were already emitted by the sheet.
+          setTick((n) => n + 1)
         }}
       />
     </div>

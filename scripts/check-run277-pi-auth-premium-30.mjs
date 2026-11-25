@@ -28,7 +28,7 @@ ok('04 SDK bridge readiness uses bounded 10s wait', /await waitForPi\(10000, 150
 ok('05 humanize never required in-Pi', /Never tell an in-Pi user/.test(auth) || /Pi Browser is open, but the authentication bridge/.test(auth))
 ok('06 soft retry once in Pi', /softRetryRef/.test(auth) && /retrying authentication/.test(auth))
 ok('07 auth screen adaptive title', /Still connecting to Pi/.test(screen))
-ok('08 retry button neutral label', /Retry Pi authentication/.test(screen) && !/Retry Pi Browser authentication/.test(screen))
+ok('08 retry button uses requested plain-language label', /Try again/.test(screen) && !/Retry Pi authentication|Retry Pi Browser authentication/.test(screen))
 ok('09 footer adapts in Pi', /You appear to be in Pi Browser/.test(screen))
 ok('10 pi-runtime longer waitForPi', /waitForPi\(10000/.test(runtime))
 ok('11 consent unavailable not "only inside"', /bridge is not ready/.test(consent))

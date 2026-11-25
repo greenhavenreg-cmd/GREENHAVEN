@@ -22,7 +22,7 @@ const storageSql = read('supabase/VALIDATE-STORAGE-CONTRACT.sql')
 const phaseDReport = read('GREENHAVEN-0.338.118-PHASE-D-REPORT.md')
 
 const checks = [
-  ['package, lockfile and in-app release agree on 0.338.119', pkg.version === '0.338.119' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version && appRelease.includes(`APP_RELEASE_VERSION = "${pkg.version}"`) ],
+  ['package, lockfile and in-app release agree on current package version', /^\d+\.\d+\.\d+$/.test(pkg.version) && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version && appRelease.includes(`APP_RELEASE_VERSION = "${pkg.version}"`) ],
   ['production Pi authentication verifies the Platform identity before resolving a canonical user', /verifyPiAccessToken/.test(piAuth) && /findOrCreateFromVerifiedPi/.test(piAuth) && piAuth.indexOf('verifyPiAccessToken') < piAuth.indexOf('findOrCreateFromVerifiedPi')],
   ['returning users are classified from durable mapping existence, not optional profile shape', /const isReturning = !isNew/.test(piAuth) && /const identityExisted = !isNew/.test(piAuth)],
   ['optional Pi username projection preserves an existing display name', /username: record\.piUsername/.test(piAuth) && /displayName: existingProfile\?\.displayName \|\| record\.piUsername/.test(piAuth)],

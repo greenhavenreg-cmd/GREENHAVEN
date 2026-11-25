@@ -165,10 +165,35 @@ export function updateMarketplaceCartQuantity(listingId: string, quantity: numbe
   return read()
 }
 
-export function removeMarketplaceCartItem(listingId: string): MarketplaceCartItem[] {
-  const next = read().filter((item) => item.listingId !== listingId)
+export function removeMarketplaceCartItem(listingId: string, variantId?: string): MarketplaceCartItem[] {
+  const next = read().filter((item) => {
+    if (item.listingId !== listingId) return true
+    // A selected SKU is its own cart line; removing it must not erase sibling variants.
+    if (variantId !== undefined) return (item.variantId || "") !== variantId
+    return false
+  })
   write(next)
   return next
+}
+
+/**
+ * Remove only cart lines that are byte-for-byte the same purchase intent that was
+ * successfully reserved/paid. If a buyer edits quantity or adds the same SKU while
+ * checkout is in flight, preserve that newer intent rather than deleting it.
+ */
+export function removeMarketplaceCartItemsBySnapshots(snapshots: MarketplaceCartItem[]): MarketplaceCartItem[] {
+  if (!snapshots.length) return read()
+  const lineKey = (item: MarketplaceCartItem) => JSON.stringify([item.listingId, item.variantId || "legacy", item.sellerId])
+  const snapshotByKey = new Map(snapshots.map((item) => [lineKey(item), item]))
+  const next = read().filter((current) => {
+    const key = lineKey(current)
+    const snapshot = snapshotByKey.get(key)
+    if (!snapshot) return true
+    return current.quantity !== snapshot.quantity || current.addedAt !== snapshot.addedAt ||
+      current.price !== snapshot.price || current.currency !== snapshot.currency
+  })
+  write(next)
+  return read()
 }
 
 /** Remove only lines that were successfully reserved; preserve unrelated/new cart edits. */

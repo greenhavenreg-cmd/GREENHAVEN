@@ -4,6 +4,8 @@ import {
   getMarketplaceCart,
   getMarketplaceCartUnitCount,
   removeMarketplaceCartItemsByIds,
+  removeMarketplaceCartItem,
+  removeMarketplaceCartItemsBySnapshots,
   updateMarketplaceCartQuantity,
 } from "../lib/marketplace/cart.ts"
 
@@ -55,6 +57,28 @@ updateMarketplaceCartQuantity("sku-listing", 5, "sku-large")
 cart = getMarketplaceCart()
 assert.equal(cart.find((line) => line.variantId === "sku-large")?.quantity, 5, "quantity edits target only the selected SKU")
 assert.equal(cart.find((line) => line.variantId === "sku-small")?.quantity, 3, "other SKU quantity is unchanged")
+// Variant-aware removal must preserve sibling SKUs for the same listing.
+removeMarketplaceCartItem("sku-listing", "sku-large")
+cart = getMarketplaceCart()
+assert.equal(cart.some((line) => line.listingId === "sku-listing" && line.variantId === "sku-large"), false, "removing one SKU removes only that variant")
+assert.equal(cart.some((line) => line.listingId === "sku-listing" && line.variantId === "sku-small"), true, "sibling SKU remains in the cart")
+
+// Checkout cleanup must preserve edits made while a request is in flight.
+const beforeCheckout = cart.find((line) => line.listingId === "sku-listing" && line.variantId === "sku-small")
+assert.ok(beforeCheckout, "small SKU exists before checkout cleanup")
+updateMarketplaceCartQuantity("sku-listing", 4, "sku-small")
+removeMarketplaceCartItemsBySnapshots([beforeCheckout])
+cart = getMarketplaceCart()
+assert.equal(cart.find((line) => line.listingId === "sku-listing" && line.variantId === "sku-small")?.quantity, 4, "checkout cleanup preserves a quantity edit made in flight")
+
+// An unchanged successfully reserved line is removed by its exact snapshot.
+const unchanged = cart.find((line) => line.listingId === "sku-listing" && line.variantId === "sku-small")
+assert.ok(unchanged, "updated small SKU remains before exact cleanup")
+removeMarketplaceCartItemsBySnapshots([unchanged])
+cart = getMarketplaceCart()
+assert.equal(cart.some((line) => line.listingId === "sku-listing" && line.variantId === "sku-small"), false, "exact reserved snapshot is removed after success")
+
+
 addMarketplaceCartItem(item("c"))
 removeMarketplaceCartItemsByIds(["a", "c", "sku-listing"])
 cart = getMarketplaceCart()
@@ -64,4 +88,5 @@ store.set("gh_marketplace_cart_v1", JSON.stringify(Array.from({ length: 140 }, (
 cart = getMarketplaceCart()
 assert.equal(cart.length, 100, "cart storage is bounded to 100 unique lines")
 
-console.log("Phase 4 marketplace cart runtime: 12/12 assertions PASS")
+console.log("Phase 4 marketplace cart runtime: baseline + race-safety assertions PASS")
+

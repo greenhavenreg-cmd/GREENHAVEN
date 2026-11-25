@@ -7,6 +7,8 @@ import { buildPiSdkEarlyLoaderScript } from "@/lib/pi-sdk-early-loader"
 import { PUBLIC_PREFIX_ROUTES } from "@/lib/routing/public-route-policy"
 import { PI_NETWORK_CONFIG } from "@/lib/system-config"
 import "./globals.css"
+import "./gh-premium-overhaul.css"
+import "./gh-executive-premium.css"
 
 const PI_SDK_EARLY_LOADER = buildPiSdkEarlyLoaderScript(PI_NETWORK_CONFIG.SDK_URL, PUBLIC_PREFIX_ROUTES)
 

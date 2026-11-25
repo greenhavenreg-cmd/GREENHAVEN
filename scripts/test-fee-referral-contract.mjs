@@ -19,7 +19,7 @@ check("Community create fee is quoted server-side", communityRoute.includes("quo
 check("Community fee settlement rejects incomplete Pi intents", feeSettlement.includes('intent.status || "").toUpperCase() !== "COMPLETED"'))
 check("Referral ID lookup uses the canonical public identity resolver", referralRoute.includes("resolvePublicIdentity") && referralRoute.includes("normalizeGreenHavenId"))
 check("Referral lookup no longer depends on legacy gh_profiles columns", !referralRoute.includes("gh_profiles") && !referralRoute.includes("green_haven_id"))
-check("Referral attribution reads the deployed attributed_at column", referralService.includes("select=referrer_user_id,attributed_at") && !referralService.includes("select=referrer_user_id,created_at"))
+check("Referral attribution status uses the complete server-side summary RPC", referralService.includes('rpc(\"ghc_referral_summary\"') && !referralService.includes("select=referrer_user_id,created_at"))
 check("Referral attribution notification no longer points to rewards", /category:\s*"system"[\s\S]{0,120}open:\s*"profile"/.test(referralUi))
 check("Release CI workflow exists", existsSync(join(root, ".github/workflows/ci.yml")))
 const failed = checks.filter((c) => !c.ok)

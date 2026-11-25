@@ -1,17 +1,22 @@
 "use client"
 
 /**
- * Phase 3 — One-time 3 π registration bonus claim + legacy 2.95 π reconciliation.
- * Server-authoritative: never invents a balance on the client.
+ * Testnet registration reward card. The server ledger is authoritative; the
+ * 100 PI cumulative campaign is gated to Testnet and idempotent per account.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Gift, Loader2, CheckCircle2, AlertCircle, Sparkles } from "lucide-react"
 
 type BonusStatus = {
   ok?: boolean
   enabled?: boolean
   amountPi?: number
+  amountAtomic?: number
+  uniqueRef?: string
+  campaign?: string
+  priorAmountPi?: number
+  totalTargetPi?: number
   claimable?: boolean
   claimed?: boolean
   legacyClaimed?: boolean
@@ -25,7 +30,6 @@ export function RegistrationBonusCard({ compact = false }: { compact?: boolean }
   const [loading, setLoading] = useState(true)
   const [claiming, setClaiming] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
-  const autoReconcileStarted = useRef(false)
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
@@ -65,46 +69,8 @@ export function RegistrationBonusCard({ compact = false }: { compact?: boolean }
     }
   }, [refresh])
 
-  // Legacy v1 claimants auto-reconcile once when the card loads and is claimable.
-  useEffect(() => {
-    if (loading || !status?.enabled || !status.legacyClaimed || !status.claimable || autoReconcileStarted.current) return
-    autoReconcileStarted.current = true
-    let cancelled = false
-    setClaiming(true)
-    void (async () => {
-      try {
-        const res = await fetch("/api/economy/earnings/registration-bonus", {
-          method: "POST",
-          credentials: "include",
-          headers: { Accept: "application/json", "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        })
-        const body = (await res.json().catch(() => null)) as BonusStatus | null
-        if (cancelled) return
-        if (!res.ok || !body?.ok) {
-          setMsg(body?.message || body?.error || "Bonus reconciliation is temporarily unavailable. Please retry later.")
-          await refresh()
-          return
-        }
-        setStatus(body)
-        setMsg(body.message || "Remaining registration bonus reconciled.")
-        window.dispatchEvent(new CustomEvent("ghc:wallet-refresh", { detail: { reason: "registration-bonus-reconciliation" } }))
-        window.dispatchEvent(new CustomEvent("ghc:earnings-refresh", { detail: { reason: "registration-bonus-reconciliation" } }))
-        window.dispatchEvent(
-          new CustomEvent("ghc:toast", {
-            detail: { message: body.message || "2.95 π top-up credited", type: "success" },
-          }),
-        )
-      } catch {
-        if (!cancelled) setMsg("Bonus reconciliation is temporarily unavailable. Please retry later.")
-      } finally {
-        if (!cancelled) setClaiming(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [loading, status, refresh])
+  // Claiming is always an explicit user action. Merely opening Wallet or Rewards
+  // must never issue a financial ledger credit in the background.
 
   const onClaim = async () => {
     if (claiming || !status?.claimable) return
@@ -123,7 +89,7 @@ export function RegistrationBonusCard({ compact = false }: { compact?: boolean }
         await refresh()
         return
       }
-      const amount = body.amountPi ?? status.amountPi ?? 3
+      const amount = body.amountPi ?? status.amountPi ?? 100
       setMsg(body.message || "Registration bonus credited.")
       setStatus(body)
       try {
@@ -147,9 +113,34 @@ export function RegistrationBonusCard({ compact = false }: { compact?: boolean }
     }
   }
 
-  // Hide completely when disabled and not claimed (giveaway paused)
+  // Keep the reward entry visible even when the campaign is paused. Hiding it
+  // makes the entire claim/history path appear missing and gives no explanation.
   if (!loading && status && status.enabled === false && !status.claimed) {
-    return null
+    return (
+      <section
+        className={`rounded-2xl border border-border/70 bg-card p-3.5 ${compact ? "mx-0" : "mx-3 mt-3"}`}
+        aria-label="Registration reward status"
+        data-testid="registration-reward-paused"
+      >
+        <div className="flex items-start gap-3">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="text-[13px] font-bold text-foreground">PI registration reward</p>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              Claims are temporarily unavailable in this environment while the Testnet reward setup is verified. Your existing PI balance and transaction history are unchanged. No reward is credited by displaying this message.
+            </p>
+            {status.message ? <p className="mt-1 text-[11px] text-muted-foreground">{status.message}</p> : null}
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              className="mt-2 rounded-full border border-border px-3 py-1 text-[11px] font-bold text-foreground transition hover:bg-muted"
+            >
+              Refresh reward status
+            </button>
+          </div>
+        </div>
+      </section>
+    )
   }
 
   if (loading && !status) {
@@ -162,7 +153,7 @@ export function RegistrationBonusCard({ compact = false }: { compact?: boolean }
   }
 
   // Migration pending while feature enabled
-  if (status?.error === "EARNINGS_LEDGER_UNAVAILABLE" || status?.error === "UNAVAILABLE") {
+  if (status?.error === "EARNINGS_LEDGER_UNAVAILABLE" || status?.error === "UNAVAILABLE" || status?.error === "REGISTRATION_BONUS_MIGRATION_REQUIRED") {
     if (status.enabled === true) {
       return (
         <section
@@ -172,11 +163,11 @@ export function RegistrationBonusCard({ compact = false }: { compact?: boolean }
           <div className="flex items-start gap-3">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
             <div className="min-w-0">
-              <p className="text-[13px] font-bold text-foreground">Registration bonus (3 π)</p>
+              <p className="text-[13px] font-bold text-foreground">Testnet registration reward (100 π target)</p>
               <p className="mt-1 text-[12px] text-muted-foreground">
-                The earnings ledger is not ready for claims yet. Operator must apply migration{" "}
-                <span className="font-mono text-[11px]">20261030010001_registration_bonus_v2_reconciliation.sql</span>{" "}
-                and ensure the service role can call the claim RPC. No balances are invented on the client.
+                The 100 π Testnet campaign requires migration{" "}
+                <span className="font-mono text-[11px]">20261125130000_run397_testnet_registration_bonus_100_pi.sql</span>{" "}
+                plus a verified service-role RPC. The migration must be reviewed and applied to the intended Testnet project before any campaign credit can occur. No balances are invented on the client.
               </p>
               <button
                 type="button"
@@ -207,8 +198,7 @@ export function RegistrationBonusCard({ compact = false }: { compact?: boolean }
     )
   }
 
-  const amount = status?.amountPi ?? 3
-  const isLegacy = Boolean(status?.legacyClaimed && !status?.claimed)
+  const amount = status?.amountPi ?? 100
   const isClaimable = Boolean(status?.claimable)
   const isClaimed = Boolean(status?.claimed)
 
@@ -217,7 +207,7 @@ export function RegistrationBonusCard({ compact = false }: { compact?: boolean }
     return (
       <div className="mx-0 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-50/60 px-3 py-2 dark:bg-emerald-950/20">
         <CheckCircle2 className="h-4 w-4 text-emerald-700" />
-        <p className="text-[12px] font-semibold text-emerald-900 dark:text-emerald-200">Registration bonus claimed (3 π total)</p>
+        <p className="text-[12px] font-semibold text-emerald-900 dark:text-emerald-200">Testnet registration reward complete (100 π cumulative target)</p>
       </div>
     )
   }
@@ -245,28 +235,22 @@ export function RegistrationBonusCard({ compact = false }: { compact?: boolean }
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-bold text-foreground">
-            {isLegacy ? "Complete your 3 π registration bonus" : isClaimed ? "Registration bonus claimed" : "Registration bonus"}
+            {isClaimed ? "Testnet registration reward complete" : "Testnet registration reward"}
           </p>
           <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
-            {isLegacy ? (
-              <>
-                You already received <span className="font-semibold">0.05 π</span>. Claim the remaining{" "}
-                <span className="font-semibold text-emerald-800 dark:text-emerald-300">2.95 π</span> so your ledger totals{" "}
-                <span className="font-semibold text-emerald-800 dark:text-emerald-300">3 π</span>.
-              </>
-            ) : isClaimed ? (
-              <>Policy total of <span className="font-semibold text-emerald-800 dark:text-emerald-300">3 π</span> is in your PI earnings ledger.</>
+            {isClaimed ? (
+              <>Your cumulative registration reward target of <span className="font-semibold text-emerald-800 dark:text-emerald-300">100 π</span> is reconciled against the server ledger.</>
             ) : (
               <>
-                One-time <span className="font-semibold text-emerald-800 dark:text-emerald-300">3 π</span> credited to your PI
-                earnings ledger. Withdrawable to your linked KYC’d Pi wallet when eligible.
+                Testnet-only reward: <span className="font-semibold text-emerald-800 dark:text-emerald-300">{amount.toLocaleString(undefined, { maximumFractionDigits: 7 })} π</span>{" "}
+                {status?.priorAmountPi ? `to top up ${status.priorAmountPi.toLocaleString(undefined, { maximumFractionDigits: 7 })} π of historical registration credits` : "for eligible new and existing accounts"}. Credited to the PI earnings ledger; withdrawal remains subject to wallet authorization and payout checks.
               </>
             )}
           </p>
 
           {isClaimed ? (
             <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-700/10 px-3 py-1.5 text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Claimed (3 π total)
+              <CheckCircle2 className="h-3.5 w-3.5" /> 100 π cumulative target reconciled
             </div>
           ) : isClaimable ? (
             <button
@@ -276,13 +260,7 @@ export function RegistrationBonusCard({ compact = false }: { compact?: boolean }
               className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 text-[14px] font-bold text-white shadow-md transition hover:bg-emerald-800 active:scale-[0.98] disabled:opacity-60"
             >
               {claiming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gift className="h-4 w-4" />}
-              {claiming
-                ? isLegacy
-                  ? "Reconciling…"
-                  : "Claiming…"
-                : isLegacy
-                  ? `Claim remaining ${amount} π`
-                  : `Claim ${amount} π now`}
+              {claiming ? "Reconciling…" : `Reconcile ${amount.toLocaleString(undefined, { maximumFractionDigits: 7 })} π now`}
             </button>
           ) : (
             <p className="mt-2 text-[11px] text-muted-foreground">

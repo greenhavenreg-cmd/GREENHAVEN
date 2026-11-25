@@ -203,7 +203,17 @@ export function ProfileScreen({
           ok?: boolean; posts?: Array<Record<string, unknown>>; hasMore?: boolean;
           nextBefore?: number | null; nextBeforeId?: string | null; error?: string; message?: string
         }
-        if (!response.ok || !data.ok) throw new Error(`Timeline request failed (${response.status})`)
+        if (!response.ok || !data.ok) {
+          const code = String(data.error || "").toUpperCase()
+          const detail = code === "POST_VISIBILITY_UNAVAILABLE"
+            ? "The server could not verify post privacy rules. Refresh after the Testnet social-read permissions are repaired."
+            : code === "PROFILE_CONTENT_MIGRATION_REQUIRED"
+              ? "The profile timeline database migration is missing on this Testnet deployment."
+              : code === "AUTH_REQUIRED"
+                ? "Your sign-in session expired. Sign in again to load your posts."
+                : data.message || `Timeline request failed (${response.status})`
+          throw new Error(detail)
+        }
         const mapped = (Array.isArray(data.posts) ? data.posts : []).map((row): Post => {
           const likes = Math.max(0, Number(row.likes) || 0)
           const commentCount = Math.max(0, Number(row.commentCount) || 0)
@@ -507,14 +517,11 @@ export function ProfileScreen({
   }, [name])
 
   const handle = useMemo(() => {
-    if (p.username?.trim()) return `@${p.username.trim().replace(/^@/, "").toLowerCase()}`
-    const base = (name || "member")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, ".")
-      .replace(/^\.+|\.+$/g, "")
-      .slice(0, 24)
-    return `@${base || "member"}`
-  }, [p.username, name])
+    // Only a verified Pi username is a public handle. GH IDs remain separate
+    // lookup identifiers and display names must never become alternate handles.
+    const canonical = String(p.username || "").trim().replace(/^@/, "")
+    return canonical ? `@${canonical}` : "Pi username not linked"
+  }, [p.username])
 
   const [serverGreenHavenId, setServerGreenHavenId] = useState<string | null>(null)
   useEffect(() => {

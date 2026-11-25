@@ -4,7 +4,7 @@
  * Referral share card — durable code + status from API; never invents rewards.
  * Settlement remains operator-flagged (GHC_REFERRAL_SETTLEMENT_ENABLED).
  */
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Check, Copy, Link2, Share2, Users } from "lucide-react"
 import { IdentityService } from "@/lib/identity/identity-service"
 import {
@@ -27,6 +27,10 @@ export function ReferralShareCard({
   className?: string
 }) {
   const [state, setState] = useState<CodeState>({ status: "loading" })
+  // Sequence + abort guard prevents a slow response for the previous session from
+  // repopulating referral details after an account switch or a newer refresh.
+  const requestSequenceRef = useRef(0)
+  const requestControllerRef = useRef<AbortController | null>(null)
   const [stats, setStats] = useState<Pick<
     ReferralStatus,
     | "invitedCount"
@@ -47,17 +51,32 @@ export function ReferralShareCard({
   const [referrerMessage, setReferrerMessage] = useState("")
 
   const load = useCallback(async () => {
+    const requestSequence = ++requestSequenceRef.current
+    requestControllerRef.current?.abort()
+    const controller = new AbortController()
+    requestControllerRef.current = controller
+    const isCurrent = () => requestSequence === requestSequenceRef.current && !controller.signal.aborted
+    // Clear every account-derived field before refreshing. A previous account's
+    // referral code, totals or attribution must never flash during identity changes.
     setState({ status: "loading" })
+    setStats(null)
+    setReferrerStatus("idle")
+    setReferrerMessage("")
+    setReferrerGhId("")
     try {
-      const status = await fetchReferralStatus()
+      const status = await fetchReferralStatus(controller.signal)
+      if (!isCurrent()) return
       if (!status.ok || !status.code) {
         // Fallback to code-only endpoint
         const res = await fetch("/api/referral/code", {
           credentials: "include",
           cache: "no-store",
           headers: { ...(IdentityService.getAuthHeaders?.() || {}), Accept: "application/json" },
+          signal: controller.signal,
         })
+        if (!isCurrent()) return
         const data = await res.json().catch(() => ({}))
+        if (!isCurrent()) return
         if (!res.ok || !data?.ok || !data?.code) {
           setState({
             status: "error",
@@ -92,33 +111,25 @@ export function ReferralShareCard({
       if (status.attributed) {
         setReferrerStatus("locked")
         setReferrerMessage("Referral locked in.")
-        try {
-          window.localStorage.setItem("ghc.referral.locked", "1")
-        } catch {
-          /* */
-        }
       }
     } catch {
-      setState({ status: "error", message: "Network error loading referral" })
+      if (isCurrent()) setState({ status: "error", message: "Network error loading referral" })
     }
   }, [])
 
   useEffect(() => {
     void load()
-  }, [load])
-
-  useEffect(() => {
-    try {
-      if (typeof window === "undefined") return
-      const locked = window.localStorage.getItem("ghc.referral.locked")
-      if (locked === "1" && referrerStatus !== "locked") {
-        setReferrerStatus("locked")
-        setReferrerMessage("Referral locked in.")
-      }
-    } catch {
-      /* */
+    const refresh = () => { void load() }
+    window.addEventListener("ghc:wallet-auth-changed", refresh)
+    window.addEventListener("ghc:referral-refresh", refresh)
+    return () => {
+      requestSequenceRef.current += 1
+      requestControllerRef.current?.abort()
+      requestControllerRef.current = null
+      window.removeEventListener("ghc:wallet-auth-changed", refresh)
+      window.removeEventListener("ghc:referral-refresh", refresh)
     }
-  }, [referrerStatus])
+  }, [load])
 
   const shareUrl =
     state.status === "ready"
@@ -127,32 +138,49 @@ export function ReferralShareCard({
         : state.sharePath
       : ""
 
+  async function copyText(value: string): Promise<boolean> {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value)
+        return true
+      }
+      const field = document.createElement("textarea")
+      field.value = value
+      field.setAttribute("readonly", "")
+      field.style.position = "fixed"
+      field.style.opacity = "0"
+      document.body.appendChild(field)
+      field.select()
+      const copied = document.execCommand("copy")
+      field.remove()
+      return copied
+    } catch {
+      return false
+    }
+  }
+
   async function copyLink() {
     if (state.status !== "ready" || !shareUrl) return
-    try {
-      await navigator.clipboard.writeText(shareUrl)
-      try {
-        window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "Invite link copied", type: "success" } }))
-      } catch { /* */ }
-      setCopied("link")
-      window.setTimeout(() => setCopied(null), 2000)
-    } catch {
-      /* */
+    const ok = await copyText(shareUrl)
+    if (!ok) {
+      setReferrerMessage("Copy is unavailable in this browser. Use Share invite or copy the code instead.")
+      return
     }
+    try { window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "Invite link copied", type: "success" } })) } catch { /* */ }
+    setCopied("link")
+    window.setTimeout(() => setCopied(null), 2000)
   }
 
   async function copyCode() {
     if (state.status !== "ready") return
-    try {
-      await navigator.clipboard.writeText(state.code)
-      try {
-        window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "Invite code copied", type: "success" } }))
-      } catch { /* */ }
-      setCopied("code")
-      window.setTimeout(() => setCopied(null), 2000)
-    } catch {
-      /* */
+    const ok = await copyText(state.code)
+    if (!ok) {
+      setReferrerMessage("Copy is unavailable in this browser. Select the invite code manually.")
+      return
     }
+    try { window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "Invite code copied", type: "success" } })) } catch { /* */ }
+    setCopied("code")
+    window.setTimeout(() => setCopied(null), 2000)
   }
 
   async function shareNative() {
@@ -200,11 +228,6 @@ export function ReferralShareCard({
       }
       setReferrerStatus("locked")
       setReferrerMessage(String(data.message || "Referral saved. This cannot be changed."))
-      try {
-        window.localStorage.setItem("ghc.referral.locked", "1")
-      } catch {
-        /* */
-      }
       try {
         notificationSystem.addNotification(
           "system",
@@ -257,8 +280,7 @@ export function ReferralShareCard({
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-bold text-foreground">Invite friends</h3>
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-            Share your link or code. Rewards are only paid from verified membership charges when
-            the operator enables settlement — we never invent balances here.
+            Share your link or code. Qualifying verified VIP membership charges earn 5% (up to 25 GHC per referral), with a 50-reward rolling 30-day cap. Rewards stay pending until settlement is enabled — no balances are invented here.
           </p>
         </div>
       </div>

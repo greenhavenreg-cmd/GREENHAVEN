@@ -1,17 +1,20 @@
-## Latest implementation — 0.338.119 Phase 9 Coordinated Acceptance
+## Latest implementation — 0.338.134 Run 406 Server-Read and Wallet Repair
 
-- User-designated source archive: `GREENHAVEN-0.338.118-PHASE-D-COMMUNITIES-STORAGE-2026-11-24-1.zip`.
-- Adds `scripts/check-run395-phase9-release-acceptance.mjs` with 24 cross-workstream assertions, registered once in `verify:static` and once in `prebuild:checks`.
-- Preserves Phase A/B/C onboarding and Pi identity, progressive profile completion, explicit wallet consent, private owner-scoped `gh-media` lifecycle and Phase D community governance/storage work.
-- Historical Phase 7/8 domain mapping remains in `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`; RUN385 research/field-research changes remain part of the retained source.
-- Focused contracts pass: RUN296/391/392/393/394, RUN353/377/383/384, Phase 7 Pi identity/payout, Phase D Communities/Storage and Phase 7/8 harmonization; new Phase 9 gate passes 24/24.
-- Migration inventory: 239 files synchronized; no migration added or modified. No live database or Storage mutation.
-- Workspace Node 22.16.0; project requires Node `^24.15.0`; dependencies are absent. Full typecheck/lint/build and browser/device acceptance are not verified.
-- No Pi authorization, financial, Mainnet, Git push or Vercel deployment action was performed. Production remains NOT APPROVED.
+- User-designated source archive: `GREENHAVEN-0.338.119-PHASE9-COORDINATED-ONBOARDING-IDENTITY-STORAGE-2026-11-24-3.zip`.
+- Preserves Phase A/B/C onboarding and Pi identity, profile and private Storage work, Phase D communities, wallet security, separate Pi/GHC rails, authoritative membership entitlements and server-side reward claims.
+- Historical Phase 7/8 domain mapping remains in `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`; RUN385 research/field-research changes remain retained.
+- Run 397 upgrades the cumulative Testnet registration-reward target to 100 PI, with historical bonus credits counted toward the target, account-level idempotency and an explicit-confirmation bounded backfill. Auto-claim is invoked only when the rewards surface is opened and both Testnet feature gates are enabled.
+- Run 397 hardens referrals with a complete database aggregate, a 5% reward cap of 25 GHC per referral, a 50 qualifying reward rolling 30-day cap per inviter, account-switch state clearing and a clipboard fallback. Referral settlement remains operator-gated.
+- The Run 397 100 PI campaign migration is now applied to the correct Testnet database and one verified account has a 100 PI available-ledger credit; the separate referral migration remains unverified. The inventory contains 242 synchronized migration files.
+- Focused Run 397 checks pass 16/16; Run 396 wallet/payout/membership checks 17/17; membership release/foundation/session checks 16/16, 18/18 and 15/15; Rewards history 20/20; cross-feature closeout 43/43; referral fee contract 10/10.
+- Workspace Node 22.16.0; project requires Node `^24.15.0`; dependencies are absent. Full dependency-backed typecheck/lint/build and browser/device acceptance remain unverified.
+- The registration campaign migration and one idempotent 100 PI Testnet ledger credit were applied. No Pi A2U transfer, Mainnet action, Git push or Vercel deployment occurred. Production remains NOT APPROVED.
 
-# CURRENT BUILD CONTEXT — 0.338.119 Phase 9 (2026-11-24)
+# CURRENT BUILD CONTEXT — 0.338.134 Run 406 Server-Read and Wallet Repair (2026-11-25)
 
-Current source is a source-only derivative of the user-designated 0.338.118 Phase D archive. See `docs/SOURCE_OF_TRUTH.md`, `docs/PROJECT_TRUTH.md`, `docs/UPGRADE-WORKLOG-0.338.119.md` and the Phase 9 delivery report. Historical records below remain historical evidence and do not override the current source authority.
+Release metadata remains synchronized with the 0.338.134 Phase 9 Coordinated Acceptance baseline; Run 406 is the current additive increment.
+
+Current source is a source-only derivative of `GREENHAVEN-0.338.132-RUN406-SERVER-READ-WALLET-REPAIR-2026-11-25-2.zip`, integrated as Run 408 (`0.338.133`) and polished in Run 409 (`0.338.134`). See `docs/SOURCE_OF_TRUTH.md`, `docs/PROJECT_TRUTH.md`, `docs/RUN406-SERVER-READ-WALLET-REPAIR-2026-11-25.md`, `docs/RUN405-LOCAL-PROJECT-HANDOFF-AND-RECONCILIATION-2026-11-25.md`, and the prior Run 405 worklog. Historical records below remain historical evidence and do not override the current source authority.
 
 ## Historical build context — 0.338.99
 

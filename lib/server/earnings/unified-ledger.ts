@@ -67,12 +67,15 @@ export async function getRegistrationBonusPolicyStatus(userId: string): Promise<
   amountAtomic?: number
   amountPi?: number
   uniqueRef?: string
+  campaign?: string
+  priorAmountPi?: number
+  totalTargetPi?: number
   message?: string
 }> {
   const result = await rpc<{
     ok?: boolean; error?: string; legacyClaimed?: boolean; claimed?: boolean
     claimable?: boolean; amountAtomic?: number; amountPi?: number
-    uniqueRef?: string; message?: string
+    uniqueRef?: string; campaign?: string; priorAmountPi?: number; totalTargetPi?: number; message?: string
   }>('gh_earnings_registration_bonus_status', { p_user_id: String(userId || '').trim() })
   if (!result) return { ok: false, error: 'EARNINGS_LEDGER_UNAVAILABLE' }
   if (result.ok !== true) return { ok: false, error: String(result.error || 'REGISTRATION_BONUS_STATUS_FAILED') }
@@ -91,12 +94,16 @@ export async function claimRegistrationBonusPolicy(userId: string): Promise<{
   amountAtomic?: number
   amountPi?: number
   uniqueRef?: string
+  campaign?: string
+  priorAmountPi?: number
+  totalTargetPi?: number
   message?: string
 }> {
   const result = await rpc<{
     ok?: boolean; error?: string; duplicate?: boolean; entryId?: string
     legacyClaimed?: boolean; claimed?: boolean; claimable?: boolean
-    amountAtomic?: number; amountPi?: number; uniqueRef?: string; message?: string
+    amountAtomic?: number; amountPi?: number; uniqueRef?: string; campaign?: string
+    priorAmountPi?: number; totalTargetPi?: number; message?: string
   }>('gh_earnings_registration_bonus_claim', { p_user_id: String(userId || '').trim() })
   if (!result) return { ok: false, error: 'EARNINGS_LEDGER_UNAVAILABLE' }
   if (result.ok !== true) return { ok: false, error: String(result.error || 'REGISTRATION_BONUS_CLAIM_FAILED') }
@@ -308,6 +315,21 @@ export type WithdrawalQuote = {
   maxSinglePayoutAtomic?: number
   destination?: string
   message?: string
+}
+
+
+/** Convert a user's requested net Pi payout to the minimum gross atomic reservation.
+ * Uses integer arithmetic and the 300 bps policy; the database quote remains the final authority.
+ */
+export function grossForRequestedNetAtomic(netAtomic: number, feeBps = 300): number {
+  if (!Number.isSafeInteger(netAtomic) || netAtomic <= 0 || !Number.isSafeInteger(feeBps) || feeBps < 0 || feeBps >= 10_000) return 0
+  const net = BigInt(netAtomic)
+  const bps = BigInt(feeBps)
+  let gross = (net * 10_000n + (10_000n - bps) - 1n) / (10_000n - bps)
+  const fee = (g: bigint) => (g * bps + 9_999n) / 10_000n
+  while (gross - fee(gross) < net) gross += 1n
+  const result = Number(gross)
+  return Number.isSafeInteger(result) ? result : 0
 }
 
 /** Quote gross / 3% fee / net for linked Pi wallet payout. */

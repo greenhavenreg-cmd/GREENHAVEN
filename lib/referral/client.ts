@@ -17,7 +17,6 @@ export type ReferralStatus = {
   code?: string
   sharePath?: string
   attributed?: boolean
-  referrerUserId?: string | null
   invitedCount?: number
   pendingRewardCount?: number
   postedRewardCount?: number
@@ -47,11 +46,12 @@ export async function fetchReferralCode(): Promise<{
   }
 }
 
-export async function fetchReferralStatus(): Promise<ReferralStatus> {
+export async function fetchReferralStatus(signal?: AbortSignal): Promise<ReferralStatus> {
   const res = await fetch("/api/referral/status", {
     credentials: "include",
     cache: "no-store",
     headers: authHeaders(),
+    signal,
   })
   const data = await res.json().catch(() => ({}))
   return {
@@ -60,7 +60,6 @@ export async function fetchReferralStatus(): Promise<ReferralStatus> {
     code: data?.code ? String(data.code) : undefined,
     sharePath: data?.sharePath ? String(data.sharePath) : undefined,
     attributed: Boolean(data?.attributed),
-    referrerUserId: data?.referrerUserId != null ? String(data.referrerUserId) : null,
     invitedCount: Number(data?.invitedCount) || 0,
     pendingRewardCount: Number(data?.pendingRewardCount) || 0,
     postedRewardCount: Number(data?.postedRewardCount) || 0,

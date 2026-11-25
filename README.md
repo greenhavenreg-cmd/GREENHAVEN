@@ -1,10 +1,16 @@
 # GreenHaven
 
-**Current source version:** `0.338.119` (Phase 9 coordinated onboarding, Pi identity, wallet-consent and Storage acceptance candidate, derived in place from 0.338.118)
+**Current source version:** `0.338.136` (Run 411 marketplace commerce reliability upgrade over Run 410; source-only, not deployed)
 
 Production status: **NOT APPROVED** — Node 24.15.x dependency-backed typecheck/lint/build, browser/device testing, live Pi Browser, Testnet/Mainnet Storage verification and target-specific migration reconciliation remain outstanding.
 
-This repository is the canonical GreenHaven source tree. The current source is derived from the user-designated `GREENHAVEN-0.338.118-PHASE-D-COMMUNITIES-STORAGE-2026-11-24-1.zip`. Phase 9 adds a consolidated 24-assertion release acceptance gate for the existing Phase A/B/C onboarding and identity repairs, progressive profile completion, explicit wallet consent and private `gh-media` lifecycle; the Phase D community and Storage work is preserved. See `GREENHAVEN-0.338.119-PHASE9-COORDINATED-ONBOARDING-IDENTITY-STORAGE-2026-11-24-REPORT.md`, `docs/SOURCE_OF_TRUTH.md` and `docs/UPGRADE-WORKLOG-0.338.119.md`. No SQL migration, live database/Storage mutation, financial action, Pi authorization, Git push or Vercel deployment was performed.
+This repository preserves the user-designated `GREENHAVEN-0.338.119-PHASE9-COORDINATED-ONBOARDING-IDENTITY-STORAGE-2026-11-24-3.zip` baseline and adds Run 397 source-only improvements for the 100 PI cumulative Testnet registration campaign, bounded referral rewards and complete referral summaries. The Run 397 100 PI campaign migration was applied to the correct Testnet database and its idempotent backfill credited the one verified Pi identity currently present there. This is a ledger credit, not an executed Pi A2U transfer. No GitHub push or Vercel deployment was performed. Production remains NOT APPROVED until target migration reconciliation, Node 24.15.x dependency-backed checks, Testnet payment/payout tests and browser/device acceptance pass.
+
+## RUN397 — Testnet registration rewards, referral integrity and release cleanup
+
+Run 397 upgrades the registration reward to a **100 PI cumulative Testnet target**: previously valid registration credits count toward the target, so existing 3 PI recipients are eligible for a 97 PI top-up and new accounts for up to 100 PI. The correct Testnet database now has the campaign migration installed and the backfill run once. It processed one account and issued one 100 PI available-ledger credit, confirmed by the status and withdrawable-balance RPCs. The campaign feature flag remains fail-closed until the matching source and new account-discovery migration are applied and deployed; no provider transfer was executed. The other historical accounts are not present as verified identities in this project and must be reconciled by stable identity and transaction provenance before import.
+
+Referral rewards now use complete server-side summary aggregates, account-scoped status refresh, a 5% qualifying membership reward capped at 25 GHC, and a 50-reward rolling 30-day cap per inviter. Referral settlement remains operator-gated. The registration-bonus migration `20261125130000_run397_testnet_registration_bonus_100_pi.sql` is applied to the correct Testnet database. The separate referral migration `20261125140000_run397_referral_quality_caps_and_summary.sql` still requires its own review and must not be assumed applied. Focused Run 397 checks pass 16/16; full Node 24.15.x build/typecheck and live Testnet acceptance remain outstanding.
 
 ## Pi authentication frame-routing correction — 2026-11-23 / Run 373
 

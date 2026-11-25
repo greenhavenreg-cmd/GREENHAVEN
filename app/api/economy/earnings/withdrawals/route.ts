@@ -1,17 +1,59 @@
-/** Create a durable PI earnings payout request. This endpoint never sends a Pi transfer. */
+/** Read Pi earnings payout history and create a durable payout request. POST never sends a Pi transfer. */
 import { createHash } from "node:crypto"
 import { NextResponse } from "next/server"
 import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
 import { checkDurableRateLimit, durableRateLimitStatus, durableRateLimitCode } from "@/lib/server/security/control-plane"
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
-import { quoteWithdrawal, createPiEarningsPayoutRequest } from "@/lib/server/earnings/unified-ledger"
+import { quoteWithdrawal, createPiEarningsPayoutRequest, grossForRequestedNetAtomic } from "@/lib/server/earnings/unified-ledger"
 import { checkPinProof, pinProofConfigured } from "@/lib/server/identity/withdrawal-pin-proof"
 import { assertPayoutWalletAuthorization } from "@/lib/server/identity/wallet-authorization"
+import { supabaseRpc } from "@/lib/server/supabase/rest-client"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 const headers = { "Cache-Control": "private, no-store, max-age=0", Pragma: "no-cache" }
 function reply(body: unknown, status = 200) { return NextResponse.json(body, { status, headers }) }
+
+
+/** Read-only, session-scoped payout history. Never expose recipient UID, idempotency key, or provider receipt. */
+export async function GET(request: Request) {
+  const auth = await resolveAuthenticatedUser(request.headers)
+  if (!auth) return reply({ ok: false, error: "AUTH_REQUIRED" }, 401)
+  const rate = await checkDurableRateLimit(`pi-earnings-payout-history:${auth.userId}`, 30, 60_000, { onUnavailable: "deny" })
+  if (!rate.ok) return reply({ ok: false, error: durableRateLimitCode(rate), retryAfterSec: rate.retryAfterSec }, durableRateLimitStatus(rate))
+
+  const result = await supabaseRpc<Record<string, unknown>>("gh_pi_earnings_payout_list_owned", {
+    p_user_id: auth.userId,
+    p_limit: 50,
+  }, { timeoutMs: 8_000 })
+  const data = result.ok && result.data && typeof result.data === "object"
+    ? result.data as Record<string, unknown>
+    : null
+  if (!data || data.ok !== true || !Array.isArray(data.items)) {
+    return reply({ ok: false, error: "PAYOUT_HISTORY_UNAVAILABLE", message: "Pi withdrawal history is temporarily unavailable. Your balance and requests have not been changed." }, 503)
+  }
+  const allowedStatuses = new Set(["reserved", "processing", "uncertain", "paid", "failed", "released"])
+  const items = data.items.flatMap((raw: unknown) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return []
+    const row = raw as Record<string, unknown>
+    const id = typeof row.id === "string" ? row.id : ""
+    const status = typeof row.status === "string" ? row.status : ""
+    const gross = String(row.grossAtomic ?? "")
+    const fee = String(row.feeAtomic ?? "")
+    const net = String(row.netAtomic ?? "")
+    const validAtomic = (v: string) => /^\d{1,38}$/.test(v)
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id) || !allowedStatuses.has(status) || !validAtomic(gross) || !validAtomic(fee) || !validAtomic(net)) return []
+    return [{
+      id, status, grossAtomic: gross, feeAtomic: fee, netAtomic: net,
+      network: row.network === "Pi Testnet" ? "Pi Testnet" : "Unknown network",
+      providerTxid: typeof row.providerTxid === "string" ? row.providerTxid.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 200) || null : null,
+      createdAt: typeof row.createdAt === "string" ? row.createdAt : null,
+      updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : null,
+      settledAt: typeof row.settledAt === "string" ? row.settledAt : null,
+    }]
+  })
+  return reply({ ok: true, asset: "PI", items, limit: 50, source: "gh_pi_earnings_payout_list_owned" })
+}
 
 export async function POST(request: Request) {
   const auth = await resolveAuthenticatedUser(request.headers)
@@ -51,12 +93,15 @@ export async function POST(request: Request) {
   }
 
   // Server-enforced withdrawal PIN: no valid proof for this user + key, no reservation.
-  if (!pinProofConfigured()) return reply({ ok: false, error: "PIN_PROOF_SECRET_MISSING" }, 503)
+  if (!pinProofConfigured()) return reply({ ok: false, error: "PIN_PROOF_SECRET_MISSING", requiredEnv: "GH_PIN_PROOF_SECRET", compatibilityEnv: "GHC_PIN_PROOF_SECRET", message: "Withdrawal PIN verification is unavailable because the server-side signing key is not configured. Your balance has not been reserved." }, 503)
   if (!checkPinProof(auth.userId, key, body.pinProof)) {
     return reply({ ok: false, error: "PIN_PROOF_REQUIRED", message: "Verify your withdrawal PIN to continue." }, 403)
   }
 
-  const quote = await quoteWithdrawal({ userId: auth.userId, grossAtomic: body.amountAtomic })
+  // amountAtomic is the user-requested NET payout. Server derives gross debit + 3% fee.
+  const grossAtomic = grossForRequestedNetAtomic(body.amountAtomic, 300)
+  if (!grossAtomic) return reply({ ok: false, error: "INVALID_AMOUNT_ATOMIC" }, 400)
+  const quote = await quoteWithdrawal({ userId: auth.userId, grossAtomic })
   if (!quote.ok || !Number.isSafeInteger(quote.grossAtomic) || !Number.isSafeInteger(quote.feeAtomic) || !Number.isSafeInteger(quote.netAtomic)) {
     return reply({ ok: false, error: quote.error || "WITHDRAWAL_QUOTE_INVALID" }, quote.error === "EARNINGS_LEDGER_UNAVAILABLE" ? 503 : 409)
   }
@@ -82,7 +127,7 @@ export async function POST(request: Request) {
   }
 
   const fingerprint = createHash("sha256").update([
-    auth.userId, "PI", "Pi Testnet", quote.grossAtomic, quote.feeAtomic, quote.netAtomic,
+    auth.userId, "PI", "Pi Testnet", body.amountAtomic, quote.grossAtomic, quote.feeAtomic, quote.netAtomic,
     recipientUid,
   ].join("|")).digest("hex")
   const result = await createPiEarningsPayoutRequest({
@@ -106,6 +151,7 @@ export async function POST(request: Request) {
     duplicate: result.duplicate === true, grossAtomic: result.grossAtomic,
     feeAtomic: result.feeAtomic, netAtomic: result.netAtomic,
     network: "Pi Testnet", transferSubmitted: false,
-    message: "Your payout request is securely reserved. Pi has not been sent yet; the balance will return to Available only after a safe, verified release, or settle after a verified Pi Testnet payment.",
+    requestedNetAtomic: body.amountAtomic,
+    message: "Your requested net Pi amount is targeted for delivery; the 3% fee is added on top and included in the gross reservation. Pi has not been sent yet; the balance returns to Available only after a safe, verified release, or settles after a verified Pi Testnet payment.",
   }, result.duplicate ? 200 : 201)
 }

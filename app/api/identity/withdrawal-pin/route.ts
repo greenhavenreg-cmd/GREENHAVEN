@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     // Proof is bound to this user + idempotency key and required by the withdrawals route.
     const bindKey = typeof body.bindKey === "string" ? body.bindKey.trim() : ""
     if (bindKey) {
-      if (!pinProofConfigured()) return reply({ ok: false, error: "PIN_PROOF_SECRET_MISSING" }, 503)
+      if (!pinProofConfigured()) return reply({ ok: false, error: "PIN_PROOF_SECRET_MISSING", requiredEnv: "GH_PIN_PROOF_SECRET", compatibilityEnv: "GHC_PIN_PROOF_SECRET" }, 503)
       return reply({ ok: true, verified: true, pinProof: issuePinProof(auth.userId, bindKey) })
     }
     return reply({ ok: true, verified: true })

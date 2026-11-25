@@ -3,18 +3,17 @@
  * All amounts and legacy detection are server/database-authoritative.
  */
 import { hasPrivilegedDatabase } from "@/lib/server/economy/env"
+import { isPiSandboxEnv } from "@/lib/server/economy/testnet-unlock"
 import {
   PI_ATOMIC_SCALE,
   getRegistrationBonusPolicyStatus,
   claimRegistrationBonusPolicy,
 } from "@/lib/server/earnings/unified-ledger"
 
-/** 3 PI total registration bonus at the 1e-7 atomic scale. */
-export const REGISTRATION_BONUS_PI = 3
-export const REGISTRATION_BONUS_ATOMIC = Math.round(REGISTRATION_BONUS_PI * PI_ATOMIC_SCALE) // 30_000_000
-export const REGISTRATION_BONUS_TOPUP_PI = 2.95
-export const REGISTRATION_BONUS_TOPUP_ATOMIC = Math.round(REGISTRATION_BONUS_TOPUP_PI * PI_ATOMIC_SCALE) // 29_500_000
-export const REGISTRATION_BONUS_POLICY_VERSION = "v2"
+/** Testnet campaign cumulative target at the 1e-7 atomic scale. */
+export const REGISTRATION_BONUS_PI = 100
+export const REGISTRATION_BONUS_ATOMIC = Math.round(REGISTRATION_BONUS_PI * PI_ATOMIC_SCALE) // 1_000_000_000
+export const REGISTRATION_BONUS_POLICY_VERSION = "testnet_100:v1"
 export const REGISTRATION_BONUS_SOURCE_KIND = "system" as const
 
 export function registrationBonusUniqueRef(userId: string): string {
@@ -34,7 +33,7 @@ export function registrationBonusTopupUniqueRef(userId: string): string {
 export function isRegistrationBonusEnabled(): boolean {
   const enabled = String(process.env.GHC_REGISTRATION_BONUS_ENABLED ?? "0").trim().toLowerCase()
   const sandbox = String(process.env.NEXT_PUBLIC_PI_SANDBOX ?? "").trim().toLowerCase()
-  return ["1", "true", "yes", "on"].includes(enabled) && sandbox === "true"
+  return ["1", "true", "yes", "on"].includes(enabled) && sandbox === "true" && isPiSandboxEnv()
 }
 
 export type RegistrationBonusStatus = {
@@ -47,6 +46,9 @@ export type RegistrationBonusStatus = {
   legacyClaimed?: boolean
   duplicate?: boolean
   uniqueRef: string
+  campaign?: string
+  priorAmountPi?: number
+  totalTargetPi?: number
   error?: string
   reasons: string[]
   message?: string
@@ -58,7 +60,7 @@ export async function getRegistrationBonusStatus(userId: string): Promise<Regist
   const base: RegistrationBonusStatus = {
     ok: true, enabled: isRegistrationBonusEnabled(), amountPi: REGISTRATION_BONUS_PI,
     amountAtomic: REGISTRATION_BONUS_ATOMIC, claimable: false, claimed: false,
-    uniqueRef, reasons: [],
+    uniqueRef, campaign: "testnet_registration_100_v1", totalTargetPi: 100, reasons: [],
   }
   if (!uid) return { ...base, ok: false, error: "AUTH_REQUIRED", reasons: ["Sign in required"] }
   if (!base.enabled) return { ...base, reasons: ["Registration bonus is paused"], message: "This one-time PI bonus is currently disabled by the operator." }
@@ -67,20 +69,27 @@ export async function getRegistrationBonusStatus(userId: string): Promise<Regist
   const status = await getRegistrationBonusPolicyStatus(uid)
   if (!status.ok) return { ...base, ok: false, error: status.error || "EARNINGS_LEDGER_UNAVAILABLE", reasons: ["Earnings ledger unavailable"], message: "Could not load the server earnings ledger. No balances were invented." }
 
+  // Fail closed until the Testnet campaign migration is actually installed. The
+  // previous RPC granted 3 PI; never allow new code to mistake that response for
+  // the 100 PI campaign and silently execute an old policy.
+  if (status.campaign !== "testnet_registration_100_v1") {
+    return { ...base, ok: false, enabled: base.enabled, claimable: false, error: "REGISTRATION_BONUS_MIGRATION_REQUIRED", reasons: ["Testnet 100 PI campaign migration is not installed"], message: "The 100 PI Testnet campaign is waiting for its approved database migration. No reward was credited." }
+  }
   const legacyClaimed = status.legacyClaimed === true
   const claimed = status.claimed === true
-  const amountAtomic = status.amountAtomic ?? (legacyClaimed ? REGISTRATION_BONUS_TOPUP_ATOMIC : REGISTRATION_BONUS_ATOMIC)
-  const amountPi = status.amountPi ?? amountAtomic / PI_ATOMIC_SCALE
+  const amountAtomic = Number(status.amountAtomic ?? REGISTRATION_BONUS_ATOMIC)
+  const amountPi = Number(status.amountPi ?? amountAtomic / PI_ATOMIC_SCALE)
   const isClaimable = status.claimable === true
   return {
     ...base, amountPi, amountAtomic, legacyClaimed, claimed, claimable: isClaimable,
-    uniqueRef: status.uniqueRef || (legacyClaimed ? registrationBonusTopupUniqueRef(uid) : uniqueRef),
+    campaign: status.campaign, priorAmountPi: Number(status.priorAmountPi ?? 0), totalTargetPi: Number(status.totalTargetPi ?? 100),
+    uniqueRef: status.uniqueRef || uniqueRef,
     reasons: claimed ? ["Registration bonus already reconciled"] : isClaimable ? [] : ["Registration bonus not claimable"],
     message: status.message || (claimed
-      ? "Registration bonus is already available in your PI earnings ledger."
+      ? "Your Testnet registration reward is already reconciled."
       : legacyClaimed
         ? "Your previous 0.05 π bonus is recorded; reconcile the remaining 2.95 π."
-        : `Claim your one-time ${REGISTRATION_BONUS_PI} π registration bonus to your PI earnings balance.`),
+        : `Claim your Testnet registration reward to bring your cumulative registration credits to ${REGISTRATION_BONUS_PI} π.`),
   }
 }
 
@@ -98,6 +107,6 @@ export async function claimRegistrationBonus(userId: string): Promise<Registrati
     claimed: result.claimed !== false, claimable: false, duplicate: result.duplicate === true,
     legacyClaimed: result.legacyClaimed ?? status.legacyClaimed, entryId: result.entryId,
     reasons: result.duplicate ? ["Registration bonus already reconciled"] : [],
-    message: result.message || (result.duplicate ? "Registration bonus already reconciled." : `${amountPi} π registration bonus credit is available in your PI earnings ledger.`),
+    message: result.message || (result.duplicate ? "Registration bonus already reconciled." : `${amountPi} π Testnet registration reward credit is available in your PI earnings ledger.`),
   }
 }

@@ -310,9 +310,9 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
 
   const feePreview = useMemo(() => {
     if (amountPi <= 0) return null
-    const grossAtomic = floorToAtomic(amountPi)
-    const feeAtomic = Math.ceil((grossAtomic * 300) / 10_000)
-    const netAtomic = Math.max(0, grossAtomic - feeAtomic)
+    const netAtomic = floorToAtomic(amountPi)
+    const grossAtomic = Math.ceil((netAtomic * 10_000) / 9_700)
+    const feeAtomic = grossAtomic - netAtomic
     return {
       gross: atomicToPi(grossAtomic),
       fee: atomicToPi(feeAtomic),
@@ -392,7 +392,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
             ? atomicToPi(body.netAtomic)
             : feePreview?.net ?? 0
       setQuote({
-        amountAtomic: grossAtomic,
+        amountAtomic,
         gross,
         fee,
         net,
@@ -521,7 +521,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
               : vBody?.error === "PIN_NOT_CONFIGURED"
                 ? "No withdrawal PIN is set yet. Create one in Security & PIN."
               : vBody?.error === "PIN_PROOF_SECRET_MISSING"
-                ? "Withdrawals are temporarily unavailable: the server's PIN signing key is not configured. Your PIN was correct and your funds are unchanged. (ref: PIN_PROOF_SECRET_MISSING)"
+                ? "Withdrawals are temporarily unavailable because the server-side PIN signing key is not configured. Set GH_PIN_PROOF_SECRET (or the compatibility alias GHC_PIN_PROOF_SECRET) in the Testnet Preview environment. Your PIN was correct and your funds are unchanged. (ref: PIN_PROOF_SECRET_MISSING)"
               : vRes.status === 429 || vBody?.error === "RATE_LIMITED"
                 ? "Too many attempts. Wait a minute and try again."
               : vRes.status === 401 && vBody?.error === "AUTH_REQUIRED"
@@ -591,6 +591,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
       setShowPin(false)
       let finalMsg =
         "Withdrawal request accepted. Your Pi is reserved while the payout is processed."
+      let terminalOutcome = false
       if (body.requestId) {
         setMsg("Request accepted. Sending your Pi…")
         const run = await apiRequest<{ ok?: boolean; status?: string; error?: string; retryable?: boolean; diagnosticCode?: string; requestId?: string }>(
@@ -599,8 +600,10 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
         )
         const r = run.data
         if (r?.ok && r.status === "paid") {
+          terminalOutcome = true
           finalMsg = "Withdrawal complete. Your Pi has been sent to your wallet."
         } else if (r?.ok && r.status === "released") {
+          terminalOutcome = true
           finalMsg = "The payout was cancelled and your Pi was returned to your available balance."
         } else if (r?.error === "PI_EARNINGS_AUTO_EXECUTE_DISABLED") {
           finalMsg = "Request accepted. Automatic payout is not switched on for this deployment yet, so your Pi stays reserved."
@@ -626,9 +629,11 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
           }),
         )
       } catch { /* */ }
-      onCompleted?.()
+      // Refresh wallet state for every accepted request, but keep the sheet open for
+      // pending/uncertain outcomes so the user can read the status and next steps.
+      if (terminalOutcome) onCompleted?.()
     } catch {
-      setMsg("Network error. No transfer was started.")
+      setMsg("The withdrawal outcome could not be confirmed because the connection failed. A request may already exist; do not submit another withdrawal yet. Check Wallet → History and retry the status refresh. Your funds remain protected until the server reconciles the request.")
     } finally {
       setSubmitting(false)
     }
@@ -881,7 +886,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Waiting for Pi…
                   </>
                 ) : consentError?.retryable ? (
-                  "Retry Pi authentication"
+                  "Try again"
                 ) : (
                   "Authorize & continue"
                 )}

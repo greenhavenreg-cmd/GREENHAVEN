@@ -1,19 +1,22 @@
-# Current project truth — 0.338.119 Phase 9 Coordinated Acceptance (2026-11-24)
+# Current project truth — 0.338.136 Run 411 Marketplace Commerce Reliability (2026-11-25)
 
-**Current source:** `gh-connect@0.338.119`, a source-only derivative of the user-designated `GREENHAVEN-0.338.118-PHASE-D-COMMUNITIES-STORAGE-2026-11-24-1.zip`. No rewrite, push or deployment occurred.
+**Current source:** `gh-connect@0.338.136`, a local source candidate based on Run 410. Run 411 corrects saved-list and order false-empty states, removes local/demo order fallback from financial UI, and makes cart cleanup/removal safe for variant-specific and in-flight edits. It preserves the existing security and financial release boundaries. Profile/identity runtime failures, migration-history drift, route-by-route privilege review, and full commerce acceptance remain unresolved. GitHub push and Vercel deployment remain unperformed.
 
-**Current source version:** `0.338.119`  
-**Package identity:** `gh-connect@0.338.119`  
-**Baseline:** `GREENHAVEN-0.338.118-PHASE-D-COMMUNITIES-STORAGE-2026-11-24-1.zip`  
-**Delivery report:** `GREENHAVEN-0.338.119-PHASE9-COORDINATED-ONBOARDING-IDENTITY-STORAGE-2026-11-24-REPORT.md`
+**Current source version:** `0.338.136`  
+**Package identity:** `gh-connect@0.338.136`  
+**User-designated baseline:** `GREENHAVEN-0.338.132-RUN406-SERVER-READ-WALLET-REPAIR-2026-11-25-2.zip` (carried forward through Runs 408–411)  
+**Delivery report:** `docs/UPGRADE-WORKLOG-0.338.136.md`  
+**Marketplace audit:** `docs/RUN411-MARKETPLACE-COMMERCE-RELIABILITY-AUDIT-2026-11-25.md`
 
-- Phase 9 adds a consolidated 24-assertion release gate covering canonical Pi identity, returning-user onboarding, optional profile enrichment, verified username projection, explicit wallet consent, withdrawal authorization boundaries and private Supabase Storage lifecycle.
-- Existing Phase A/B/C onboarding and identity work, Phase 5/6 profile and Storage changes, and Phase D community/storage work are preserved. No SQL migration was added or changed; the inventory contains 239 synchronized migration files.
-- Focused onboarding, Pi identity, wallet consent, Storage, community and harmonization contracts passed. The new Phase 9 gate passes 24/24.
-- Node 22.16.0 is available in this workspace; the project requires Node `^24.15.0`. Dependencies are not installed. Full dependency-backed typecheck, lint, production build and browser/device acceptance remain unverified.
-- No live Supabase bucket/policy mutation, database migration application, payment, payout, reward, entitlement, wallet balance mutation, Pi authorization, Mainnet change, Git push or Vercel deployment occurred. Production remains **NOT APPROVED**.
+- Correct workspace census after Run 397: one verified Pi identity (`EUCLIDABO`), one profile, one GHC account, nine session rows for that same account, no PI earnings entries before the campaign, and four GHC transaction rows. After applying the campaign, one 100 PI `available` entry exists; withdrawal quote eligibility is true, but provider execution remains disabled.
+- Run 397 raises the cumulative registration reward target to 100 PI on Testnet only. Existing valid registration-bonus ledger credits are counted toward the target; the new campaign uses a distinct idempotency key and account lock. The app requires both `GHC_REGISTRATION_BONUS_ENABLED=1`, `NEXT_PUBLIC_PI_SANDBOX=true`, `PI_NETWORK=testnet`, and a non-Production Vercel environment, and fails closed until the new campaign RPC is present.
+- A service-role-only bounded backfill was run with the explicit Testnet confirmation. It processed one account and credited one available 100 PI ledger entry. It did not import the five other identities from the previously inspected database because they are not present as verified identities in this correct project.
+- Referral rewards are 5% of a verified qualifying membership charge, capped at 25 GHC per referral and 50 qualifying rewards per inviter per rolling 30 days. A new service-role summary RPC avoids old REST pagination undercounts. Settlement remains operator-gated.
+- The registration migration `20261125130000_run397_testnet_registration_bonus_100_pi.sql` is applied and recorded as `20261125065113`. Run 406 also applied the referral quality-cap/summary migration and the RLS-preserving server-read grant migration; the latter was recorded twice under adjacent versions by the migration tool and both ACL postflights passed. The canonical source inventory contains 245 SQL migrations while the database has 239 recorded migration rows; remaining source/history discrepancies are unresolved.
+- Run 397 source checks pass 16/16; Run 396 wallet/payout/membership checks pass 17/17; membership release checks pass 16/16 and 18/18; rewards history passes 20/20; cross-feature wallet/rewards/membership closeout passes 43/43. Full Node 24.15.x dependency-backed typecheck, lint, production build and browser/device acceptance remain unverified.
+- Node 22.16.0 is available in this workspace; the project requires Node `^24.15.0`. Dependencies are not installed. The registration migration and one 100 PI ledger credit were applied on Testnet. No Pi A2U transfer, payout execution, GHC balance mutation, Mainnet change, Git push or Vercel deployment occurred. Production remains **NOT APPROVED**.
 
-## Historical RUN390 project-truth snapshot (0.338.111)
+Run 407 grants SELECT, INSERT and UPDATE on `gh_earnings_ledger_entries` to `service_role` only. Postflight confirmed DELETE=false, anon/authenticated SELECT=false and RLS=true. The source migration is `20261125090000_run407_service_role_earnings_ledger_privileges.sql`; because the live migration history must be reconciled, it remains REVIEW_REQUIRED for any target and must not be blindly replayed.\n\n## Historical RUN390 project-truth snapshot (0.338.111)
 
 The detailed RUN390 and earlier records below are retained as historical implementation evidence. Their original version/archive references are not the current release pointer.
 
@@ -286,3 +289,6 @@ Phase 2 is not operationally closed: the Research Intelligence migration remains
 ## RUN377 identity/session finding
 
 Both identity/session tables and their base migration-history rows exist in the currently connected Supabase project. The `service_role` SELECT/INSERT/UPDATE privilege gap is confirmed there. RUN377 contains a source-only least-privilege grant migration and readiness evidence correction. The Preview database target mapping is unconfirmed, so no live database change or sign-in acceptance is claimed.
+
+## Run 402 update (2026-11-25)
+Release source version is `0.338.132`. Run 406 restores least-privilege server-side reads for social visibility, marketplace catalog and membership entitlements; exposes registration rewards in Wallet without automatic claims; and refines wallet presentation. Run 403 keeps reward status visible when paused; Run 405 expands bounded backfill account discovery, preserves canonical Pi usernames, and documents source-to-destination reconciliation steps. Run 402 covers net-first withdrawal fee handling and Testnet-only marketplace/community fee configuration. GitHub push, Vercel deployment, full migration-history reconciliation, remaining-account mapping, and live payout acceptance remain blockers.

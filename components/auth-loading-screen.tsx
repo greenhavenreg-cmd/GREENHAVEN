@@ -9,7 +9,7 @@ import { SignInWithPiButton } from "@/components/auth/sign-in-with-pi-button"
 import { isPiBrowserRuntime, markPiBrowserRuntime } from "@/lib/pi-native"
 
 export function AuthLoadingScreen() {
-  const { authMessage, hasError, reinitialize, continueLocalPreview } = usePiAuth()
+  const { authMessage, hasError, continueLocalPreview } = usePiAuth()
   const [diagnosticReport, setDiagnosticReport] = useState<string | null>(null)
   const [diagnosticCopied, setDiagnosticCopied] = useState(false)
   async function showDiagnostics() {
@@ -97,7 +97,13 @@ export function AuthLoadingScreen() {
                   ? "Still connecting to Pi"
                   : "Couldn’t sign you in"}
             </h1>
-            <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-rose-300/90">{authMessage}</p>
+            <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-white/65">
+              {/Pi Sandbox is ready/i.test(String(authMessage || ""))
+                ? "Your welcome space is ready. Sign in securely to continue."
+                : /server unavailable|api offline|redeploy|identity service/i.test(String(authMessage || ""))
+                  ? "We couldn’t reach the sign-in service. Please try again shortly."
+                  : "Your account hasn’t connected yet. You can safely try again."}
+            </p>
           </>
         ) : (
           <p className="text-[13px] font-medium tracking-wide text-white/55">Getting things ready…</p>
@@ -105,15 +111,8 @@ export function AuthLoadingScreen() {
 
         {hasError ? (
           <div className="mt-6 flex w-full flex-col items-center gap-3">
-            <SignInWithPiButton />
+            <SignInWithPiButton label="Sign in" />
             <>
-              <button
-                type="button"
-                onClick={() => void reinitialize()}
-                className="w-full rounded-full bg-emerald-500 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-400 active:scale-[0.98]"
-              >
-                Retry Pi authentication
-              </button>
               {allowLocalAuthFallback() ? (
                 <>
                   <button
@@ -130,8 +129,8 @@ export function AuthLoadingScreen() {
               ) : (
                 <p className="max-w-xs text-center text-[11px] text-white/40">
                   {isPiBrowserRuntime()
-                    ? "You appear to be in Pi Browser. Use Retry if the bridge is slow to load."
-                    : "Prefer Pi Browser for payments. Or use Sign in with Pi above in a normal browser."}
+                    ? "You appear to be in Pi Browser. If sign-in does not complete, tap Try again."
+                    : "For the most reliable account connection, open GreenHaven in Pi Browser."}
                 </p>
               )}
             </>

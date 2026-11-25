@@ -16,18 +16,10 @@ import { SignatureGhIdCard } from "./signature-gh-id"
 import { ExpandableBio } from "./profile-components"
 import { ReputationBadge } from "./reputation-badge"
 
-function toHandle(displayName: string, username?: string | null): string {
-  if (username && username.trim()) {
-    // Phase 2: canonical handle is always lower-case for visual consistency.
-    const u = username.trim().replace(/^@/, "").toLowerCase()
-    return `@${u}`
-  }
-  const base = (displayName || "member")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ".")
-    .replace(/^\.+|\.+$/g, "")
-    .slice(0, 24)
-  return `@${base || "member"}`
+function toHandle(username?: string | null): string {
+  // Pi username is the sole public handle. Preserve the verified username's exact spelling; never synthesize @USER from a display name.
+  const canonical = String(username || "").trim().replace(/^@/, "")
+  return canonical ? `@${canonical}` : "Pi username not linked"
 }
 
 export function ProfileHeroMeta({
@@ -70,7 +62,7 @@ export function ProfileHeroMeta({
     [userId, preferredId]
   )
   const ghDisplay = formatGreenHavenIdDisplay(ghId)
-  const handle = toHandle(displayName, username)
+  const handle = toHandle(username)
   const locationLine = [city, country].filter(Boolean).join(", ")
   const [copied, setCopied] = useState(false)
 
@@ -90,7 +82,7 @@ export function ProfileHeroMeta({
       {/* Name + verification */}
       <div>
         <h1 className="flex flex-wrap items-center gap-1.5 text-[1.35rem] font-black tracking-tight text-foreground sm:text-2xl">
-          <span className="truncate">{displayName || "Member"}</span>
+          <span className="truncate">{String(username || "").trim().replace(/^@/, "") || displayName || "Member"}</span>
           {verified ? (
             <BadgeCheck size={18} className="shrink-0 text-sky-600" aria-label="Verified" />
           ) : null}

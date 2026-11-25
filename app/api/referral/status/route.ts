@@ -27,7 +27,6 @@ export async function GET(request: Request) {
     code: status.code,
     sharePath: status.code ? `/join?ref=${encodeURIComponent(status.code)}` : undefined,
     attributed: status.attributed,
-    referrerUserId: status.referrerUserId,
     invitedCount: status.invitedCount ?? 0,
     pendingRewardCount: status.pendingRewardCount ?? 0,
     postedRewardCount: status.postedRewardCount ?? 0,

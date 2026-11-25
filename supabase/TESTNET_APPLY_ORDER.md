@@ -1,7 +1,7 @@
 # GreenHaven Testnet migration review order
 
 **Generated from:** `supabase/migrations/*.sql` and the canonical classification policy in `scripts/generate-migration-inventory.mjs`.
-**Current source inventory:** 239 migrations.
+**Current source inventory:** 245 migrations.
 
 > **This is a review order, not permission to apply.** It does not prove remote migration history, database compatibility, or Testnet/Mainnet readiness. See docs/RUN384-FULL-PROJECT-AUDIT-2026-11-24.md for the current live target reconciliation; RUN278 and 2026-11-10 records are historical snapshots. Never run `supabase db push` while any pending migration is held for review, approval, validation, or marked proposal. Supabase CLI does not enforce these classifications.
 
@@ -259,6 +259,12 @@ The rows are sorted by the canonical migration identifier for review. Dependenci
 | 237 | `20261124120000_run384_server_rest_table_grants.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
 | 238 | `20261124143000_run390_marketplace_membership_feed_read_grants.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
 | 239 | `20261124150000_run388_research_atomic_schedule_quota.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 240 | `20261125090000_run407_service_role_earnings_ledger_privileges.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 241 | `20261125120000_run396_pi_payout_history_rpc.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 242 | `20261125130000_run397_testnet_registration_bonus_100_pi.sql` | REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 243 | `20261125140000_run397_referral_quality_caps_and_summary.sql` | REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 244 | `20261125150000_run405_registration_backfill_account_discovery.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 245 | `20261125160000_run406_server_read_privilege_reconciliation.sql` | REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
 
 ## Classification meanings
 

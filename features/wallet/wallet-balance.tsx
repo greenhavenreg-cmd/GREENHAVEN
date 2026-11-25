@@ -302,8 +302,8 @@ export function WalletBalanceCard({
   const statusLabel = !online ? "Offline" : refreshing || (piSelected && piLoading) ? "Syncing" : (piSelected ? piSnapshot !== null : ghcVerified) ? "Live" : "Unconfirmed"
   const statusTone = !online || statusLabel === "Unconfirmed" ? "bg-amber-400" : statusLabel === "Syncing" ? "bg-sky-400 animate-pulse" : "bg-emerald-400"
   const glow = piSelected
-    ? "bg-[radial-gradient(circle_at_85%_0%,rgba(139,92,246,0.45),transparent_55%),radial-gradient(circle_at_0%_100%,rgba(56,189,248,0.18),transparent_50%)]"
-    : "bg-[radial-gradient(circle_at_85%_0%,rgba(16,185,129,0.42),transparent_55%),radial-gradient(circle_at_0%_100%,rgba(250,204,21,0.14),transparent_50%)]"
+    ? "bg-[radial-gradient(circle_at_85%_0%,rgba(139,92,246,0.34),transparent_52%),radial-gradient(circle_at_0%_100%,rgba(56,189,248,0.12),transparent_48%)]"
+    : "bg-[radial-gradient(circle_at_85%_0%,rgba(18,162,90,0.34),transparent_52%),radial-gradient(circle_at_0%_100%,rgba(203,178,106,0.12),transparent_48%)]"
   const reservedAmount = piSnapshot?.reserved ?? 0
 
   const stats = piSelected
@@ -320,7 +320,7 @@ export function WalletBalanceCard({
 
   return (
     <section
-      className="relative mx-3 mt-3 overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#060b16] text-white shadow-[0_26px_60px_-26px_rgba(2,6,23,0.85)]"
+      className="relative mx-3 mt-3 overflow-hidden rounded-[1.75rem] border border-emerald-950/15 bg-[#08251e] text-white shadow-[0_24px_55px_-26px_rgba(4,38,28,0.72)] ring-1 ring-white/[0.04]"
       aria-label="Unified PI and GHC wallet balances; Pi and GHC remain separate"
     >
       {/* Ambient light + fine technical grid */}
@@ -330,9 +330,9 @@ export function WalletBalanceCard({
         style={{
           backgroundImage:
             "linear-gradient(rgba(255,255,255,0.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.035) 1px,transparent 1px)",
-          backgroundSize: "24px 24px",
-          WebkitMaskImage: "linear-gradient(to bottom, black, transparent 85%)",
-          maskImage: "linear-gradient(to bottom, black, transparent 85%)",
+          backgroundSize: "28px 28px",
+          WebkitMaskImage: "linear-gradient(to bottom, black, transparent 78%)",
+          maskImage: "linear-gradient(to bottom, black, transparent 78%)",
         }}
         aria-hidden
       />
@@ -376,7 +376,7 @@ export function WalletBalanceCard({
             type="button"
             aria-pressed={piSelected}
             onClick={() => onSelectRail?.("pi")}
-            className={`flex h-10 items-center justify-center gap-2 rounded-full text-[12px] font-extrabold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2 focus-visible:ring-offset-[#060b16] ${
+            className={`flex h-10 items-center justify-center gap-2 rounded-full text-[12px] font-extrabold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08251e] ${
               piSelected ? "bg-violet-600 text-white shadow-lg shadow-violet-900/50" : "text-white/60 hover:text-white"
             }`}
           >
@@ -387,7 +387,7 @@ export function WalletBalanceCard({
             type="button"
             aria-pressed={!piSelected}
             onClick={() => onSelectRail?.("ghc")}
-            className={`flex h-10 items-center justify-center gap-2 rounded-full text-[12px] font-extrabold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 focus-visible:ring-offset-[#060b16] ${
+            className={`flex h-10 items-center justify-center gap-2 rounded-full text-[12px] font-extrabold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08251e] ${
               ghcSelected ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/50" : "text-white/60 hover:text-white"
             }`}
           >

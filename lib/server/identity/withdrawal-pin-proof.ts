@@ -6,7 +6,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
 
 const TTL_MS = 5 * 60_000
-const secret = () => String(process.env.GH_PIN_PROOF_SECRET || "").trim()
+/**
+ * GH_PIN_PROOF_SECRET is canonical. GHC_PIN_PROOF_SECRET is accepted as a
+ * server-only compatibility alias for existing Preview environments.
+ * Never expose either value to client code or diagnostics.
+ */
+const secret = () => String(process.env.GH_PIN_PROOF_SECRET || process.env.GHC_PIN_PROOF_SECRET || "").trim()
 export const pinProofConfigured = () => secret().length >= 32
 const mac = (u: string, k: string, exp: number) => createHmac("sha256", secret()).update(`${u}|${k}|${exp}`).digest("base64url")
 

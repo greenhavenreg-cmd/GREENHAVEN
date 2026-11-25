@@ -10,6 +10,7 @@ import {
   quoteWithdrawal,
   piToAtomic,
   floorPiToAtomic,
+  grossForRequestedNetAtomic,
 } from "@/lib/server/earnings/unified-ledger"
 
 export const runtime = "nodejs"
@@ -34,16 +35,18 @@ export async function POST(request: Request) {
   }
   const body = parsedBody.value as { amountPi?: unknown; amountAtomic?: unknown }
 
-  let grossAtomic = 0
+  let requestedNetAtomic = 0
   if (typeof body.amountAtomic === "number" && Number.isSafeInteger(body.amountAtomic) && body.amountAtomic > 0) {
-    grossAtomic = body.amountAtomic
+    requestedNetAtomic = body.amountAtomic
   } else if (typeof body.amountPi === "number" && Number.isFinite(body.amountPi) && body.amountPi > 0) {
-    grossAtomic = floorPiToAtomic(body.amountPi)
-    if (!Number.isSafeInteger(grossAtomic) || grossAtomic <= 0) grossAtomic = 0
+    requestedNetAtomic = floorPiToAtomic(body.amountPi)
+    if (!Number.isSafeInteger(requestedNetAtomic) || requestedNetAtomic <= 0) requestedNetAtomic = 0
   } else {
     return reply({ ok: false, error: "AMOUNT_REQUIRED" }, 400)
   }
 
+  const grossAtomic = grossForRequestedNetAtomic(requestedNetAtomic, 300)
+  if (!Number.isSafeInteger(grossAtomic) || grossAtomic <= 0) return reply({ ok: false, error: "INVALID_AMOUNT" }, 400)
   const quote = await quoteWithdrawal({ userId: auth.userId, grossAtomic })
   if (!quote.ok) {
     const status = quote.error === "EARNINGS_LEDGER_UNAVAILABLE" ? 503 : 409
@@ -68,7 +71,8 @@ export async function POST(request: Request) {
     ...quote,
     // Explicit: recipient is never taken from the request body
     recipientSource: "gh_pi_identities",
-    feePolicy: "3% of gross withdrawal (fee_bps=300)",
+    requestedNetAtomic,
+    feePolicy: "3% added on top of the requested net payout; gross debit includes fee (fee_bps=300)",
     ok: true,
   })
 }

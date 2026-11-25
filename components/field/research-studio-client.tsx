@@ -365,7 +365,7 @@ export function ResearchStudioClient() {
     finally { setExportingResponses(false) }
   }
 
-  return <main className="mx-auto min-h-dvh w-full max-w-6xl px-4 pb-24 pt-6 text-foreground sm:px-6 lg:px-8">
+  return <main data-gh-module="research" className="mx-auto min-h-dvh w-full max-w-6xl px-4 pb-24 pt-6 text-foreground sm:px-6 lg:px-8">
     <nav className="flex items-center justify-between gap-3" aria-label="Research navigation">
       <Link href="/" className="text-sm font-bold text-emerald-700 dark:text-emerald-400">← GreenHaven</Link>
       <div className="flex gap-2 text-xs"><Link href="/field" className="rounded-full border border-border px-3 py-2">Field agent portal</Link><span className="rounded-full bg-emerald-600/10 px-3 py-2 font-semibold text-emerald-700 dark:text-emerald-300">Research Studio</span></div>

@@ -107,7 +107,7 @@ import {
   clearMarketplaceCart,
   getMarketplaceCart,
   removeMarketplaceCartItem,
-  removeMarketplaceCartItemsByIds,
+  removeMarketplaceCartItemsBySnapshots,
   removeMarketplaceCartItemsBySeller,
   updateMarketplaceCartQuantity,
   type MarketplaceCartItem,
@@ -1469,7 +1469,7 @@ function CartPanel({
 }: {
   items: MarketplaceCartItem[]
   onChange: (listingId: string, quantity: number, variantId?: string) => void
-  onRemove: (listingId: string) => void
+  onRemove: (listingId: string, variantId?: string) => void
   onClear: () => void
   onContinueShopping: () => void
 }) {
@@ -1577,8 +1577,8 @@ function CartPanel({
 
       // Remove only successfully reserved lines. Preserve own listings and any
       // unrelated cart edits made while the asynchronous checkout was running.
-      const completedLineIds = created.map(({ item }) => item.listingId)
-      removeMarketplaceCartItemsByIds(completedLineIds)
+      const completedLineSnapshots = created.map(({ item }) => item)
+      removeMarketplaceCartItemsBySnapshots(completedLineSnapshots)
       for (const { item } of created) {
         checkoutKeysRef.current.delete(`${item.listingId}:${item.variantId || "legacy"}:${item.quantity}:${item.sellerId}`)
       }
@@ -1621,6 +1621,16 @@ function CartPanel({
       emitMarketplaceEconomyRefresh("marketplace-cart-checkout")
       window.dispatchEvent(new CustomEvent("ghc:marketplace-order-changed"))
     } catch (e) {
+      // If one or more GHC orders settled before a later line failed, remove only
+      // those paid purchase-intent snapshots. Keep unpaid/reserved lines available
+      // for recovery and preserve any cart edits made while checkout was running.
+      if (paidGhcIds.length) {
+        const paidLines = created.filter(({ id }) => paidGhcIds.includes(id))
+        removeMarketplaceCartItemsBySnapshots(paidLines.map(({ item }) => item))
+        for (const { item } of paidLines) {
+          checkoutKeysRef.current.delete(`${item.listingId}:${item.variantId || "legacy"}:${item.quantity}:${item.sellerId}`)
+        }
+      }
       const aborted = controller?.signal?.aborted
       const reservedNote =
         created.length > 0
@@ -1641,7 +1651,7 @@ function CartPanel({
 
   if (!items.length) {
     return (
-      <div className="mx-auto max-w-2xl px-1 py-8">
+      <div data-gh-module="cart" className="mx-auto max-w-2xl px-1 py-8">
         <div className="rounded-[1.5rem] border border-border/60 bg-card p-7 text-center shadow-[var(--gh-card-shadow)]">
           <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
             <ShoppingCart size={28} aria-hidden />
@@ -1659,7 +1669,7 @@ function CartPanel({
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 px-1 pb-8">
+    <div data-gh-module="cart" className="mx-auto max-w-3xl space-y-4 px-1 pb-8">
       <div className="rounded-[1.4rem] border border-border/60 bg-card p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -1717,7 +1727,7 @@ function CartPanel({
                           : "Seller details unavailable"}
                     </p>
                   </div>
-                  <button type="button" onClick={() => onRemove(item.listingId)} disabled={busy} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-muted disabled:opacity-40" aria-label={`Remove ${item.title}`}><X size={15} /></button>
+                  <button type="button" onClick={() => onRemove(item.listingId, item.variantId ?? "")} disabled={busy} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-muted disabled:opacity-40" aria-label={`Remove ${item.title}`}><X size={15} /></button>
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <div className="inline-flex items-center rounded-full border border-border/70 bg-background">
@@ -1783,14 +1793,20 @@ function SellerCommandCenter({
   listings,
   orders,
   loading,
+  listingsAvailable,
+  ordersAvailable,
   onNewListing,
   onOpenOrders,
+  onRefresh,
 }: {
   listings: MarketplaceListing[]
   orders: MarketplaceOrder[]
   loading: boolean
+  listingsAvailable: boolean
+  ordersAvailable: boolean
   onNewListing: () => void
   onOpenOrders: () => void
+  onRefresh: () => void
 }) {
   const sellerOrders = useMemo(() => orders.filter((order) => isOwnedByCurrentUser(order.sellerId)), [orders])
   const isSoldOut = (listing: MarketplaceListing) => listing.status === "sold_out" || (listing.kind === "product" && listing.availability <= 0)
@@ -1815,16 +1831,30 @@ function SellerCommandCenter({
           </div>
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"><BarChart3 size={18} /></span>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8" aria-live="polite">
-          <div className="rounded-2xl border border-border/50 bg-background/80 p-3"><p className="text-[10px] text-muted-foreground">Active</p><p className="mt-1 text-lg font-extrabold">{loading ? "—" : activeListings}</p></div>
-          <div className="rounded-2xl border border-border/50 bg-background/80 p-3"><p className="text-[10px] text-muted-foreground">Paused</p><p className="mt-1 text-lg font-extrabold">{loading ? "—" : pausedListings}</p></div>
-          <div className="rounded-2xl border border-border/50 bg-background/80 p-3"><p className="text-[10px] text-muted-foreground">Sold out</p><p className="mt-1 text-lg font-extrabold">{loading ? "—" : soldOutListings}</p></div>
-          <div className="rounded-2xl border border-border/50 bg-background/80 p-3"><p className="text-[10px] text-muted-foreground">Drafts</p><p className="mt-1 text-lg font-extrabold">{loading ? "—" : draftListings}</p></div>
-          <div className="rounded-2xl border border-amber-300/50 bg-amber-50/70 p-3 dark:bg-amber-950/20"><p className="text-[10px] text-muted-foreground">Low stock</p><p className="mt-1 text-lg font-extrabold">{loading ? "—" : lowStockListings}</p></div>
-          <div className="rounded-2xl border border-border/50 bg-background/80 p-3"><p className="text-[10px] text-muted-foreground">Needs polish</p><p className="mt-1 text-lg font-extrabold">{loading ? "—" : incompleteListings}</p></div>
-          <div className="rounded-2xl border border-border/50 bg-background/80 p-3"><p className="text-[10px] text-muted-foreground">Open orders</p><p className="mt-1 text-lg font-extrabold">{loading ? "—" : openOrders}</p></div>
-          <div className="rounded-2xl border border-border/50 bg-background/80 p-3"><p className="text-[10px] text-muted-foreground">Needs attention</p><p className="mt-1 text-lg font-extrabold">{loading ? "—" : needsAttention}</p></div>
-          <div className="rounded-2xl border border-border/50 bg-background/80 p-3"><p className="text-[10px] text-muted-foreground">Completed</p><p className="mt-1 text-lg font-extrabold">{loading ? "—" : completedOrders}</p></div>
+        {(!listingsAvailable || !ordersAvailable) && !loading ? (
+          <div className="mt-4 flex flex-col gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 sm:flex-row sm:items-center sm:justify-between" role="status" data-testid="seller-data-unavailable">
+            <p className="text-xs leading-relaxed text-foreground">
+              {!listingsAvailable && !ordersAvailable
+                ? "Seller listings and orders could not be verified right now. Counts are withheld rather than shown as zero."
+                : !listingsAvailable
+                  ? "Seller listings could not be refreshed. Listing counts are withheld until the server confirms your inventory."
+                  : "Seller orders could not be refreshed. Order counts are withheld until the server confirms your orders."}
+            </p>
+            <button type="button" onClick={onRefresh} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 text-xs font-bold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+              <Loader2 size={13} className={loading ? "animate-spin" : "hidden"} aria-hidden /> Retry data
+            </button>
+          </div>
+        ) : null}
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9" aria-live="polite">
+          <div className="rounded-2xl border border-border/50 bg-background/80 p-3"><p className="text-[10px] text-muted-foreground">Active</p><p className="mt-1 text-lg font-extrabold">{loading || !listingsAvailable ? "—" : activeListings}</p></div>
+          <div className="rounded-2xl border border-border/50 bg-background/80 p-3"><p className="text-[10px] text-muted-foreground">Paused</p><p className="mt-1 text-lg font-extrabold">{loading || !listingsAvailable ? "—" : pausedListings}</p></div>
+          <div className="rounded-2xl border border-border/50 bg-background/80 p-3"><p className="text-[10px] text-muted-foreground">Sold out</p><p className="mt-1 text-lg font-extrabold">{loading || !listingsAvailable ? "—" : soldOutListings}</p></div>
+          <div className="rounded-2xl border border-border/50 bg-background/80 p-3"><p className="text-[10px] text-muted-foreground">Drafts</p><p className="mt-1 text-lg font-extrabold">{loading || !listingsAvailable ? "—" : draftListings}</p></div>
+          <div className="rounded-2xl border border-amber-300/50 bg-amber-50/70 p-3 dark:bg-amber-950/20"><p className="text-[10px] text-muted-foreground">Low stock</p><p className="mt-1 text-lg font-extrabold">{loading || !listingsAvailable ? "—" : lowStockListings}</p></div>
+          <div className="rounded-2xl border border-border/50 bg-background/80 p-3"><p className="text-[10px] text-muted-foreground">Needs polish</p><p className="mt-1 text-lg font-extrabold">{loading || !listingsAvailable ? "—" : incompleteListings}</p></div>
+          <div className="rounded-2xl border border-border/50 bg-background/80 p-3"><p className="text-[10px] text-muted-foreground">Open orders</p><p className="mt-1 text-lg font-extrabold">{loading || !ordersAvailable ? "—" : openOrders}</p></div>
+          <div className="rounded-2xl border border-border/50 bg-background/80 p-3"><p className="text-[10px] text-muted-foreground">Needs attention</p><p className="mt-1 text-lg font-extrabold">{loading || !ordersAvailable ? "—" : needsAttention}</p></div>
+          <div className="rounded-2xl border border-border/50 bg-background/80 p-3"><p className="text-[10px] text-muted-foreground">Completed</p><p className="mt-1 text-lg font-extrabold">{loading || !ordersAvailable ? "—" : completedOrders}</p></div>
         </div>
       </div>
       {(() => {
@@ -1834,6 +1864,7 @@ function SellerCommandCenter({
         const topListing = top ? listings.find((l) => l.id === top.listingId) : null
         const stale = staleListings(listings).length
         const restock = restockCandidates(listings).length
+        if (!listingsAvailable || !ordersAvailable) return null
         if (!revenue.length && hours === null && !stale && !restock) return null
         return (
           <div className="border-t border-border/50 p-3 text-[11px] text-muted-foreground" data-testid="seller-insights">
@@ -2127,6 +2158,7 @@ export function MarketplaceScreen({
   const [mineListings, setMineListings] = useState<MarketplaceListing[]>([])
   const [mineStatusFilter, setMineStatusFilter] = useState<"all" | "active" | "paused" | "sold_out" | "draft">("all")
   const [mineLoading, setMineLoading] = useState(false)
+  const [mineLoadState, setMineLoadState] = useState<"loading" | "ready" | "unavailable">("loading")
   const [showCategories, setShowCategories] = useState(true)
   const [searchFocused, setSearchFocused] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -2158,8 +2190,10 @@ export function MarketplaceScreen({
   const [sellError, setSellError] = useState<string | null>(null)
   const [savedListings, setSavedListings] = useState<MarketplaceListing[]>([])
   const [savedLoading, setSavedLoading] = useState(false)
+  const [savedLoadState, setSavedLoadState] = useState<"loading" | "ready" | "unavailable">("loading")
   const [durableOrders, setDurableOrders] = useState<MarketplaceOrder[]>([])
   const [ordersLoading, setOrdersLoading] = useState(false)
+  const [ordersLoadState, setOrdersLoadState] = useState<"loading" | "ready" | "unavailable">("loading")
   const [orderBusy, setOrderBusy] = useState<string | null>(null)
   const [orderRoleFilter, setOrderRoleFilter] = useState<"all" | "buying" | "selling">("all")
   const [focusedOrderId, setFocusedOrderId] = useState<string | null>(initialOrderId || null)
@@ -2244,17 +2278,19 @@ export function MarketplaceScreen({
   const loadSavedListings = useCallback(async () => {
     const requestId = ++savedRequestRef.current
     setSavedLoading(true)
+    setSavedLoadState("loading")
     try {
       const remote = await socialFetchMarketplaceSaved(100)
       if (requestId !== savedRequestRef.current) return
       // A failed or malformed response must not erase the last known saved list.
-      if (!remote.ok || !remote.durable || !Array.isArray(remote.saved)) return
+      if (!remote.ok || !remote.durable || !Array.isArray(remote.saved)) { setSavedLoadState("unavailable"); return }
       const mapped = remote.saved
         .map((row) => mapSavedMarketplaceListingRecord(row))
         .filter((row): row is MarketplaceListing => Boolean(row))
-      if (requestId === savedRequestRef.current) setSavedListings(mapped)
+      if (requestId === savedRequestRef.current) { setSavedListings(mapped); setSavedLoadState("ready") }
     } catch {
       // Keep the last known list; transient failures are retried on the next visit/refresh.
+      if (requestId === savedRequestRef.current) setSavedLoadState("unavailable")
     } finally {
       if (requestId === savedRequestRef.current) setSavedLoading(false)
     }
@@ -2271,18 +2307,26 @@ export function MarketplaceScreen({
   const loadMineListings = useCallback(async () => {
     const requestId = ++mineRequestRef.current
     setMineLoading(true)
+    setMineLoadState("loading")
     try {
       const { socialFetchMarketplaceListings } = await import("@/lib/social/client")
       const remote = await socialFetchMarketplaceListings({ scope: "mine", limit: 100 })
       if (requestId !== mineRequestRef.current) return
       // Only a successful, well-formed response may replace the current view.
-      if (!remote.ok || !Array.isArray(remote.listings)) return
+      if (!remote.ok || !Array.isArray(remote.listings)) {
+        setMineLoadState("unavailable")
+        return
+      }
       const mapped = remote.listings
         .map((row) => mapMarketplaceListingRecord(row))
         .filter((row): row is MarketplaceListing => Boolean(row))
-      if (requestId === mineRequestRef.current) setMineListings(mapped)
+      if (requestId === mineRequestRef.current) {
+        setMineListings(mapped)
+        setMineLoadState("ready")
+      }
     } catch {
       // Preserve the previous seller inventory on transient transport failures.
+      if (requestId === mineRequestRef.current) setMineLoadState("unavailable")
     } finally {
       if (requestId === mineRequestRef.current) setMineLoading(false)
     }
@@ -2313,6 +2357,7 @@ export function MarketplaceScreen({
   const loadDurableOrders = useCallback(async () => {
     const requestId = ++ordersRequestRef.current
     setOrdersLoading(true)
+    setOrdersLoadState("loading")
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null
     const hardTimeout =
       typeof window !== "undefined"
@@ -2331,13 +2376,20 @@ export function MarketplaceScreen({
       const data = await res.json().catch(() => ({}))
       if (requestId !== ordersRequestRef.current) return
       // An authoritative empty array clears orders; transport/API failures do not.
-      if (!res.ok || !Array.isArray(data.orders)) return
+      if (!res.ok || !Array.isArray(data.orders)) {
+        setOrdersLoadState("unavailable")
+        return
+      }
       const mapped = data.orders
         .map((order: unknown) => mapMarketplaceOrderRecord(order))
         .filter((order: MarketplaceOrder | null): order is MarketplaceOrder => Boolean(order))
-      if (requestId === ordersRequestRef.current) setDurableOrders(mapped)
+      if (requestId === ordersRequestRef.current) {
+        setDurableOrders(mapped)
+        setOrdersLoadState("ready")
+      }
     } catch {
       // Retain last known durable orders; never turn a network failure into an empty order history.
+      if (requestId === ordersRequestRef.current) setOrdersLoadState("unavailable")
     } finally {
       if (hardTimeout != null) window.clearTimeout(hardTimeout)
       if (requestId === ordersRequestRef.current) setOrdersLoading(false)
@@ -2501,11 +2553,9 @@ export function MarketplaceScreen({
 
     const orders = useMemo(() => {
     void tick
-    let list: MarketplaceOrder[] = []
-    if (durableOrders.length) list = durableOrders
-    else if (domain?.getOrders) {
-      try { list = domain.getOrders?.() || [] } catch { list = [] }
-    }
+    // Orders are financial records: never substitute a local/demo cache when the
+    // durable server returns an authoritative empty list or is unavailable.
+    let list: MarketplaceOrder[] = durableOrders
     const viewerId = IdentityService.getCurrentUserId() || ""
     if (orderRoleFilter === "buying") {
       list = list.filter((o) => o.buyerId === viewerId)
@@ -2513,7 +2563,7 @@ export function MarketplaceScreen({
       list = list.filter((o) => isOwnedByCurrentUser(o.sellerId))
     }
     return [...list].sort((a, b) => (Number(b.updatedAt || b.createdAt) || 0) - (Number(a.updatedAt || a.createdAt) || 0))
-  }, [domain, tick, durableOrders, orderRoleFilter])
+  }, [tick, durableOrders, orderRoleFilter])
 
   useEffect(() => {
     if (bucket !== "orders" || !focusedOrderId || !orders.some((order) => order.id === focusedOrderId)) return
@@ -2524,11 +2574,7 @@ export function MarketplaceScreen({
     return () => window.clearTimeout(timer)
   }, [bucket, focusedOrderId, orders])
 
-  const outcomeOrders = useMemo(() => {
-    if (durableOrders.length) return durableOrders
-    if (!domain?.getOrders) return [] as MarketplaceOrder[]
-    try { return domain.getOrders?.() || [] } catch { return [] as MarketplaceOrder[] }
-  }, [domain, durableOrders])
+  const outcomeOrders = useMemo(() => durableOrders, [durableOrders])
 
   const [remoteSelected, setRemoteSelected] = useState<MarketplaceListing | null>(null)
 
@@ -2813,7 +2859,8 @@ export function MarketplaceScreen({
                 setBucket(chip.id)
                 if (chip.id === "browse") setShowCategories(true)
               }}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
+              aria-pressed={bucket === chip.id}
+              className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 bucket === chip.id
                   ? "bg-[var(--gh-green)] text-white shadow-sm"
                   : "bg-muted text-foreground hover:bg-muted/80"
@@ -2829,7 +2876,8 @@ export function MarketplaceScreen({
               setBucket("browse")
               setShowCategories((v) => !v)
             }}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
+            aria-pressed={showCategories && bucket === "browse"}
+            className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
               showCategories && bucket === "browse"
                 ? "bg-card text-foreground ring-1 ring-border shadow-sm"
                 : "bg-muted text-foreground hover:bg-muted/80"
@@ -2845,7 +2893,8 @@ export function MarketplaceScreen({
               setSearchFocused(true)
               requestAnimationFrame(() => searchRef.current?.focus())
             }}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-[11px] font-bold text-foreground hover:bg-muted/80"
+            aria-label={msg("searchListings")}
+            className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-muted px-3 py-2 text-[11px] font-bold text-foreground hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
             <Search size={14} aria-hidden />
             {msg("searchListings")}
@@ -2979,7 +3028,7 @@ export function MarketplaceScreen({
 
       <div className="gh-marketplace-content min-h-0 flex-1 overflow-y-auto px-3 pb-8 pt-3">
         {bucket === "browse" ? (
-          <div className="mx-auto w-full max-w-[var(--gh-content-max,42rem)]">
+          <div className="mx-auto w-full max-w-[var(--gh-marketplace-max,84rem)]">
             <MarketplaceOutcomeCenter
               orders={outcomeOrders}
               cartCount={cartItems.length}
@@ -3002,8 +3051,8 @@ export function MarketplaceScreen({
                 window.dispatchEvent(new CustomEvent("ghc:marketplace-cart-changed", { detail: { count: next.reduce((n, i) => n + (i.quantity || 0), 0) } }))
               } catch { /* */ }
             }}
-            onRemove={(id) => {
-              const next = removeMarketplaceCartItem(id)
+            onRemove={(id, variantId) => {
+              const next = removeMarketplaceCartItem(id, variantId)
               setCartItems(next)
               try {
                 window.dispatchEvent(new CustomEvent("ghc:marketplace-cart-changed", { detail: { count: next.reduce((n, i) => n + (Number(i.quantity) || 0), 0) } }))
@@ -3021,13 +3070,16 @@ export function MarketplaceScreen({
         ) : null}
         {bucket === "mine" ? (
           <div className="p-1">
-            <div className="mx-auto w-full max-w-[var(--gh-content-max,42rem)]">
+            <div className="mx-auto w-full max-w-[var(--gh-marketplace-max,84rem)]">
               <SellerCommandCenter
                 listings={mineListings}
                 orders={durableOrders}
                 loading={mineLoading || ordersLoading}
+                listingsAvailable={mineLoadState === "ready"}
+                ordersAvailable={ordersLoadState === "ready"}
                 onNewListing={() => { setSellEditId(null); setSellMedia([]); setSellProductOptionsText(""); setSellProductVariantsText(""); setSellAvailability("1"); setBucket("sell") }}
                 onOpenOrders={() => { setOrderRoleFilter("selling"); setBucket("orders") }}
+                onRefresh={() => { void loadMineListings(); void loadDurableOrders() }}
               />
               <div className="mb-3 flex items-center justify-between gap-2">
                 <div>
@@ -3067,18 +3119,25 @@ export function MarketplaceScreen({
               {mineLoading ? (
                 <LoadingState title="Loading your listings" description="Checking your current storefront from the latest available data." />
               ) : filteredMineListings.length ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {filteredMineListings.map((listing) => (
                     <ListingCard key={listing.id} listing={listing} onOpen={(id) => setSelectedId(id)} />
                   ))}
                 </div>
               ) : mineListings.length > 0 ? (
                 <EmptyState title={`No ${mineStatusFilter.replace("_", " ")} listings`} description="Choose another listing status or clear this filter." action={{ label: "Show all listings", onClick: () => setMineStatusFilter("all") }} />
+              ) : mineLoadState === "unavailable" ? (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 text-center" data-testid="seller-listings-unavailable" role="status">
+                  <Package size={24} className="mx-auto text-amber-700 dark:text-amber-300" aria-hidden />
+                  <h3 className="mt-2 text-sm font-bold text-foreground">Your listings could not be verified</h3>
+                  <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">This is not the same as an empty storefront. Retry the server request before assuming you have no listings.</p>
+                  <button type="button" onClick={() => void loadMineListings()} className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-[var(--gh-green)] px-4 text-xs font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">Retry listings</button>
+                </div>
               ) : (
                 <EmptyState
-                  title="No listings yet"
-                  description="Publish a product or service priced in ₲ or π. Listing fees are non-refundable."
-                  action={{ label: "Sell something", onClick: () => setBucket("sell") }}
+                  title="Your storefront is ready for its first listing"
+                  description="Add a clear title, accurate price, product photos, stock and delivery details. Your listing appears here after the server confirms it was saved. Listing fees are non-refundable."
+                  action={{ label: "Create your first listing", onClick: () => setBucket("sell") }}
                 />
               )}
             </div>
@@ -3087,14 +3146,21 @@ export function MarketplaceScreen({
 
         {bucket === "saved" ? (
         <div className="p-1">
-          <div className="mx-auto w-full max-w-[var(--gh-content-max,42rem)]">
+          <div className="mx-auto w-full max-w-[var(--gh-marketplace-max,84rem)]">
             <div className="mb-3 flex items-center justify-between">
               <div><h2 className="text-base font-bold">Saved listings</h2><p className="text-xs text-muted-foreground">Your marketplace shortlist stays synced to your account.</p></div>
               <Bookmark size={18} className="text-emerald-700" aria-hidden />
             </div>
-            {savedLoading ? <LoadingState title="Loading saved listings" description="Checking your marketplace shortlist." />
-              : savedListings.length ? <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{savedListings.map((listing) => <ListingCard key={listing.id} listing={listing} onOpen={(id) => setSelectedId(id)} />)}</div>
-              : <EmptyState title="Nothing saved yet" description="Save a listing from its detail page and it will appear here." action={{ label: "Browse marketplace", onClick: () => setBucket("browse") }} />}
+            {savedLoading && savedListings.length === 0 ? <LoadingState title="Loading saved listings" description="Checking your marketplace shortlist." /> : null}
+            {savedLoadState === "unavailable" ? (
+              <div className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4" role="status" data-testid="marketplace-saved-unavailable">
+                <p className="text-sm font-semibold">Saved listings could not be verified</p>
+                <p className="mt-1 text-xs text-muted-foreground">Your saved list has not been cleared. Retry before assuming there are no saved listings.</p>
+                <button type="button" onClick={() => void loadSavedListings()} className="mt-3 min-h-10 rounded-full bg-[var(--gh-green)] px-4 text-xs font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Retry saved listings</button>
+              </div>
+            ) : null}
+            {savedListings.length ? <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">{savedListings.map((listing) => <ListingCard key={listing.id} listing={listing} onOpen={(id) => setSelectedId(id)} />)}</div>
+              : savedLoadState === "ready" ? <EmptyState title="Nothing saved yet" description="Save a listing from its detail page and it will appear here." action={{ label: "Browse marketplace", onClick: () => setBucket("browse") }} /> : null}
           </div>
         </div>
       ) : null}
@@ -3521,6 +3587,7 @@ export function MarketplaceScreen({
             <p className="text-[11px] text-muted-foreground">
               Track pay → fulfill → deliver → complete. Message opens the order thread when available.
             </p>
+            {ordersLoadState === "unavailable" && orders.length > 0 ? <p className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-muted-foreground" role="status" data-testid="marketplace-orders-stale">Showing the last verified orders. Refresh failed, so these statuses may be out of date.</p> : null}
             <FilterSummary
               items={orderRoleFilter !== "all" ? [{ id: "role", label: `Role: ${orderRoleFilter}`, onRemove: () => setOrderRoleFilter("all") }] : []}
               onClearAll={() => setOrderRoleFilter("all")}
@@ -3529,7 +3596,14 @@ export function MarketplaceScreen({
             </FilterPanel>
           {ordersLoading && orders.length === 0 ? (
             <LoadingState title="Loading orders" description="Checking the latest durable order status." />
-          ) : orders.length === 0 ? (
+          ) : ordersLoadState === "unavailable" && orders.length === 0 ? (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 text-center" role="status" data-testid="marketplace-orders-unavailable">
+              <Package size={24} className="mx-auto text-amber-700 dark:text-amber-300" aria-hidden />
+              <h3 className="mt-2 text-sm font-bold">Orders could not be verified</h3>
+              <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">This does not mean you have no orders. The durable order service did not return a verified list.</p>
+              <button type="button" onClick={() => void loadDurableOrders()} className="mt-3 min-h-10 rounded-full bg-[var(--gh-green)] px-4 text-xs font-bold text-white">Retry orders</button>
+            </div>
+          ) : orders.length === 0 && ordersLoadState === "ready" ? (
             <EmptyState
               variant="transactions"
               title={
@@ -3775,7 +3849,7 @@ export function MarketplaceScreen({
         ) : listings.length === 0 && serverBrowseState === "loading" ? (
           <FilterResultState state="loading" description="Searching the server catalog with your selected filters…" />
         ) : listings.length === 0 && serverBrowseState === "unavailable" ? (
-          <FilterResultState state="error" title="Server catalog unavailable" description="The server-filtered catalog could not be loaded. Try again or review the locally available catalog." onRetry={refresh} />
+          <FilterResultState state="error" title="Server catalog unavailable" description="The authoritative marketplace catalog could not be read from the server. Retry after the Testnet server-read permissions are restored; checkout remains server-validated." onRetry={refresh} />
         ) : listings.length === 0 ? (
           <div className="flex flex-col items-center px-2 pt-6">
             <EmptyState
