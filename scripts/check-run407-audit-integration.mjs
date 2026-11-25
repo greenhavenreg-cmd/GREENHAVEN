@@ -10,7 +10,7 @@ const checks = [
   ['migration does not grant DELETE or client-role access', !/GRANT[^;]*\bDELETE\b|GRANT[^;]*\bTO\s+(PUBLIC|anon|authenticated)\b/i.test(migration)],
   ['audit report records runtime failures and remaining blockers', /profile-store upsert 403\/409/.test(read('docs/GREENHAVEN-RUN407-PRODUCTION-AUDIT-2026-11-25.md')) && /fail-closed/.test(read('docs/GREENHAVEN-RUN407-PRODUCTION-AUDIT-2026-11-25.md'))],
   ['worklog preserves migration-history and deployment caveats', /do not blindly replay it/i.test(read('docs/UPGRADE-WORKLOG-0.338.133.md')) && /does not claim a GitHub push/i.test(read('docs/UPGRADE-WORKLOG-0.338.133.md'))],
-  ['candidate package and in-app release agree', JSON.parse(read('package.json')).version === '0.338.135' && read('lib/app-release.ts').includes('APP_RELEASE_VERSION = "0.338.135"')],
+  ['candidate package and in-app release agree', (() => { const version = JSON.parse(read('package.json')).version; const lock = JSON.parse(read('package-lock.json')); return typeof version === 'string' && lock.version === version && lock.packages?.['']?.version === version && read('lib/app-release.ts').includes(`APP_RELEASE_VERSION = "${version}"`); })()],
 ]
 let failed = 0
 for (const [name, pass] of checks) { console.log(`${pass ? 'PASS' : 'FAIL'} ${name}`); if (!pass) failed++ }
