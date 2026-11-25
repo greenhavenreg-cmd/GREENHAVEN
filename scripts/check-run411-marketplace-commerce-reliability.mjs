@@ -15,8 +15,8 @@ const checks = [
   ['cart removal distinguishes variants', /removeMarketplaceCartItem\(listingId: string, variantId\?: string\)/.test(cart) && /onRemove\(item\.listingId, item\.variantId \?\? ""\)/.test(screen)],
   ['checkout cleanup preserves changed cart lines', /removeMarketplaceCartItemsBySnapshots/.test(cart) && /current\.quantity !== snapshot\.quantity/.test(cart) && /current\.addedAt !== snapshot\.addedAt/.test(cart)],
   ['partial checkout removes already-paid GHC lines but preserves unpaid recovery lines', /if \(paidGhcIds\.length\)/.test(screen) && /const paidLines = created\.filter\(\(\{ id \}\) => paidGhcIds\.includes\(id\)\)/.test(screen) && /removeMarketplaceCartItemsBySnapshots\(paidLines\.map\(\(\{ item \}\) => item\)\)/.test(screen)],
-  ['package and lock versions are synchronized', pkg.version === '0.338.136' && lock.version === pkg.version && lock.packages[''].version === pkg.version],
-  ['release metadata matches candidate version', read('lib/app-release.ts').includes('APP_RELEASE_VERSION = "0.338.136"')],
+  ['package and lock versions are synchronized', typeof pkg.version === 'string' && pkg.version.length > 0 && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version],
+  ['release metadata matches candidate version', read('lib/app-release.ts').includes(`APP_RELEASE_VERSION = "${pkg.version}"`)],
   ['run 411 check is registered in static and prebuild gates', pkg.scripts['verify:static'].includes('check-run411-marketplace-commerce-reliability.mjs') && pkg.scripts['prebuild:checks'].includes('check-run411-marketplace-commerce-reliability.mjs')],
 ]
 let failed = 0
