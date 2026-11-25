@@ -12,7 +12,7 @@ const checks = [
   ["paused state explains claim availability without promising a credit", /Claims are temporarily unavailable in this environment/.test(card) && /No reward is credited by displaying this message/.test(card)],
   ["paused state preserves PI balance and history and offers a real refresh action", /existing PI balance and transaction history are unchanged/.test(card) && /onClick=\{\(\) => void refresh\(\)\}/.test(card)],
   ["registration claim still uses the server endpoint and sends no client amount", /fetch\("\/api\/economy\/earnings\/registration-bonus"/.test(card) && /body: JSON\.stringify\(\{\}\)/.test(card)],
-  ["package, lockfile and app release versions agree", pkg.version === "0.338.132" && lock.version === pkg.version && lock.packages?.["" ]?.version === pkg.version && release.includes(`APP_RELEASE_VERSION = "${pkg.version}"`)],
+  ["package, lockfile and app release versions agree", typeof pkg.version === "string" && lock.version === pkg.version && lock.packages?.["" ]?.version === pkg.version && release.includes(`APP_RELEASE_VERSION = "${pkg.version}"`)],
   ["Run 403 gate is registered exactly once in static and prebuild checks", (pkg.scripts["verify:static"].match(/check-run403-reward-card-visible\.mjs/g) || []).length === 1 && (pkg.scripts["prebuild:checks"].match(/check-run403-reward-card-visible\.mjs/g) || []).length === 1],
 ]
 let failed = 0
