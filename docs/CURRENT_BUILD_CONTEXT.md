@@ -12,6 +12,9 @@
 
 # CURRENT BUILD CONTEXT — 0.338.134 Run 406 Server-Read and Wallet Repair (2026-11-25)
 
+## Current release overlay — 0.338.137 (Run 414)
+The current package baseline is `gh-connect@0.338.137`; package.json, package-lock.json, and `lib/app-release.ts` carry this release identity. Run 414 synchronizes release metadata and adds the versioned current worklog required by Phase 24. Older implementation summaries below retain their original version numbers and are historical context, not claims that the package is still at those versions. The latest Vercel log passed Phase 22 marketplace atomic-transition and Phase 23 migration-integrity checks, then stopped at Phase 24 because `docs/UPGRADE-WORKLOG-0.338.137.md` was missing. The source-only repair adds that worklog and does not claim the remaining prebuild checks, Next.js build, deployment, or live payout acceptance have passed. Production remains NOT APPROVED.
+
 Release metadata remains synchronized with the 0.338.134 Phase 9 Coordinated Acceptance baseline; Run 406 is the current additive increment.
 
 Current source is a source-only derivative of `GREENHAVEN-0.338.132-RUN406-SERVER-READ-WALLET-REPAIR-2026-11-25-2.zip`, integrated as Run 408 (`0.338.133`) and polished in Run 409 (`0.338.134`). See `docs/SOURCE_OF_TRUTH.md`, `docs/PROJECT_TRUTH.md`, `docs/RUN406-SERVER-READ-WALLET-REPAIR-2026-11-25.md`, `docs/RUN405-LOCAL-PROJECT-HANDOFF-AND-RECONCILIATION-2026-11-25.md`, and the prior Run 405 worklog. Historical records below remain historical evidence and do not override the current source authority.
