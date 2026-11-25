@@ -1,11 +1,11 @@
-# Current project truth — 0.338.136 Run 411 Marketplace Commerce Reliability (2026-11-25)
+# Current project truth — 0.338.137 Run 414 Release Metadata Synchronization (2026-11-25)
 
-**Current source:** `gh-connect@0.338.136`, a local source candidate based on Run 410. Run 411 corrects saved-list and order false-empty states, removes local/demo order fallback from financial UI, and makes cart cleanup/removal safe for variant-specific and in-flight edits. It preserves the existing security and financial release boundaries. Profile/identity runtime failures, migration-history drift, route-by-route privilege review, and full commerce acceptance remain unresolved. GitHub push and Vercel deployment remain unperformed.
+**Current source:** `gh-connect@0.338.137`, based on the supplied Run 412 Testnet Pi-withdrawal PIN proof/readiness source and Run 413 release-version alignment. Run 414 synchronizes the four authoritative release metadata records required by the Run #300 release-integrity gate. This is metadata synchronization only; it does not enable withdrawals, change payout flags, apply migrations, or prove runtime/provider acceptance. Full prebuild, build, and live Testnet acceptance remain unverified until the deployment pipeline completes.
 
-**Current source version:** `0.338.136`  
-**Package identity:** `gh-connect@0.338.136`  
-**User-designated baseline:** `GREENHAVEN-0.338.132-RUN406-SERVER-READ-WALLET-REPAIR-2026-11-25-2.zip` (carried forward through Runs 408–411)  
-**Delivery report:** `docs/UPGRADE-WORKLOG-0.338.136.md`  
+**Current source version:** `0.338.137`  
+**Package identity:** `gh-connect@0.338.137`  
+**User-designated baseline:** `GREENHAVEN-0.338.137-RUN412-TESTNET-PI-WITHDRAWAL-PIN-PROOF-READINESS-2026-11-25.zip` (continued through Runs 413–414)  
+**Delivery report:** `RUN414-RELEASE-METADATA-SYNCHRONIZATION-REPORT.md`  
 **Marketplace audit:** `docs/RUN411-MARKETPLACE-COMMERCE-RELIABILITY-AUDIT-2026-11-25.md`
 
 - Correct workspace census after Run 397: one verified Pi identity (`EUCLIDABO`), one profile, one GHC account, nine session rows for that same account, no PI earnings entries before the campaign, and four GHC transaction rows. After applying the campaign, one 100 PI `available` entry exists; withdrawal quote eligibility is true, but provider execution remains disabled.

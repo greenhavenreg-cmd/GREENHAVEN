@@ -1,6 +1,6 @@
 # GreenHaven
 
-**Current source version:** `0.338.136` (Run 411 marketplace commerce reliability upgrade over Run 410; source-only, not deployed)
+**Current source version:** `0.338.137` (Run 412 Testnet Pi-withdrawal PIN proof/readiness baseline, with Run 413 release-version alignment and Run 414 release-metadata synchronization; source-only, not deployed)
 
 Production status: **NOT APPROVED** — Node 24.15.x dependency-backed typecheck/lint/build, browser/device testing, live Pi Browser, Testnet/Mainnet Storage verification and target-specific migration reconciliation remain outstanding.
 

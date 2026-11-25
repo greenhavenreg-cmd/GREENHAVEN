@@ -1,10 +1,10 @@
-# GreenHaven source authority — 0.338.136 Run 411 Marketplace Commerce Reliability (2026-11-25)
+# GreenHaven source authority — 0.338.137 Run 414 Release Metadata Synchronization (2026-11-25)
 
-**Current source version:** `0.338.136`
-**Latest supplied source archive:** `GREENHAVEN-0.338.132-RUN406-SERVER-READ-WALLET-REPAIR-2026-11-25-2.zip`  
-**Parent candidate:** `0.338.135` Run 410 Marketplace Maturity
+**Current source version:** `0.338.137`
+**Latest supplied source archive:** `GREENHAVEN-0.338.137-RUN412-TESTNET-PI-WITHDRAWAL-PIN-PROOF-READINESS-2026-11-25.zip`  
+**Parent candidate:** `0.338.137` Run 412 Testnet Pi-withdrawal PIN proof/readiness baseline
 **Current working tree:** Run 411 Marketplace Commerce Reliability, based on Run 410 marketplace maturity and Run 409 executive-premium UI polish; earlier Run 406/407 database and audit history is retained below. The correct Testnet database has the additive Run 406 least-privilege read-grant migration applied and ACL-verified. See `docs/RUN406-SERVER-READ-WALLET-REPAIR-2026-11-25.md`. This archive is for local GitHub Desktop handoff; it does not imply a remote push or Vercel deploy.
-**Package identity:** `gh-connect@0.338.136` (user-facing brand: GREENHAVEN).
+**Package identity:** `gh-connect@0.338.137` (user-facing brand: GREENHAVEN).
 The correct workspace is Supabase `jhlsjnmfpakvibuuoygx`, GitHub `greenhavenreg-cmd/GREENHAVEN` branch `testnet`, and Vercel project `greenhaven` under team `greenhavenreg-5659`. The database had 235 recorded migration rows before Run 397; Run 397 is recorded as `20261125065113`. Run 406 server-read privileges were applied through the migration tool and verified. The tool recorded the same idempotent Run 406 migration name twice in adjacent versions; the duplicate history rows were left intact. The source tree contains 245 SQL migration files, and remaining history differences still require row-by-row reconciliation. The 100 PI backfill processed one verified account and credited one idempotent 100 PI `available` entry. No other accounts were imported or credited because the other five identities from the previously inspected database are not present in the correct project and their ownership/history must be mapped safely.
 - **Current Run 411 report:** `docs/RUN411-MARKETPLACE-COMMERCE-RELIABILITY-AUDIT-2026-11-25.md`; the candidate remains source-only and not deployed.
 The Phase 7/8 domain register remains `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`; RUN385 research/field-research work remains retained. The current source preserves the Phase A identity/onboarding gate repair, Phase B onboarding UX, Phase C Pi identity and explicit wallet consent, progressive profile completion, private Supabase Storage lifecycle and Phase D community/storage work. Phase 9 adds a 24-assertion cross-workstream acceptance gate registered in both static and prebuild pipelines.
@@ -23,7 +23,12 @@ Referral rewards are 5% of a verified qualifying membership charge, capped at 25
 
 ## Historical RUN390 source snapshot (0.338.111)
 
-The records below retain prior implementation history. Their original version/archive references are historical and do not override the current 0.338.136 source pointer.
+
+## RUN414 — Release metadata synchronization (2026-11-25)
+
+Run 414 synchronizes the current version references in README.md, docs/PROJECT_TRUTH.md, VERIFIED_MANIFEST.txt, and this source-of-truth record with the package/lockfile release identity `gh-connect@0.338.137`. This addresses the four stale metadata failures in `scripts/check-run300-release-integrity.mjs` without changing or weakening the gate. Historical records remain historical. No dependency, application behavior, migration, environment setting, financial flag, database, GitHub, or Vercel state was changed. Targeted Run #300 and Phase 4 release identity checks must pass before the full prebuild/build can be considered clear.
+
+The records below retain prior implementation history. Their original version/archive references are historical and do not override the current 0.338.137 source pointer.
 
 ## RUN390 — Membership, Feed Privacy and Marketplace read-path repair
 
