@@ -12,8 +12,8 @@ const checks = [
   ['seller inventory does not claim empty until authoritative response is ready', /data-testid="seller-listings-unavailable"/.test(screen) && /Your listings could not be verified/.test(screen) && /Your storefront is ready for its first listing/.test(screen)],
   ['marketplace section controls expose pressed state and usable touch targets', /aria-pressed=\{bucket === chip\.id\}/.test(screen) && /aria-pressed=\{showCategories && bucket === "browse"\}/.test(screen) && /min-h-10 shrink-0/.test(screen)],
   ['seller center distinguishes listing and order data availability', /listingsAvailable=\{mineLoadState === "ready"\}/.test(screen) && /ordersAvailable=\{ordersLoadState === "ready"\}/.test(screen)],
-  ['package and lockfile versions are synchronized', pkg.version === '0.338.136' && lock.version === pkg.version && lock.packages[''].version === pkg.version],
-  ['release version matches package version', read('lib/app-release.ts').includes('APP_RELEASE_VERSION = "0.338.136"')],
+  ['package and lockfile versions are synchronized', typeof pkg.version === 'string' && pkg.version.length > 0 && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version],
+  ['release version matches package version', read('lib/app-release.ts').includes(`APP_RELEASE_VERSION = "${pkg.version}"`)],
   ['marketplace maturity check is registered for static and prebuild gates', pkg.scripts['verify:static'].includes('check-run410-marketplace-maturity.mjs') && pkg.scripts['prebuild:checks'].includes('check-run410-marketplace-maturity.mjs')],
 ]
 let failed = 0
