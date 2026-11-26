@@ -240,7 +240,7 @@ export async function POST(
         referenceId,
         reason,
         sourceEvent: "MARKETPLACE_PURCHASE",
-      }, { transportError: "SPEND_FAILED" })
+      })
       if (spend.ok) {
         spendOk = true
         spendTx = spend.tx

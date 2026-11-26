@@ -1,14 +1,14 @@
-## RUN445 — Earnings dashboard build repair
-
-RUN445 resolves the duplicate `snap` declaration in the unified earnings dashboard by separating the React state name (`serverSnap`) from the render-only `snap` alias. The source fix preserves the last-known snapshot fallback and does not alter payment or withdrawal policy. A focused regression gate is part of static verification. The Vercel log supplied for RUN444 showed all 465 prebuild checks passing before this Next.js compilation error. The full static suite passes and the prebuild dry-run discovers 466 checks. A fresh production build of RUN445 must still be confirmed on Node.js 24.15.x.
-
 # GreenHaven
 
-**Package:** `gh-connect@0.338.157`  
-**Current source version:** `0.338.157`  
-**Candidate:** RUN445 — Earnings Dashboard Build Repair  
+**Package:** `gh-connect@0.338.158`  
+**Current source version:** `0.338.158`  
+**Candidate:** RUN446 — Marketplace Spend Signature Repair  
 **Accepted source archive:** `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`  
-**Candidate archive:** `GREENHAVEN-0.338.157-RUN445-EARNINGS-DASHBOARD-BUILD-REPAIR-2026-11-26.zip`
+**Candidate archive:** `GREENHAVEN-0.338.158-RUN446-MARKETPLACE-SPEND-SIGNATURE-REPAIR-2026-11-26.zip`
+
+## RUN446 — Marketplace spend signature repair
+
+The in-memory marketplace GHC payment fallback now calls `executeAuthoritativeSpend` using its actual two-argument signature. The transport-error override remains exclusively on the durable RPC implementation, which accepts it. A focused regression check is registered in static and prebuild gates. The supplied RUN445 Vercel log showed all 466 prebuild checks and bundle compilation succeeding before TypeScript validation found this error. A new Vercel build is required to confirm the fix. No remote deployment, database mutation, provider transaction or Mainnet operation occurred.
 
 ## RUN444 — Testnet payment and withdrawal activation profile
 

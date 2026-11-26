@@ -1,3 +1,18 @@
+RUN446 source verification: marketplace spend signature contract passes; RUN445 earnings snapshot contract passes; RUN444 Testnet payment/withdrawal contract passes. The supplied RUN445 Vercel log confirms 466 prebuild checks and bundle compilation, but TypeScript validation then failed. RUN446 corrects that type mismatch; a fresh Node 24.15.x Vercel build is required to confirm it.
+
+## RUN446 Marketplace spend signature repair
+
+The in-memory marketplace GHC payment fallback now calls `executeAuthoritativeSpend` with its declared two-argument signature. The transport-error option remains on the durable RPC path only. The focused RUN446 check is registered in static and prebuild checks. No remote push, deployment, database mutation or provider transaction occurred.
+
+> **Current authority notice (26 November 2026):** The working package candidate is `gh-connect@0.338.158` (RUN446 Marketplace Spend Signature Repair), documented in `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md`. The last user-designated accepted source archive remains `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`; 0.338.158 is not accepted, pushed or deployed.
+
+# Current project truth — 0.338.158 RUN446 Marketplace Spend Signature Repair candidate (2026-11-26)
+
+**Current package candidate:** `gh-connect@0.338.158`.
+**Current source version:** `0.338.158` (working candidate)
+**Package identity:** `gh-connect@0.338.158`
+**User-designated parent baseline:** `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`.
+
 RUN445 source verification: focused earnings-dashboard contract 13/13; `npm run verify:static` exits 0; prebuild dry-run discovers 466 checks. The actual Next.js build remains unverified in the local Node 22.16.0 workspace.
 
 ## RUN445 build repair

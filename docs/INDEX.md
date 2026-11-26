@@ -58,3 +58,5 @@ Older RUN, PHASE, PASS and worklog records are historical evidence, not current 
 - [RUN440 Phase 4 worklog](UPGRADE-WORKLOG-0.338.152.md) — durable compare-and-swap session rotation and concurrent replay/revocation race hardening.
 
 - [RUN445 Earnings Dashboard Build Repair](RUN445-EARNINGS-DASHBOARD-BUILD-REPAIR-2026-11-26.md)
+
+- [RUN446 Marketplace Spend Signature Repair](RUN446-MARKETPLACE-SPEND-SIGNATURE-REPAIR-2026-11-26.md)

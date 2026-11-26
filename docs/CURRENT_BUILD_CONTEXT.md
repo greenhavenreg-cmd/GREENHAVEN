@@ -1,3 +1,9 @@
+## Latest implementation — 0.338.158 Testnet migration closeout and marketplace spend signature repair / RUN446 (26 November 2026)
+
+RUN446 fixes the TypeScript build blocker in `app/api/marketplace/orders/[orderId]/pay/route.ts`. The in-memory fallback now passes only the store and spend input to `executeAuthoritativeSpend`, matching its declared two-argument API. The `transportError: "SPEND_FAILED"` option remains on the durable `executeGhcSpendRpc` call only. A focused contract check is registered in static and prebuild checks. The supplied RUN445 Vercel log confirms 466 prebuild checks and successful production bundle compilation before TypeScript validation found the mismatch. A fresh Vercel build is pending; no deployment, database mutation or provider transaction occurred.
+
+**Current source version:** `0.338.158` (unaccepted review candidate; parent `0.338.157` / RUN445).
+
 ## Latest implementation — 0.338.157 Testnet migration closeout and earnings-dashboard build repair / RUN445 (26 November 2026)
 
 RUN443 applied the four migrations previously held by RUN442 to Testnet `jhlsjnmfpakvibuuoygx` (PostgreSQL 17.12): RUN388 Research quota RPC (`20261126161545`), RUN396 owner-scoped payout history (`20261126161553`), RUN405 bounded registration account-discovery replacement (`20261126161603`), and RUN429 durable Community invitations with the RUN441 Community-before-Invitation lock-order correction (`20261126161651`). Combined with three RUN442 operations, seven migrations are installed. Migration history reconciliation and disposable PostgreSQL concurrency rehearsal remain outstanding.

@@ -1,8 +1,8 @@
 **Current source version:** `0.338.156`
-**Current package identity:** `gh-connect@0.338.157`
-**Current source version:** `0.338.157`
+**Current package identity:** `gh-connect@0.338.158`
+**Current source version:** `0.338.158`
 
-> **Current authority notice (26 November 2026):** This file retains historical architecture and release context. The working candidate is `gh-connect@0.338.157` (RUN445 Earnings Dashboard Build Repair), documented in `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md`. The last user-designated accepted archive remains `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`; 0.338.157 is not accepted, pushed or deployed.
+> **Current authority notice (26 November 2026):** This file retains historical architecture and release context. The working candidate is `gh-connect@0.338.158` (RUN446 Marketplace Spend Signature Repair), documented in `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md`. The last user-designated accepted archive remains `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`; 0.338.158 is not accepted, pushed or deployed.
 
 
 
@@ -359,3 +359,7 @@ The working candidate is `gh-connect@0.338.152` / RUN440. Durable session token 
 ## RUN445 — Earnings Dashboard Build Repair (26 November 2026)
 
 The working candidate is `gh-connect@0.338.157`. The React state snapshot in `components/ghc/unified-earnings-dashboard.tsx` is named `serverSnap`, while the render-only `snap` alias continues to select the live snapshot or last-known fallback. The quote callback dependency is updated, and a focused scope regression is registered in static and prebuild checks. This addresses the duplicate lexical declaration reported after all 465 RUN444 prebuild checks passed in Vercel. A fresh Node 24.15.x Next.js build remains required; no remote push, deployment or payment operation has occurred. See `docs/RUN445-EARNINGS-DASHBOARD-BUILD-REPAIR-2026-11-26.md`.
+
+## RUN446 — Marketplace Spend Signature Repair (26 November 2026)
+
+The working candidate is `gh-connect@0.338.158`. The in-memory marketplace GHC fallback now calls `executeAuthoritativeSpend` with its declared two-argument signature; the `transportError` option remains on the durable RPC call only. A focused regression gate is registered in static and prebuild checks. The supplied RUN445 Vercel log confirms bundle compilation but failed during TypeScript validation; a fresh Vercel production build is required to verify RUN446. No remote push, deployment, database mutation or provider transaction occurred. See `docs/RUN446-MARKETPLACE-SPEND-SIGNATURE-REPAIR-2026-11-26.md`.
