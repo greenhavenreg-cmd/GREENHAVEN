@@ -170,3 +170,111 @@ export function FeedSkeletonList({ count = 4 }: { count?: number }) {
     </div>
   )
 }
+
+/** Rewards "at a glance" balance panel skeleton */
+export function RewardsBalanceSkeleton() {
+  return (
+    <div className="mx-3 mt-3 rounded-[1.25rem] border border-border/60 bg-card px-3.5 py-3 shadow-sm" aria-busy="true" aria-label="Loading rewards balances">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="h-3 w-28 animate-pulse rounded bg-muted" />
+          <div className="h-3 w-48 animate-pulse rounded bg-muted/70" />
+          <div className="h-2.5 w-36 animate-pulse rounded bg-muted/50" />
+        </div>
+        <div className="h-9 w-9 animate-pulse rounded-xl bg-muted" />
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="rounded-xl bg-muted/40 px-2.5 py-2">
+            <div className="h-2.5 w-12 animate-pulse rounded bg-muted" />
+            <div className="mt-2 h-4 w-14 animate-pulse rounded bg-muted/80" />
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="h-16 animate-pulse rounded-xl bg-muted/40" />
+        <div className="h-16 animate-pulse rounded-xl bg-muted/40" />
+      </div>
+    </div>
+  )
+}
+
+/** Membership status + plan list skeleton */
+export function MembershipScreenSkeleton() {
+  return (
+    <div className="space-y-3 px-3 pt-2" aria-busy="true" aria-label="Loading membership">
+      <div className="gh-card space-y-3 px-3 py-3">
+        <div className="h-3 w-16 animate-pulse rounded bg-muted" />
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="h-8 w-28 animate-pulse rounded-full bg-muted" />
+          <div className="h-3 w-24 animate-pulse rounded bg-muted/60" />
+        </div>
+        <div className="h-3 w-full animate-pulse rounded bg-muted/50" />
+        <div className="h-3 w-4/5 animate-pulse rounded bg-muted/40" />
+      </div>
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="rounded-2xl border border-border/60 bg-card p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+            <div className="h-5 w-16 animate-pulse rounded-full bg-muted/70" />
+          </div>
+          <div className="h-3 w-full animate-pulse rounded bg-muted/50" />
+          <div className="h-3 w-3/4 animate-pulse rounded bg-muted/40" />
+          <div className="h-11 w-full animate-pulse rounded-full bg-muted/60" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Pi earnings / wallet balance card skeleton */
+export function PiEarningsSkeleton({ compact = false }: { compact?: boolean }) {
+  return (
+    <section
+      className={compact ? "overflow-hidden rounded-2xl border border-border/60 bg-card" : "mx-3 mt-3 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm"}
+      aria-busy="true"
+      aria-label="Loading Pi balances"
+    >
+      <div className="flex items-center justify-between gap-2 border-b border-border/40 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 animate-pulse rounded-full bg-violet-200 dark:bg-violet-900" />
+          <div className="space-y-1.5">
+            <div className="h-3.5 w-24 animate-pulse rounded bg-muted" />
+            <div className="h-2.5 w-16 animate-pulse rounded bg-muted/60" />
+          </div>
+        </div>
+        <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />
+      </div>
+      <div className="grid grid-cols-3 gap-2 px-4 py-3">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="space-y-1.5">
+            <div className="h-2.5 w-12 animate-pulse rounded bg-muted/70" />
+            <div className="h-5 w-16 animate-pulse rounded bg-muted" />
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-border/40 px-4 py-3 space-y-2">
+        <div className="h-3 w-28 animate-pulse rounded bg-muted/60" />
+        <div className="h-10 w-full animate-pulse rounded-xl bg-muted/40" />
+        <div className="h-10 w-full animate-pulse rounded-xl bg-muted/40" />
+      </div>
+    </section>
+  )
+}
+
+/** GHC → Pi settlement panel skeleton */
+export function SettlementPanelSkeleton() {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Loading settlement options">
+      <div className="grid grid-cols-2 gap-2">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="rounded-xl bg-muted/40 px-2.5 py-2">
+            <div className="h-2.5 w-14 animate-pulse rounded bg-muted" />
+            <div className="mt-2 h-4 w-16 animate-pulse rounded bg-muted/80" />
+          </div>
+        ))}
+      </div>
+      <div className="h-11 w-full animate-pulse rounded-xl bg-muted/50" />
+    </div>
+  )
+}

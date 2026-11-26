@@ -399,6 +399,9 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
   const [piPayoutHistory, setPiPayoutHistory] = useState<PiPayoutHistoryRow[]>([])
   const [piPayoutHistoryLoading, setPiPayoutHistoryLoading] = useState(false)
   const [piPayoutHistoryError, setPiPayoutHistoryError] = useState<string | null>(null)
+  /** Last successful Pi withdrawal history so transient 503s do not blank the list. */
+  const lastKnownPiPayoutHistoryRef = useRef<PiPayoutHistoryRow[]>([])
+  const lastKnownPiIntentsRef = useRef<PiIntentRow[]>([])
   const [piStatusFilter, setPiStatusFilter] = useState<"all" | "pending" | "completed" | "failed">("all")
   const [selectedPiIntent, setSelectedPiIntent] = useState<PiIntentRow | null>(null)
   const [piIntentsLoading, setPiIntentsLoading] = useState(false)
@@ -544,12 +547,24 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
         })
         if (cancelled || controller.signal.aborted) return
         if (!res.ok) {
-          setPiIntentsError(res.status === 401 ? "Sign in again to view your π payment history." : "Payment history could not be loaded from the server. Your records have not been changed.")
+          if (lastKnownPiIntentsRef.current.length > 0) {
+            setPiIntents(lastKnownPiIntentsRef.current)
+            setPiIntentsError(res.status === 401
+              ? "Sign in again to refresh π payment history. Showing last loaded records."
+              : "Payment history could not be refreshed. Showing last loaded records — nothing was changed.")
+          } else {
+            setPiIntentsError(res.status === 401 ? "Sign in again to view your π payment history." : "Payment history could not be loaded from the server. Your records have not been changed.")
+          }
           return
         }
         const data = await res.json().catch(() => ({}))
         if (data?.ok === false) {
-          setPiIntentsError("Payment history is temporarily unavailable. Please retry shortly.")
+          if (lastKnownPiIntentsRef.current.length > 0) {
+            setPiIntents(lastKnownPiIntentsRef.current)
+            setPiIntentsError("Payment history is temporarily unavailable. Showing last loaded records.")
+          } else {
+            setPiIntentsError("Payment history is temporarily unavailable. Please retry shortly.")
+          }
           return
         }
         const list: unknown[] | null = Array.isArray(data?.intents)
@@ -558,18 +573,26 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
             ? data.items as unknown[]
             : null
         if (!list) {
-          if (!cancelled) setPiIntentsError("Payment history response was invalid. Your records have not been changed; retry to reload authoritative history.")
+          if (!cancelled) {
+            if (lastKnownPiIntentsRef.current.length > 0) {
+              setPiIntents(lastKnownPiIntentsRef.current)
+              setPiIntentsError("Payment history response was invalid. Showing last loaded records.")
+            } else {
+              setPiIntentsError("Payment history response was invalid. Your records have not been changed; retry to reload authoritative history.")
+            }
+          }
           return
         }
         if (!cancelled) {
-          setPiIntents(
-            list
-              .filter((raw: unknown) => Boolean(raw) && typeof raw === "object" && !Array.isArray(raw))
-              .map((raw: unknown) => normalizePiTransactionIntent(raw))
-              .filter((x): x is PiTransactionProjection => x !== null)
-              // This endpoint is Pi history: never coerce unknown/mixed rails into π.
-              .filter((x: PiIntentRow) => Boolean(x.id) && x.currency === "PI")
-          )
+          const normalized = list
+            .filter((raw: unknown) => Boolean(raw) && typeof raw === "object" && !Array.isArray(raw))
+            .map((raw: unknown) => normalizePiTransactionIntent(raw))
+            .filter((x): x is PiTransactionProjection => x !== null)
+            // This endpoint is Pi history: never coerce unknown/mixed rails into π.
+            .filter((x: PiIntentRow) => Boolean(x.id) && x.currency === "PI")
+          lastKnownPiIntentsRef.current = normalized
+          setPiIntents(normalized)
+          setPiIntentsError(null)
         }
         // The server performs user-scoped read-only checks against feature stores.
         // Keep this separate from the client-side intent-field warnings below.
@@ -677,9 +700,17 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
         const body = await res.json().catch(() => null) as { ok?: boolean; error?: string; items?: unknown } | null
         if (cancelled) return
         if (!res.ok || body?.ok !== true || !Array.isArray(body.items)) {
-          setPiPayoutHistoryError(res.status === 401
-            ? "Sign in again to view your Pi withdrawal history."
-            : "Pi withdrawal history is temporarily unavailable. Your requests and balance have not been changed.")
+          // Soft degrade: keep last successful rows instead of blanking history.
+          if (lastKnownPiPayoutHistoryRef.current.length > 0) {
+            setPiPayoutHistory(lastKnownPiPayoutHistoryRef.current)
+            setPiPayoutHistoryError(res.status === 401
+              ? "Sign in again to refresh your Pi withdrawal history. Showing last loaded requests."
+              : "Pi withdrawal history is temporarily unavailable. Showing last loaded requests — your balance is unchanged.")
+          } else {
+            setPiPayoutHistoryError(res.status === 401
+              ? "Sign in again to view your Pi withdrawal history."
+              : "Pi withdrawal history is temporarily unavailable. Your requests and balance have not been changed.")
+          }
           return
         }
         const rows = body.items.flatMap((raw: unknown) => {
@@ -699,9 +730,18 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
             settledAt: typeof row.settledAt === "string" ? row.settledAt : null,
           }]
         })
+        lastKnownPiPayoutHistoryRef.current = rows
         setPiPayoutHistory(rows)
+        setPiPayoutHistoryError(null)
       } catch {
-        if (!cancelled) setPiPayoutHistoryError("Could not connect to Pi withdrawal history. Check your connection and retry.")
+        if (!cancelled) {
+          if (lastKnownPiPayoutHistoryRef.current.length > 0) {
+            setPiPayoutHistory(lastKnownPiPayoutHistoryRef.current)
+            setPiPayoutHistoryError("Could not refresh Pi withdrawal history. Showing last loaded requests.")
+          } else {
+            setPiPayoutHistoryError("Could not connect to Pi withdrawal history. Check your connection and retry.")
+          }
+        }
       } finally {
         window.clearTimeout(timeout)
         if (!cancelled) setPiPayoutHistoryLoading(false)
@@ -1048,7 +1088,14 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
   }, [walletOnline, pendingHolds.length, pendingHolds.map((h) => h.id + ":" + h.claimState).join("|"), tick])
 
 
-  const displayPending = pending > 0 ? pending : pendingSum
+  // When wallet authority is present, trust its pending exclusively so Rewards and Wallet
+  // never disagree. Local pendingSum is only a bootstrap while authority is still loading.
+  const displayPending =
+    authoritativeWallet.status === "ready" || authoritativeWallet.status === "error"
+      ? pending
+      : pending > 0
+        ? pending
+        : pendingSum
 
   const monthInsight = useMemo(() => {
     const movement = summarizeGhcMonthlyMovement(txs)
@@ -1465,7 +1512,7 @@ const lowBalance = balance === 0 && displayPending === 0
                   ? "You're offline. Showing your last available wallet information. Refresh when you're back online."
                   : walletSnapshotStale
                     ? (authoritativeWallet.message || "Authoritative wallet refresh failed. Any displayed previous values may be stale; server checks still govern financial actions.")
-                    : "Couldn’t refresh your wallet. Showing the last available information."}
+                    : "Couldn’t refresh your wallet right now. Showing the last confirmed balances — server checks still govern withdrawals and transfers."}
               </p>
               {!offline && (
                 <button
@@ -2226,14 +2273,24 @@ const lowBalance = balance === 0 && displayPending === 0
 
         {/* Settlement & tools — below primary activity, not mixed into the hero */}
         <div className="mx-3 mt-5 space-y-3">
-          <div className="rounded-2xl border border-border bg-card p-1 shadow-sm">
-            <p className="px-3 pt-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-              GHC settlement
-            </p>
-            <p className="px-3 pb-2 text-[11px] leading-relaxed text-muted-foreground">
-              Request Pi settlement of eligible GHC. Not an instant transfer · rate 100 GHC per 1 π.
-            </p>
-            <WithdrawGhcPanel />
+          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            <div className="border-b border-border/50 bg-gradient-to-r from-emerald-50/90 to-violet-50/60 px-3.5 py-3 dark:from-emerald-950/40 dark:to-violet-950/30">
+              <p className="text-[11px] font-black uppercase tracking-[0.12em] text-emerald-900 dark:text-emerald-200">
+                GHC → Pi settlement
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                Operator-reviewed conversion of eligible GHC into Pi. Not instant, not 1:1, and may be gated on Testnet.
+                Reference rate <strong className="text-foreground">100 GHC = 1 π</strong>.
+              </p>
+              <ul className="mt-2 space-y-0.5 text-[10px] text-muted-foreground">
+                <li>· Locked / pending GHC cannot be settled until it becomes Available</li>
+                <li>· A request reserves funds until settlement or safe release</li>
+                <li>· If settlement is closed on this deployment, your balance is unchanged</li>
+              </ul>
+            </div>
+            <div className="p-2">
+              <WithdrawGhcPanel />
+            </div>
           </div>
 
           <WalletToolsGrid

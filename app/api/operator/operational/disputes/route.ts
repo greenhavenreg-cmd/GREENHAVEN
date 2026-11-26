@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { assertOperatorKey } from "@/lib/server/marketplace/operational-rpc"
+import { OPERATOR_KEY_AUDIT_ACTOR } from "@/lib/server/security/operator-audit-actor"
 import {
   applyDisputeAdjustment,
   recordDisputeDecision,
@@ -34,7 +35,8 @@ export async function POST(request: Request) {
       decision,
       reasonCode: String(body.reasonCode || body.reason || "").trim(),
       approvalRef: String(body.approvalRef || "").trim(),
-      actorId: String(body.actorId || body.decidedBy || "operator").trim(),
+      // A shared key cannot identify a human operator. Ignore caller-supplied actor labels.
+      actorId: OPERATOR_KEY_AUDIT_ACTOR,
       currency: currency === "GHC" ? "GHC" : "PI",
       buyerAmount: Number(body.buyerAmount || 0),
       sellerNetReduction: Number(body.sellerNetReduction || 0),

@@ -64,7 +64,7 @@ const envEx = existsSync(join(root, ".env.example"))
   ? readFileSync(join(root, ".env.example"), "utf8")
   : ""
 ok("A2U fail-closed in env example", /PI_A2U_ENABLED\s*=\s*0/.test(envEx))
-ok("withdrawals fail-closed in env example", /GHC_WITHDRAWALS_ENABLED\s*=\s*0/.test(envEx))
+ok("withdrawals fail-closed in env example", /GHC_WITHDRAWALS_ENABLED\s*=\s*(?:0|false)/.test(envEx))
 
 const mig = join(root, "supabase/migrations/20261104180001_gh_community_list_memberships_viewer.sql")
 ok("communities memberships migration present", existsSync(mig))

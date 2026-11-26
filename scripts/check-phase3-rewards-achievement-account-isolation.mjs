@@ -8,7 +8,7 @@ const checks = [
   ['rows are accepted only after a successful durable response', /if \(!r\.ok\)[\s\S]*?setServerAchievements\(rows\)[\s\S]*?serverAchievementsOwnerRef\.current = userId/.test(screen)],
   ['achievement rendering is scoped to the active account', /serverAchievementsOwnerRef\.current === userId \? serverAchievements : \[\]/.test(screen)],
   ['failed hydration cannot retain a prior account owner', /catch\(\(\) => \{[\s\S]*?serverAchievementsOwnerRef\.current = null[\s\S]*?setServerAchievements\(\[\]\)/.test(screen)],
-  ['only durable achievement IDs can complete mission cards', screen.includes('durableMissionIds.has(missionCode)') && screen.includes('Server-verified achievement saved to your account.')],
+  ['only durable achievement IDs can complete mission cards', screen.includes('durableMissionIds.has(missionCode)') && screen.includes('Achievement saved.')],
 ]
 let failed = 0
 for (const [label, ok] of checks) { console.log(`${ok ? 'PASS' : 'FAIL'} ${label}`); if (!ok) failed++ }

@@ -24,7 +24,7 @@ if (resolved.isProdTarget || process.env.GHC_E2E_TARGET === 'production') {
 
 const base = resolved.baseUrl
 const cookie = String(process.env.GHC_E2E_COOKIE_A || '').trim()
-const opKey = String(process.env.GHC_OPERATOR_RECONCILE_KEY || process.env.GHC_A2U_ADMIN_KEY || '').trim()
+const opKey = String(process.env.GHC_OPERATOR_RECONCILE_KEY || '').trim()
 
 let pass = 0, fail = 0, skip = 0
 const p = (l, d='') => { pass++; console.log(`PASS ${l}${d ? ` — ${d}` : ''}`) }

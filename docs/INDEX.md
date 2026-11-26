@@ -1,53 +1,54 @@
+
 # GreenHaven documentation index
 
-## Current authority — read these first
+## Current authority
 
-- [`RUN411-MARKETPLACE-COMMERCE-RELIABILITY-AUDIT-2026-11-25.md`](RUN411-MARKETPLACE-COMMERCE-RELIABILITY-AUDIT-2026-11-25.md) — saved-listing/order false-empty corrections, cart variant/race safety, and remaining release blockers.
-- [`UPGRADE-WORKLOG-0.338.136.md`](UPGRADE-WORKLOG-0.338.136.md) — Run 411 source changes and verification limits.
+- [RUN442 Testnet migration application report](RUN442-TESTNET-MIGRATION-APPLICATION-REPORT-2026-11-26.md) — three applied migrations, generated history mappings, four held migrations and postflight evidence.
+- [RUN442 upgrade worklog](UPGRADE-WORKLOG-0.338.154.md) — controlled Testnet migration execution and release boundary.
 
-- [`RUN410-MARKETPLACE-MATURITY-AUDIT-2026-11-25.md`](RUN410-MARKETPLACE-MATURITY-AUDIT-2026-11-25.md) — marketplace UX and seller-data reliability changes, verification and release limits.
-- [`RUN409-EXECUTIVE-PREMIUM-UI-AUDIT-2026-11-25.md`](RUN409-EXECUTIVE-PREMIUM-UI-AUDIT-2026-11-25.md) — executive-premium visual audit, scope, validation and release limitations.
-- [`UPGRADE-WORKLOG-0.338.135.md` (historical Run 410)](UPGRADE-WORKLOG-0.338.135.md) — Run 410 source changes and validation log.
-- [`GREENHAVEN-RUN407-PRODUCTION-AUDIT-2026-11-25.md`](GREENHAVEN-RUN407-PRODUCTION-AUDIT-2026-11-25.md) — confirmed live findings, least-privilege ledger repair, and remaining blockers.
-- [`UPGRADE-WORKLOG-0.338.133.md`](UPGRADE-WORKLOG-0.338.133.md) — historical Run 408 source integration and release boundaries.
+- [RUN441 Phase 4 transaction rehearsal plan](RUN441-PHASE4-COMMUNITY-MESSENGER-TRANSACTION-REHEARSAL.md) — held PostgreSQL 17 concurrency matrix and explicit unexecuted status.
+- [Current source of truth](CURRENT-SOURCE-OF-TRUTH-2026-11-26.md) — active archive, connected GitHub/Vercel/Supabase state, migration boundaries and release status.
+- [RUN426 Phase 0 social experience foundation](RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.md) — external research, Community/Messages/Discovery architecture, accessibility, performance and Phase 1 acceptance criteria.
+- [RUN427 Phase 1A Community directory](RUN427-PHASE1A-COMMUNITY-DIRECTORY-2026-11-26.md) — role-derived Managed directory and authorization boundary.
+- [RUN428 Phase 1 Social & Connections](RUN428-PHASE1-SOCIAL-CONNECTIONS-IMPLEMENTATION-2026-11-26.md) — Resources workspace increment and cross-domain Community/Messages/Discovery/Connections checks.
+- [RUN429 Phase 1 durable Community invitations](RUN429-PHASE1-DURABLE-COMMUNITY-INVITATIONS-2026-11-26.md) — canonical invitation persistence, authenticated lifecycle APIs, notification integration and migration hold.
+- [RUN429 upgrade worklog](UPGRADE-WORKLOG-0.338.142.md) — implementation sequence, verification evidence and remaining acceptance gates.
+- [Product UX and copy standard](PRODUCT-UX-COPY-STANDARD.md) — concise, production-ready customer-facing experience.
+- [Source authority](SOURCE_OF_TRUTH.md) — architecture, release and security boundaries.
+- [Project truth](PROJECT_TRUTH.md) — verified package and project state.
+- [Project source-of-truth history](PROJECT-SOURCE-OF-TRUTH.md) — retained earlier context; the current override above takes precedence.
 
-- [`SECURITY.md`](../SECURITY.md) — private vulnerability reporting and release-boundary policy.
+## Operations
 
-- [`SOURCE_OF_TRUTH.md`](SOURCE_OF_TRUTH.md) — current 0.338.136 Run 411 source authority and release boundaries.
-- [`../GREENHAVEN-0.338.119-PHASE9-COORDINATED-ONBOARDING-IDENTITY-STORAGE-2026-11-24-REPORT.md`](../GREENHAVEN-0.338.119-PHASE9-COORDINATED-ONBOARDING-IDENTITY-STORAGE-2026-11-24-REPORT.md) — Phase 9 delivery report and outstanding operator acceptance.
-- [`PHASE-D-COMMUNITIES-STORAGE-2026-11-24.md`](PHASE-D-COMMUNITIES-STORAGE-2026-11-24.md) — Phase D product and infrastructure completion record.
-- [`UPGRADE-WORKLOG-0.338.118.md`](UPGRADE-WORKLOG-0.338.118.md) — Phase D implementation and verification log.
-- [`PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`](PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md) — canonical register for reused Phase 7/8 workstream labels and domain dependencies.
-- [`UPGRADE-WORKLOG-0.338.117.md`](UPGRADE-WORKLOG-0.338.117.md) — historical source-only harmonization worklog.
-- [`RUN384-FULL-PROJECT-AUDIT-2026-11-24.md`](RUN384-FULL-PROJECT-AUDIT-2026-11-24.md) — cross-system GitHub, Vercel and Supabase audit baseline.
+- [Environment variables](ENVIRONMENT-VARIABLES.md)
+- [Operator environment and status](OPERATOR_ENV_AND_STATUS.md)
+- [Supabase Storage operations](SUPABASE-STORAGE-OPERATIONS.md)
+- [Migration checklist](MIGRATION_CHECKLIST.md)
+- [Migration readiness states](architecture/MIGRATION_READINESS_STATES.md)
+- [Policy review checklist](POLICY_REVIEW_CHECKLIST.md)
+- [Current build context](CURRENT_BUILD_CONTEXT.md)
 
-1. [`SOURCE_OF_TRUTH.md`](SOURCE_OF_TRUTH.md) — sole source/archive authority and release boundaries for 0.338.136.
-2. [`PROJECT_TRUTH.md`](PROJECT_TRUTH.md) — current verified project state and explicit acceptance limits.
-3. [`CURRENT_BUILD_CONTEXT.md`](CURRENT_BUILD_CONTEXT.md) — current build/runtime context.
-5. [`RUN382-SUPABASE-REST-JSON-CONTENT-TYPE-2026-11-24.md`](RUN382-SUPABASE-REST-JSON-CONTENT-TYPE-2026-11-24.md) — Supabase REST transport correction and verification status.
-4. [`RUN383-IDENTITY-PRIVACY-SERVICE-ROLE-GRANTS-2026-11-24.md`](RUN383-IDENTITY-PRIVACY-SERVICE-ROLE-GRANTS-2026-11-24.md) — live Preview 403 diagnosis, service-role privilege repair and Testnet reward-gate findings.
-6. [`PROJECT-WIDE-AUDIT-RUN379-2026-11-24.md`](PROJECT-WIDE-AUDIT-RUN379-2026-11-24.md) — project-wide audit findings and access-control upgrade plan.
+## Historical material
 
-## Historical implementation records
+Older RUN, PHASE, PASS and worklog records are historical evidence, not current implementation instructions. Use them only when a current source file or the current source-of-truth document explicitly requires them. Do not restore historical application snapshots or bulk-merge old project trees.
 
-Older RUN, phase, maintenance, audit, and worklog documents are evidence of earlier changes. They must not be used as current requirements unless the current source authority explicitly adopts them. Superseded records should remain under `archive/` when referenced by executable regression checks; do not delete a referenced document merely because its implementation is old.
+- [RUN430 Phase 2 Social Engagement](RUN430-PHASE2-SOCIAL-ENGAGEMENT-2026-11-26.md) — saved-collection persistence failure handling and cross-feature social interaction contract.
+- [RUN430 upgrade worklog](archive/upgrade-worklogs/UPGRADE-WORKLOG-0.338.143.md) — implementation, checks and release boundaries.
+- [RUN431 Phase 2 Discovery preferences](RUN431-PHASE2-DISCOVERY-PREFERENCES-2026-11-26.md) — server-authoritative connection-intent persistence and Discover context integration.
+- [RUN431 upgrade worklog](archive/upgrade-worklogs/UPGRADE-WORKLOG-0.338.144.md) — implementation, checks and release boundaries.
 
-## Current local handoff
+- [RUN432 Phase 2 Community creation draft recovery](RUN432-PHASE2-COMMUNITY-CREATE-DRAFT-2026-11-26.md) — account-scoped resumable creation wizard, safe draft storage and stable create identity.
+- [RUN432 upgrade worklog](archive/upgrade-worklogs/UPGRADE-WORKLOG-0.338.145.md) — implementation, checks and release boundaries.
 
-- [RUN405 Local Project Handoff and Reconciliation](RUN405-LOCAL-PROJECT-HANDOFF-AND-RECONCILIATION-2026-11-25.md) — local GitHub Desktop handoff, safe Testnet reward backfill scope, account identity rules, and required reconciliation/acceptance steps.
+- [RUN433 Phase 2 Integrated Social Transformation](RUN433-PHASE2-INTEGRATED-SOCIAL-TRANSFORMATION-2026-11-26.md) — five-stage source audit, canonical-domain mapping, call capability gate and release acceptance boundary.
+- [RUN433 upgrade worklog](archive/upgrade-worklogs/UPGRADE-WORKLOG-0.338.146.md) — implementation, checks and release boundaries.
+- [RUN434 Phase 3 authority audit](RUN434-PHASE3-AUTHORITY-AUDIT-2026-11-26.md) — 284-route inventory, canonical writer boundaries, identity/session model, Testnet read-only catalog evidence and transactional outbox decision.
+- [RUN434 route/writer inventory](RUN434-PHASE3-ROUTE-WRITER-INVENTORY-2026-11-26.csv) — deterministic route-level RPC/table and security-signal inventory.
+- [RUN434 upgrade worklog](UPGRADE-WORKLOG-0.338.147.md) — implementation, checks and release boundaries.
+- [RUN435 identity input classification](RUN435-PHASE3-IDENTITY-INPUT-CLASSIFICATION-2026-11-26.md) — manual review of caller-supplied actor/owner aliases and target identifiers.
+- [RUN435 upgrade worklog](archive/upgrade-worklogs/UPGRADE-WORKLOG-0.338.148.md) — implementation, verification and outstanding acceptance gates.
 
-## Database and operations
-
-Migration manifests, migration checklists, Testnet reconciliation reports, and operator runbooks are historical or target-specific evidence. Before any database operation, reconcile the exact target project and migration history. Source presence is not proof of remote application.
-
-- [RUN385 Research & Field Research Upgrade — 24 November 2026](RUN385-RESEARCH-FIELD-RESEARCH-UPGRADE-2026-11-24.md)
-- [RUN386 Research Pagination & Complete Export](RUN386-RESEARCH-PAGINATION-AND-COMPLETE-EXPORT-2026-11-24.md)
-- [RUN387 Research Analytics](RUN387-RESEARCH-ANALYTICS-2026-11-24.md)
-- [RUN388 Research Schedule & Quota](RUN388-RESEARCH-SCHEDULE-AND-QUOTA-2026-11-24.md)
-- [RUN390 Membership, Feed and Marketplace Read Repair](RUN390-MEMBERSHIP-FEED-MARKETPLACE-READ-REPAIR-2026-11-24.md)
-- [RUN389 Research Team Roles](RUN389-RESEARCH-TEAM-ROLES-2026-11-24.md)
-- [0.338.111 RUN390 Upgrade Worklog](UPGRADE-WORKLOG-0.338.111.md)
-
-- [Run 406 — Server-read and wallet repair](RUN406-SERVER-READ-WALLET-REPAIR-2026-11-25.md)
-
-- [RUN412 Testnet Pi Withdrawal PIN-Proof Readiness — 25 November 2026](RUN412-TESTNET-PI-WITHDRAWAL-PIN-PROOF-READINESS-2026-11-25.md)
+- [RUN437 Phase 3 read-only Testnet reconciliation pack](RUN437-PHASE3-READONLY-RECONCILIATION-PACK-2026-11-26.md) — reproducible catalog checks; SELECT-only and non-mutating.
+- [RUN437 upgrade worklog](UPGRADE-WORKLOG-0.338.150.md) — reconciliation diagnostics and remaining operational gates.
+- [RUN439 Phase 4 worklog](UPGRADE-WORKLOG-0.338.151.md) — identity principal-boundary regression and Phase 4 kickoff.
+- [RUN440 Phase 4 worklog](UPGRADE-WORKLOG-0.338.152.md) — durable compare-and-swap session rotation and concurrent replay/revocation race hardening.

@@ -18,6 +18,7 @@ export type CommunityInviteStatus =
 
 export interface CommunityInvitationView {
   communityId: string
+  invitationId?: string
   communityName: string
   purpose?: string
   coverImage?: string

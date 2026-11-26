@@ -38,9 +38,11 @@ export async function GET(request: Request) {
     )
   }
   const snap = await rpcWalletSnapshot(auth.userId).catch(() => null)
-  const balanceRaw = (snap as { balance?: number } | null)?.balance
-  const balance = Number(balanceRaw)
-  if (!snap || !Number.isFinite(balance) || balance < 0) {
+  // `balance` in the wallet snapshot is already spendable (posted ledger less
+  // active withdrawal reservations). Quotes require the posted ledger total so
+  // reservations are subtracted exactly once by getWithdrawalQuote().
+  const ledgerBalance = Number(snap?.ledgerBalance)
+  if (!snap || !Number.isFinite(ledgerBalance) || ledgerBalance < 0) {
     return NextResponse.json(
       { ok: false, error: "WALLET_SNAPSHOT_UNAVAILABLE", message: "Withdrawal eligibility cannot be calculated safely right now." },
       { status: 503, headers: { "Cache-Control": "no-store" } }
@@ -53,7 +55,13 @@ export async function GET(request: Request) {
       { status: 503, headers: { "Cache-Control": "no-store" } }
     )
   }
-  const quote = await getWithdrawalQuote(balance, locked)
+  if (locked > ledgerBalance + 0.00000001) {
+    return NextResponse.json(
+      { ok: false, error: "WALLET_LOCK_RECONCILIATION_REQUIRED", message: "Withdrawal eligibility is temporarily unavailable while wallet reservations are reconciled." },
+      { status: 503, headers: { "Cache-Control": "no-store" } }
+    )
+  }
+  const quote = await getWithdrawalQuote(ledgerBalance, locked)
   const items = await listWithdrawalsForUser(auth.userId)
   if (items === null) {
     return NextResponse.json(

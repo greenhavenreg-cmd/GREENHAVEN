@@ -91,6 +91,7 @@ export type CommunityHubTab =
   | "discussion"
   | "chat"
   | "events"
+  | "resources"
   | "members"
   | "about"
   | "mod"
@@ -185,6 +186,7 @@ const HUB_TABS: { id: CommunityHubTab; label: string; icon: React.ReactNode; boa
   { id: "announcements", label: "Updates", icon: <Megaphone size={14} />, board: true },
   { id: "discussion", label: "Discussion", icon: <Pin size={14} />, board: true },
   { id: "events", label: "Events", icon: <Calendar size={14} />, board: true },
+  { id: "resources", label: "Resources", icon: <Pin size={14} /> },
   { id: "chat", label: "Chat", icon: <MessageSquare size={14} /> },
   { id: "members", label: "Members", icon: <Users size={14} /> },
   { id: "about", label: "About", icon: <Shield size={14} /> },
@@ -2010,6 +2012,26 @@ export function PremiumCommunityHub({
           </div>
         )}
 
+        {tab === "resources" && (
+          <div className="space-y-3">
+            <section className="rounded-2xl border border-border bg-card p-4" aria-label="Community resources">
+              <h2 className="flex items-center gap-2 text-sm font-bold text-foreground"><Pin size={15} /> Community resources</h2>
+              <p className="mt-1 text-[11px] text-muted-foreground">Guides, links and shared materials published for this community.</p>
+              {Array.isArray((community as any).resources) && (community as any).resources.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {((community as any).resources as any[]).slice(0, 50).map((resource) => (
+                    <PinnedResourceCard key={resource.id || resource.title} resource={resource} />
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 rounded-xl border border-dashed border-border px-3 py-6 text-center text-[12px] text-muted-foreground">
+                  {community.isJoined ? "No resources have been shared yet." : "Join this community to access member resources."}
+                </p>
+              )}
+            </section>
+          </div>
+        )}
+
         {tab === "about" && (
           <div className="space-y-4">
             <section className="rounded-2xl border border-border bg-card p-4">
@@ -2337,20 +2359,6 @@ export function PremiumCommunityHub({
               </section>
             ) : null}
 
-
-                        {Array.isArray((community as any).resources) && (community as any).resources.length > 0 ? (
-              <section className="rounded-2xl border border-border bg-card p-4" aria-label="Community knowledge hub">
-                <h2 className="text-xs font-bold text-foreground">Knowledge hub</h2>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">Pinned guides, links, and materials for members.</p>
-                <div className="mt-2 space-y-2">
-                  {((community as any).resources as any[]).slice(0, 8).map((r) => (
-                    <PinnedResourceCard key={r.id || r.title} resource={r} />
-                  ))}
-                </div>
-              </section>
-            ) : community.isJoined ? (
-              <p className="text-[11px] text-muted-foreground">No pinned resources yet.</p>
-            ) : null}
 
             {Array.isArray((community as any).activities) && (community as any).activities.length > 0 ? (
               <section className="rounded-2xl border border-border bg-card p-4" aria-label="Community activities">

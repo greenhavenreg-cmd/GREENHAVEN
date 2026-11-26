@@ -11,7 +11,6 @@ import {
   jsonErr,
   jsonOk,
 } from "@/lib/server/economy/http"
-import { readGhcServerEnv } from "@/lib/server/economy/env"
 import { checkDurableRateLimit, durableRateLimitStatus, durableRateLimitCode } from "@/lib/server/security/control-plane"
 import { resolveSpendAmount } from "@/lib/server/economy/spend-catalog"
 import {
@@ -21,7 +20,7 @@ import {
 import { requireRecentStepUp } from "@/lib/server/identity/step-up-store"
 import { attachLedgerCorrelation, buildCorrelationEnvelope } from "@/lib/server/economy/correlation"
 import { loadOrder } from "@/lib/server/marketplace/order-store"
-import { parseGhcSpendRpcResult } from "@/lib/server/economy/spend-rpc-contract"
+import { executeGhcSpendRpc } from "@/lib/server/economy/execute-spend-rpc"
 
 // These catalog sinks must remain unavailable until a durable effect record and
 // its consumer are deployed atomically. A ledger debit alone is not a boost.
@@ -29,49 +28,6 @@ const UNCONFIGURED_PREMIUM_EFFECTS = new Set([
   "boost", "boost_post", "boost_profile", "boost_listing", "feed_spotlight",
   "community_tools_month", "creator_studio_day",
 ])
-
-async function rpcSpend(input: {
-  userId: string
-  amount: number
-  referenceId: string
-  reason: string
-  sourceEvent: string
-}): Promise<{ ok: boolean; idempotent?: boolean; tx?: unknown; error?: string }> {
-  const env = readGhcServerEnv()
-  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
-    return { ok: false, error: "SERVER_UNAVAILABLE" }
-  }
-  try {
-    const res = await fetch(
-      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_execute_spend`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-store",
-          apikey: env.supabaseServiceRoleKey,
-          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-        },
-        cache: "no-store",
-        signal: AbortSignal.timeout(10_000),
-        body: JSON.stringify({
-          p_user_id: input.userId,
-          p_amount: input.amount,
-          p_reference_id: input.referenceId,
-          p_reason: input.reason,
-          p_source_event: input.sourceEvent,
-        }),
-      }
-    )
-    const data = await res.json().catch(() => null)
-    if (!res.ok) return { ok: false, error: "SPEND_RPC_FAILED" }
-    const result = parseGhcSpendRpcResult(data, input)
-    if (!result.ok) return { ok: false, error: result.error }
-    return { ok: true, idempotent: result.idempotent, tx: result.tx }
-  } catch {
-    return { ok: false, error: "SPEND_RPC_FAILED" }
-  }
-}
 
 export async function POST(request: Request) {
   const auth = await resolveAuthenticatedUser(request.headers)
@@ -166,7 +122,7 @@ export async function POST(request: Request) {
     const reason = `Marketplace order ${order.listingTitle || order.id}`
 
     if (isDatabaseConfigured()) {
-      const rpc = await rpcSpend({
+      const rpc = await executeGhcSpendRpc({
         userId: auth.userId,
         amount,
         referenceId,
@@ -232,7 +188,7 @@ export async function POST(request: Request) {
   }
 
   if (isDatabaseConfigured()) {
-    const rpc = await rpcSpend({
+    const rpc = await executeGhcSpendRpc({
       userId: auth.userId,
       amount: resolved.amount,
       referenceId,

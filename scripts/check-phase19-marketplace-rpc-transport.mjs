@@ -3,6 +3,7 @@
 import fs from 'node:fs'
 const store = fs.readFileSync('lib/server/marketplace/order-store.ts', 'utf8')
 const pay = fs.readFileSync('app/api/marketplace/orders/[orderId]/pay/route.ts', 'utf8')
+const spendTransport = fs.readFileSync('lib/server/economy/execute-spend-rpc.ts', 'utf8')
 const restClient = fs.readFileSync('lib/server/supabase/rest-client.ts', 'utf8')
 const checks = [
   ['durable marketplace RPCs have a bounded timeout', /supabaseRpc\(fn, body, \{ timeoutMs: 10000 \}\)/.test(store) && /signal:\s*AbortSignal\.timeout\(options\.timeoutMs \?\? 15_000\)/.test(restClient)],
@@ -11,8 +12,8 @@ const checks = [
   ['empty PostgREST void RPC responses remain explicitly supported', /if \(!text\.trim\(\)\) return \{ ok: true \}/.test(store)],
   ['HTTP failures never become successful order mutations', /if \(!res\.ok\) return null/.test(store)],
   ['RPC network and timeout failures are contained as unavailable', /catch\s*\{\s*return null\s*\}/.test(store)],
-  ['GHC spend RPC has a bounded timeout', /signal:\s*AbortSignal\.timeout\(10_000\)/.test(pay)],
-  ['GHC spend RPC bypasses caches', /cache:\s*"no-store"/.test(pay)],
+  ['GHC spend RPC has a bounded timeout', /signal:\s*AbortSignal\.timeout\(10_000\)/.test(spendTransport)],
+  ['GHC spend RPC bypasses caches', /cache:\s*"no-store"/.test(spendTransport)],
   ['ambiguous GHC spend retains payment claim for recovery', /if \(spendError === "INSUFFICIENT_BALANCE"\)/.test(pay)],
   ['GHC spend remains idempotent by order reference', /const referenceId = `market_order_\$\{order\.id\}`/.test(pay)],
   ['production does not fall back to process-local order authority', /DURABLE_REQUIRED: production requires Supabase marketplace orders schema/.test(store)],

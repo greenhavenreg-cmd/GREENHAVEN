@@ -22,11 +22,10 @@ import {
   getProcessGhcStore,
 } from "@/lib/server/economy/store"
 import { allowMemoryServer, isDatabaseConfigured } from "@/lib/server/economy/http"
-import { readGhcServerEnv } from "@/lib/server/economy/env"
 import { splitMarketplaceCommission } from "@/lib/server/marketplace/commission"
 import { appendVerifiedCompanyRevenueEvent } from "@/lib/server/revenue/revenue-event"
 import { attachLedgerCorrelation, buildCorrelationEnvelope } from "@/lib/server/economy/correlation"
-import { parseGhcSpendRpcResult } from "@/lib/server/economy/spend-rpc-contract"
+import { executeGhcSpendRpc } from "@/lib/server/economy/execute-spend-rpc"
 import { enforceUserMutationRateLimit } from "@/lib/server/security/user-rate-limit"
 import { notifyMarketplaceOrderPaid } from "@/lib/server/notifications/unified"
 
@@ -90,49 +89,6 @@ function reconciliationPendingResponse(order: unknown, commission: unknown) {
     commission,
     message: "Payment is verified. Retry this order endpoint to reconcile the revenue journal; do not submit a new payment.",
   }, { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "5" } })
-}
-
-async function rpcGhcSpend(input: {
-  userId: string
-  amount: number
-  referenceId: string
-  reason: string
-  sourceEvent: string
-}): Promise<{ ok: boolean; idempotent?: boolean; tx?: unknown; error?: string }> {
-  const env = readGhcServerEnv()
-  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
-    return { ok: false, error: "SERVER_UNAVAILABLE" }
-  }
-  try {
-    const res = await fetch(
-      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_execute_spend`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-store",
-          apikey: env.supabaseServiceRoleKey,
-          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-        },
-        cache: "no-store",
-        signal: AbortSignal.timeout(10_000),
-        body: JSON.stringify({
-          p_user_id: input.userId,
-          p_amount: input.amount,
-          p_reference_id: input.referenceId,
-          p_reason: input.reason,
-          p_source_event: input.sourceEvent,
-        }),
-      }
-    )
-    const data = await res.json().catch(() => null)
-    if (!res.ok) return { ok: false, error: "SPEND_FAILED" }
-    const result = parseGhcSpendRpcResult(data, input)
-    if (!result.ok) return { ok: false, error: result.error }
-    return { ok: true, idempotent: result.idempotent, tx: result.tx }
-  } catch {
-    return { ok: false, error: "SPEND_FAILED" }
-  }
 }
 
 export async function POST(
@@ -266,13 +222,13 @@ export async function POST(
     let idempotent = false
 
     if (isDatabaseConfigured()) {
-      const rpc = await rpcGhcSpend({
+      const rpc = await executeGhcSpendRpc({
         userId: auth.userId,
         amount,
         referenceId,
         reason,
         sourceEvent: "MARKETPLACE_PURCHASE",
-      })
+      }, { transportError: "SPEND_FAILED" })
       spendOk = rpc.ok
       spendTx = rpc.tx
       spendError = rpc.error || "SPEND_FAILED"
@@ -284,7 +240,7 @@ export async function POST(
         referenceId,
         reason,
         sourceEvent: "MARKETPLACE_PURCHASE",
-      })
+      }, { transportError: "SPEND_FAILED" })
       if (spend.ok) {
         spendOk = true
         spendTx = spend.tx

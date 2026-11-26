@@ -7,6 +7,7 @@ const discovery = read('lib/community/discovery.ts')
 const participation = read('lib/domains/adapters/community-participation-hub.ts')
 const card = read('components/ghc/group-card.tsx')
 const hub = read('components/ghc/premium-community-hub.tsx')
+const context = read('contexts/ghc-context.tsx')
 const pkg = JSON.parse(read('package.json'))
 const lock = JSON.parse(read('package-lock.json'))
 const checks = [
@@ -17,7 +18,7 @@ const checks = [
   ['Invalid event dates remain unknown instead of becoming false epoch dates', participation.includes('return 0') && participation.includes('startsAt: startsAt || null')],
   ['External HTTPS resource URLs reject embedded credentials', participation.includes('parsed.username || parsed.password')],
   ['Pending join requests are displayed without offering a duplicate join action', card.includes('membershipStatus === \"pending\"') && card.includes('Request pending') && screen.includes('onJoin={!joined && !membershipStatus')],
-  ['Invitations can be accepted or declined through canonical context actions', card.includes('onAcceptInvite') && card.includes('onDeclineInvite') && screen.includes('acceptCommunityInvitation') && screen.includes('declineCommunityInvitation')],
+  ['Invitations can be accepted or declined through authenticated durable context actions', card.includes('onAcceptInvite') && card.includes('onDeclineInvite') && screen.includes('handleAcceptCommunityInvitation') && screen.includes('handleDeclineCommunityInvitation') && context.includes('/api/communities/invitations/')],
   ['Community hub prevents duplicate joins for pending and invited states', hub.includes('community.membershipState === \"pending\" || community.membershipState === \"invited\"') && hub.includes('Accept invite')],
   ['Community privacy labels preserve approval and invite-only semantics', screen.includes('privacy: normalizeCommunityPrivacy(selected.privacy)') && hub.includes('Approval required') && hub.includes('Invite only')],
   ['Discovery regression gates are registered in prebuild and static verification', (pkg.scripts['prebuild:checks'].match(/check-priority7-community-discovery\.mjs/g) || []).length === 1 && (pkg.scripts['verify:static'].match(/check-priority7-community-discovery\.mjs/g) || []).length === 1],

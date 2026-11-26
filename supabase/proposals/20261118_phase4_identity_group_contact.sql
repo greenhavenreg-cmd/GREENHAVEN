@@ -90,6 +90,8 @@ GRANT EXECUTE ON FUNCTION public.gh_session_issue_with_cap(text,text,text,timest
 -- ---------------------------------------------------------------------------
 -- Pending group invitations. A new group starts with the creator only; invitees
 -- become members only after accepting their own invitation.
+-- Expiry is evaluated per invitation by inbox/response paths; group creation
+-- must never perform an unbounded sweep across every account's pending rows.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.gh_conversation_invites (
   id text PRIMARY KEY,
@@ -127,28 +129,45 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
-  v_conversation_id text;
+  v_new_conversation_id text;
+  v_old_conversation_id text;
 BEGIN
   IF TG_OP = 'DELETE' THEN
-    v_conversation_id := OLD.conversation_id;
+    v_old_conversation_id := OLD.conversation_id;
+  ELSIF TG_OP = 'UPDATE' THEN
+    v_new_conversation_id := NEW.conversation_id;
+    v_old_conversation_id := OLD.conversation_id;
   ELSE
-    v_conversation_id := NEW.conversation_id;
+    v_new_conversation_id := NEW.conversation_id;
   END IF;
-  UPDATE public.gh_conversations c
-     SET member_count = (
-       SELECT count(*)::integer FROM public.gh_conversation_members m
-        WHERE m.conversation_id = v_conversation_id AND m.left_at IS NULL
-     ),
-     updated_at = GREATEST(c.updated_at, now())
-   WHERE c.id = v_conversation_id;
-  IF TG_OP = 'UPDATE' AND OLD.conversation_id IS DISTINCT FROM NEW.conversation_id THEN
+
+  -- Serialize count recomputation against concurrent membership changes. Lock
+  -- both sides of a move in deterministic order to avoid opposite-move deadlocks.
+  PERFORM 1
+    FROM public.gh_conversations c
+   WHERE c.id = ANY(array_remove(ARRAY[v_new_conversation_id, v_old_conversation_id], NULL))
+   ORDER BY c.id
+   FOR UPDATE;
+
+  IF v_new_conversation_id IS NOT NULL THEN
     UPDATE public.gh_conversations c
        SET member_count = (
          SELECT count(*)::integer FROM public.gh_conversation_members m
-          WHERE m.conversation_id = OLD.conversation_id AND m.left_at IS NULL
+          WHERE m.conversation_id = v_new_conversation_id AND m.left_at IS NULL
        ),
        updated_at = GREATEST(c.updated_at, now())
-     WHERE c.id = OLD.conversation_id;
+     WHERE c.id = v_new_conversation_id;
+  END IF;
+
+  IF v_old_conversation_id IS NOT NULL
+     AND v_old_conversation_id IS DISTINCT FROM v_new_conversation_id THEN
+    UPDATE public.gh_conversations c
+       SET member_count = (
+         SELECT count(*)::integer FROM public.gh_conversation_members m
+          WHERE m.conversation_id = v_old_conversation_id AND m.left_at IS NULL
+       ),
+       updated_at = GREATEST(c.updated_at, now())
+     WHERE c.id = v_old_conversation_id;
   END IF;
   RETURN NULL;
 END;
@@ -184,10 +203,6 @@ DECLARE
   v_existing_meta jsonb;
   v_title text := left(trim(COALESCE(p_title, '')), 80);
 BEGIN
-  UPDATE public.gh_conversation_invites
-     SET status = 'expired', responded_at = now()
-   WHERE status = 'pending' AND expires_at <= now();
-
   IF p_actor_id IS NULL OR length(trim(p_actor_id)) = 0 OR length(p_actor_id) > 180
      OR p_group_id IS NULL OR p_group_id !~ '^[a-zA-Z0-9_-]{12,100}$'
      OR p_source_conversation_id IS NULL OR length(trim(p_source_conversation_id)) = 0

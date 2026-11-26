@@ -4,6 +4,7 @@
  */
 import { NextResponse } from "next/server"
 import { assertOperatorKey } from "@/lib/server/marketplace/operational-rpc"
+import { OPERATOR_KEY_AUDIT_ACTOR } from "@/lib/server/security/operator-audit-actor"
 import {
   beginRefundRequest,
   recordProviderConfirmedRefund,
@@ -47,7 +48,8 @@ export async function POST(request: Request) {
       grossAmount,
       sellerNetReduction,
       idempotencyKey,
-      actorId: String(body.actorId || "operator"),
+      // A shared key cannot identify a human operator. Ignore caller-supplied actor labels.
+      actorId: OPERATOR_KEY_AUDIT_ACTOR,
       metadata: typeof body.metadata === "object" && body.metadata ? (body.metadata as Record<string, unknown>) : {},
     })
     return reply({ ...result, ok: result.ok !== false }, result.ok === false ? 409 : 200)

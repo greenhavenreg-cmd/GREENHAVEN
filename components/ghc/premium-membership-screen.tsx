@@ -1,5 +1,7 @@
 "use client"
 
+import { MembershipScreenSkeleton } from "@/components/ghc/skeleton-loaders"
+
 import { useState, useEffect, useRef } from "react"
 import {
   ArrowLeft,
@@ -300,10 +302,12 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
   /** Authoritative status from /api/membership/status */
   const [serverStatus, setServerStatus] = useState<MembershipStatus | null>(null)
   const [serverStatusState, setServerStatusState] = useState<
-    "loading" | "ready" | "unavailable"
+    "loading" | "ready" | "stale" | "unavailable"
   >("loading")
   const membershipRequestRef = useRef<AbortController | null>(null)
   const membershipRequestSequenceRef = useRef(0)
+  /** Last known good status for degraded fallback (survives async closure). */
+  const lastKnownStatusRef = useRef<MembershipStatus | null>(null)
 
   // Prefer server entitlement over local-only cache. Lifecycle history is a
   // separate read-only stream so a history outage never changes access status.
@@ -316,6 +320,7 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
       membershipRequestSequenceRef.current += 1
       membershipRequestRef.current?.abort()
       membershipRequestRef.current = null
+      lastKnownStatusRef.current = null
       setServerStatus(null)
       setServerStatusState("loading")
       setSuccessStatus(null)
@@ -366,7 +371,10 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
   // Production membership display is fail-closed: only an authoritative server
   // entitlement may display VIP/VVIP. Local domain state is cache, never authority.
   const currentTier = (serverStatus?.tier || "free") as MembershipTierId
-  const membershipAuthorityReady = serverStatusState === "ready" && serverStatus !== null
+  // "ready" = fresh server confirmation; "stale" = last known good (server or domain) while refresh is degraded.
+  // Both are usable for display and non-destructive CTAs. Purchases still re-validate on the server.
+  const membershipAuthorityReady =
+    (serverStatusState === "ready" || serverStatusState === "stale") && serverStatus !== null
   const compareRows = buildMembershipCompareRows(period)
   const compareCategories = ["All", ...Array.from(new Set(compareRows.map((row) => row.category)))]
   const visibleCompareRows = compareCategory === "All" ? compareRows : compareRows.filter((row) => row.category === compareCategory)
@@ -414,13 +422,36 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
     } satisfies MembershipStatus
   }
 
+
+  const applyDegradedMembershipStatus = (
+    requestSequence: number,
+    previous: MembershipStatus | null,
+  ): { status: MembershipStatus | null; degraded: boolean } => {
+    if (requestSequence !== membershipRequestSequenceRef.current) {
+      return { status: null, degraded: false }
+    }
+    // Prefer last server-confirmed status over wiping the UI to "unavailable".
+    if (previous) {
+      lastKnownStatusRef.current = previous
+      setServerStatus(previous)
+      setServerStatusState("stale")
+      return { status: previous, degraded: true }
+    }
+    setServerStatus(null)
+    setServerStatusState("unavailable")
+    return { status: null, degraded: false }
+  }
+
   const refreshMembershipFromServer = async (
     _fallbackTier?: MembershipTierId
-  ): Promise<MembershipStatus | null> => {
+  ): Promise<{ status: MembershipStatus | null; degraded: boolean }> => {
     const requestSequence = ++membershipRequestSequenceRef.current
     membershipRequestRef.current?.abort()
     const controller = new AbortController()
     membershipRequestRef.current = controller
+    // Only a previously server-confirmed status may be retained during a transient outage.
+    // Browser-local membership cache is never promoted into the display authority path.
+    const previousStatus = lastKnownStatusRef.current
     try {
       const headers: Record<string, string> = {}
       try {
@@ -441,21 +472,22 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
       } finally {
         window.clearTimeout(timeout)
       }
-      if (requestSequence !== membershipRequestSequenceRef.current || controller.signal.aborted) return null
+      if (requestSequence !== membershipRequestSequenceRef.current || controller.signal.aborted) return { status: null, degraded: false }
       if (!res.ok) {
-        setServerStatusState("unavailable")
-        setServerStatus(null)
-        return null
+        return applyDegradedMembershipStatus(requestSequence, previousStatus)
       }
       const data = await res.json().catch(() => ({}))
-      if (requestSequence !== membershipRequestSequenceRef.current || controller.signal.aborted) return null
+      if (requestSequence !== membershipRequestSequenceRef.current || controller.signal.aborted) return { status: null, degraded: false }
       if (!data?.ok || !data?.entitlement || typeof data.entitlement !== "object") {
-        setServerStatusState("unavailable")
-        setServerStatus(null)
-        return null
+        return applyDegradedMembershipStatus(requestSequence, previousStatus)
       }
       const e = data.entitlement as Record<string, unknown>
-      const mapped = mapEntitlementToStatus(e)
+      let mapped: MembershipStatus
+      try {
+        mapped = mapEntitlementToStatus(e)
+      } catch {
+        return applyDegradedMembershipStatus(requestSequence, previousStatus)
+      }
       const mem = getBoundDomainServices()?.membership as {
         activate?: (i: unknown) => Promise<unknown>
       } | null
@@ -472,16 +504,13 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
               : undefined,
         })
       }
-      if (requestSequence !== membershipRequestSequenceRef.current || controller.signal.aborted) return null
+      if (requestSequence !== membershipRequestSequenceRef.current || controller.signal.aborted) return { status: null, degraded: false }
+      lastKnownStatusRef.current = mapped
       setServerStatus(mapped)
       setServerStatusState("ready")
-      return mapped
+      return { status: mapped, degraded: false }
     } catch {
-      if (requestSequence === membershipRequestSequenceRef.current) {
-        setServerStatusState("unavailable")
-        setServerStatus(null)
-      }
-      return null
+      return applyDegradedMembershipStatus(requestSequence, previousStatus)
     } finally {
       if (membershipRequestRef.current === controller) membershipRequestRef.current = null
     }
@@ -546,23 +575,37 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
     if (refreshing) return
     setRefreshing(true)
     let refreshed = false
+    let degraded = false
     try {
-      const next = await refreshMembershipFromServer()
+      const result = await refreshMembershipFromServer()
+      const next = result.status
       refreshed = next !== null
-      if (next) {
+      degraded = result.degraded
+      if (next && !degraded) {
         addToast(
           next.tier === "free"
             ? "Membership is Free"
             : `${MEMBERSHIP_PLANS[next.tier].label} is active`,
           "success"
         )
+      } else if (next && degraded) {
+        addToast(
+          `Showing last confirmed ${MEMBERSHIP_PLANS[next.tier].label} status — live check is temporarily limited`,
+          "info"
+        )
       } else {
         addToast("Membership status is temporarily unavailable", "error")
       }
     } finally {
       setRefreshing(false)
-      setStatusMsg(refreshed ? "Status refreshed" : "Membership status unavailable")
-      window.setTimeout(() => setStatusMsg(null), 1500)
+      setStatusMsg(
+        refreshed
+          ? degraded
+            ? "Showing last confirmed status"
+            : "Status refreshed"
+          : "Membership status unavailable"
+      )
+      window.setTimeout(() => setStatusMsg(null), 1800)
     }
   }
 
@@ -628,10 +671,12 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
       if (ok) {
         setConfirmTier(null)
         // Server grants on complete/fulfill; poll status until paid tier appears or retries exhaust
-        let next = await refreshMembershipFromServer(tier)
+        let result = await refreshMembershipFromServer(tier)
+        let next = result.status
         for (let i = 0; i < 3 && (!next || next.tier === "free"); i++) {
           await new Promise((r) => setTimeout(r, 800 + i * 400))
-          next = await refreshMembershipFromServer(tier)
+          result = await refreshMembershipFromServer(tier)
+          next = result.status
         }
         if (next && next.active && next.tier === tier) {
           setSuccessStatus(next)
@@ -671,7 +716,8 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
       const result = await mem.purchaseWithGhc(tier, period)
       if (result.ok) {
         setConfirmTier(null)
-        const next = await refreshMembershipFromServer(tier)
+        const statusResult = await refreshMembershipFromServer(tier)
+        const next = statusResult.status
         const already = Boolean((result as { alreadyActive?: boolean }).alreadyActive)
         if (next && next.active && next.tier === tier) {
           if (!already) setSuccessStatus(next)
@@ -772,7 +818,10 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
                   ? "Status unavailable"
                   : MEMBERSHIP_PLANS[currentTier].label}
             </span>
-            {serverStatusState === "ready" && serverStatus?.expiresAt ? (
+            {serverStatusState === "stale" ? (
+              <span className="text-muted-foreground"> · last confirmed</span>
+            ) : null}
+            {(serverStatusState === "ready" || serverStatusState === "stale") && serverStatus?.expiresAt ? (
               <span className="text-muted-foreground"> · {formatUntil(serverStatus.expiresAt)}</span>
             ) : null}
           </p>
@@ -808,7 +857,7 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
       </div>
       {isOffline ? (
         <div
-          className="mx-3 mt-2 rounded-[1.25rem] border border-amber-200/80 bg-amber-50/90 px-3.5 py-2 text-[11px] leading-snug text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+          className="mx-3 mt-2 rounded-[1.25rem] border border-amber-300/80 bg-amber-50 px-3.5 py-2.5 shadow-sm dark:border-amber-900 dark:bg-amber-950/50"
           role="status"
         >
           Offline — plan details stay visible. Activation and payment need a connection.
@@ -836,13 +885,17 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
         </div>
       ) : null}
 
+        {serverStatusState === "loading" && !serverStatus ? (
+          <MembershipScreenSkeleton />
+        ) : null}
+
         {/* STATUS zone — presentation of existing status only */}
         <div className="mb-3 gh-card px-3 py-3">
           <p className="gh-type-meta font-bold uppercase tracking-wide text-muted-foreground">Status</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <span
               className={`inline-flex min-h-8 items-center rounded-full px-3 py-1 text-[12px] font-bold ${
-                serverStatusState === "ready" && authoritativeStatus?.active && currentTier !== "free"
+                (serverStatusState === "ready" || serverStatusState === "stale") && authoritativeStatus?.active && currentTier !== "free"
                   ? "bg-emerald-600 text-white"
                   : serverStatusState === "unavailable" || busy
                     ? "bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-100"
@@ -856,9 +909,14 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
                   : serverStatusState === "unavailable"
                     ? "Status unavailable"
                     : authoritativeStatus?.active && currentTier !== "free"
-                      ? `${MEMBERSHIP_PLANS[currentTier].label} active`
+                      ? `${MEMBERSHIP_PLANS[currentTier].label}${serverStatusState === "stale" ? " (last confirmed)" : " active"}`
                       : "Free membership"}
             </span>
+            {serverStatusState === "unavailable" ? (
+              <span className="text-[11px] text-muted-foreground">
+                Live check failed and no prior status is cached. Tap Refresh — purchases stay blocked until status is confirmed.
+              </span>
+            ) : null}
             {authoritativeStatus?.source === "trial" || (authoritativeStatus as { lifecycle?: string } | null)?.lifecycle === "trial" ? (
               <span className="text-[11px] text-muted-foreground">
                 Welcome trial{authoritativeStatus?.expiresAt ? ` · ends ${formatUntil(authoritativeStatus.expiresAt)}` : ""}
@@ -868,7 +926,7 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
             ) : null}
           </div>
           <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-            Membership is separate from identity verification, reputation and wallet balances. <strong className="text-foreground">Verification ≠ VIP.</strong> Paid access is determined by server-confirmed entitlements, not a profile badge or local cache.
+            Membership is separate from verification and reputation. <strong className="text-foreground">Verification ≠ VIP.</strong> Access follows your confirmed membership.
           </p>
         </div>
 
@@ -934,7 +992,7 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
           <div className="mb-3 rounded-[1.25rem] border border-border/60 bg-card px-3.5 py-3 shadow-sm">
             <p className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">Membership path</p>
             <p className="mt-1 text-[13px] font-bold text-foreground">{currentTier === "free" ? "Stay Free or choose tools you genuinely need" : currentTier === "vip" ? "VIP is active — compare VVIP only if its additional tools matter" : "VVIP is active — your highest membership tier"}</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{currentTier === "free" ? "Stay Free for core social access. Upgrade for specific benefits, not because GreenHaven requires payment to participate." : currentTier === "vip" ? "Use your current benefits first. VVIP is intended for people who need the broader creator, business, matching and analytics toolkit." : "Your account already has the broadest membership entitlement set. Membership does not buy reputation, verification or guaranteed rewards."}</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{currentTier === "free" ? "Core GreenHaven access stays free. Upgrade only when you need more." : currentTier === "vip" ? "Your VIP benefits are active. Compare VVIP for expanded creator and business tools." : "You have the highest tier. Membership does not affect reputation or verification."}</p>
           </div>
         ) : null}
 
@@ -1374,7 +1432,7 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
                         type="button"
                         disabled={!canPurchaseTier(tier) || isOffline}
                         onClick={() => setConfirmTier(tier)}
-                        className="w-full rounded-full bg-[var(--gh-green)] py-3 text-sm font-bold text-white shadow-sm transition hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="w-full min-h-12 rounded-full bg-[var(--gh-green)] py-3 text-sm font-black tracking-wide text-white shadow-md transition hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
                       >
                         {!membershipAuthorityReady ? "Confirm account status first" : TIER_RANK[tier] < TIER_RANK[currentTier] ? `${plan.label} is below your current tier` : isOffline ? "Connect to continue" : `Review ${plan.label}`}
                       </button>
@@ -1486,7 +1544,7 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
             <div className="mt-3 rounded-xl border border-border/70 bg-muted/40 px-3 py-2.5">
               <p className="text-[11px] font-bold text-foreground">Your prepaid term</p>
               <p className="mt-1 text-[11px] text-muted-foreground">{period} paid month{period === 1 ? "" : "s"} + 1 bonus month = {period + 1} months of access. No automatic renewal or future charge is scheduled.</p>
-              <p className="mt-1 text-[10px] text-muted-foreground">The server confirms your membership after the payment provider or GHC ledger verifies the purchase. If payment completes but access does not appear, recover or refresh — do not pay again.</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">Membership activates after payment confirmation. If access is delayed, refresh or recover — do not pay again.</p>
             </div>
             <p className="mt-3 text-[11px] font-semibold text-muted-foreground">Payment methods</p>
             <div className="mt-2 flex flex-col gap-2">

@@ -1,3 +1,8 @@
+> **Current authority override (26 November 2026):** The current working candidate is `gh-connect@0.338.154` / RUN442, documented in `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md`. Three additive migrations were applied and postflight-verified on Testnet; four remain held. The old RUN390/RUN384 state below is historical and must not override RUN442's live reconciliation report. The accepted source baseline remains 0.338.139; RUN442 is not accepted, pushed or deployed.
+
+> **Current authority notice (26 November 2026):** This document is historical context. Use `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md` and the current RUN424 candidate `GREENHAVEN-0.338.138-RUN424-IDENTITY-FINANCIAL-INTEGRITY-2026-11-26.zip` for current project decisions. The 0.338.137 Phase 1–6 archive is the parent baseline; older RUN/PHASE snapshots must not override the current candidate.
+
+
 # GreenHaven project source of truth
 
 ## Active authority

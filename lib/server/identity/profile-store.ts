@@ -291,18 +291,18 @@ function rowToRecord(row: DbRow): ServerProfileRecord {
   }
 }
 
-async function dbSelect(ghUserId: string): Promise<ServerProfileRecord | null> {
+async function dbSelect(ghUserId: string): Promise<ServerProfileRecord | null | undefined> {
   const env = readGhcServerEnv()
-  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
+  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return undefined
   try {
     const restResult = await supabaseRest(`gh_user_profiles?gh_user_id=eq.${encodeURIComponent(ghUserId)}&select=*&limit=1`, { method: "GET", timeoutMs: 10000 })
     const res = { ok: restResult.ok, status: restResult.status, json: async () => restResult.ok ? restResult.data : restResult.body, text: async () => JSON.stringify(restResult.ok ? restResult.data : restResult.body) }
-    if (!res.ok) return null
+    if (!res.ok) return undefined
     const rows = (await res.json()) as DbRow[]
     if (!Array.isArray(rows) || !rows[0]) return null
     return rowToRecord(rows[0])
   } catch {
-    return null
+    return undefined
   }
 }
 
@@ -331,10 +331,17 @@ async function dbUpsert(rec: ServerProfileRecord): Promise<ServerProfileRecord |
     profile_payload: rec.profilePayload,
     onboarded: rec.onboarded,
     schema_version: rec.schemaVersion,
+    // Include the original creation timestamp so a merge-upsert never resets it.
+    created_at: new Date(rec.createdAt).toISOString(),
     updated_at: new Date(rec.updatedAt).toISOString(),
   }
   try {
-    const restResult = await supabaseRest(`gh_user_profiles?on_conflict=gh_user_id`, { method: "POST", body: JSON.stringify(body), timeoutMs: 10000 })
+    const restResult = await supabaseRest(`gh_user_profiles?on_conflict=gh_user_id`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify(body),
+      timeoutMs: 10000,
+    })
     const res = { ok: restResult.ok, status: restResult.status, json: async () => restResult.ok ? restResult.data : restResult.body, text: async () => JSON.stringify(restResult.ok ? restResult.data : restResult.body) }
     if (!res.ok) {
       console.error("[profile-store] upsert failed", res.status)
@@ -385,7 +392,16 @@ export async function upsertServerProfile(
 ): Promise<ServerProfileRecord | null> {
   const key = String(ghUserId || "").trim()
   if (!key) return null
-  const existing = await getServerProfile(key)
+  const existingResult = dbConfigured()
+    ? await dbSelect(key)
+    : mem.get(key) || null
+  if (dbConfigured() && existingResult === undefined && isProd()) {
+    // Do not turn an unavailable read into an apparent new profile. The
+    // upsert includes created_at and must preserve the real record timestamp.
+    console.error("[profile-store] durable read unavailable before upsert")
+    return null
+  }
+  const existing = existingResult ?? null
   const next = sanitizeProfileInput(key, input, existing, options)
 
   if (dbConfigured()) {

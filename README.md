@@ -1,10 +1,51 @@
 # GreenHaven
 
-**Current source version:** `0.338.137` (Run 412 Testnet Pi-withdrawal PIN proof/readiness baseline, with Run 413 release-version alignment and Run 414 release-metadata synchronization; source-only, not deployed)
+**Package:** `gh-connect@0.338.154`  
+**Current source version:** `0.338.154`  
+**Candidate:** RUN442 — Testnet Migration Reconciliation & Controlled Application  
+**Accepted source archive:** `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`  
+**Candidate archive:** `GREENHAVEN-0.338.154-RUN442-TESTNET-MIGRATION-RECONCILIATION-2026-11-26.zip`
 
-Production status: **NOT APPROVED** — Node 24.15.x dependency-backed typecheck/lint/build, browser/device testing, live Pi Browser, Testnet/Mainnet Storage verification and target-specific migration reconciliation remain outstanding.
+## RUN442 — Testnet migration reconciliation and controlled application
 
-This repository preserves the user-designated `GREENHAVEN-0.338.119-PHASE9-COORDINATED-ONBOARDING-IDENTITY-STORAGE-2026-11-24-3.zip` baseline and adds Run 397 source-only improvements for the 100 PI cumulative Testnet registration campaign, bounded referral rewards and complete referral summaries. The Run 397 100 PI campaign migration was applied to the correct Testnet database and its idempotent backfill credited the one verified Pi identity currently present there. This is a ledger credit, not an executed Pi A2U transfer. No GitHub push or Vercel deployment was performed. Production remains NOT APPROVED until target migration reconciliation, Node 24.15.x dependency-backed checks, Testnet payment/payout tests and browser/device acceptance pass.
+RUN442 verified the intended PostgreSQL 17 Testnet project and applied three additive migrations individually: 17 research/evidence FK indexes (17/17 postflight), least-privilege server REST grants (13/13 postflight), and idempotent Membership/Feed/Marketplace read grants. The Supabase migration tool recorded generated history versions `20261126153605`, `20261126153609`, and `20261126153614`; original source versions remain drifted, so `db push` and migration-history repair remain blocked pending full reconciliation. Four migrations remain held: RUN388 quota RPC, RUN396 payout history RPC, RUN405 registration backfill replacement, and RUN429 Community invitations (known lock-order correction and PostgreSQL rehearsal required). Security Advisor reports 37 INFO deny-client RLS tables; Performance Advisor reports 200 INFO unused indexes; no indexes were removed. No financial operation, backfill invocation, GitHub push, Vercel deployment or Mainnet action occurred. Full evidence: `docs/RUN442-TESTNET-MIGRATION-APPLICATION-REPORT-2026-11-26.md`.
+
+## RUN441 — Phase 4 identity and transaction-boundary hardening
+
+RUN441 adds 34 runtime assertions for canonical account remapping, independent multi-device sessions, owner-only revocation, session-bound step-up scope/revocation and overlapping public-profile hydration. A 21-check source contract verifies these boundaries and the Community/Messenger SQL protections. Deeper SQL inspection identified a Community invitation lock-order inversion and a Messenger member-count race: RUN441 adds held proposal corrections that serialize Community → invitation locks and conversation-count recomputation. The transaction rehearsal matrix is documented at `docs/RUN441-PHASE4-COMMUNITY-MESSENGER-TRANSACTION-REHEARSAL.md`. No PostgreSQL runtime was available, so transaction rehearsal is NOT EXECUTED; proposals remain held and no migration was applied.
+
+## Current release status
+
+Production status: **NOT APPROVED**.
+
+**Source candidate only — NOT APPROVED for production or Mainnet.** The candidate has not been pushed to GitHub or deployed to Vercel. No live database migration or data mutation was performed. The RUN429 invitation migration remains held for disposable-PostgreSQL validation and exact Testnet migration-history reconciliation.
+
+## RUN440 — Phase 4 session rotation hardening
+
+RUN440 closes a concurrency weakness in durable session rotation. Token replacement now uses a database compare-and-swap against the exact previous token hash and active row state, requests the changed-row representation, and accepts success only when exactly the expected session row changed. Same-process fallback also rechecks the token index after asynchronous validation. Concurrent stale rotations and rotations racing with revocation fail closed instead of returning a token that may already have lost the race. The RUN440 source contract passes 12/12 and the concurrent in-memory rotation plus durable-read outage runtime regression passes 7 assertions. This remains source-level/runtime-unit evidence; live PostgreSQL concurrency rehearsal remains required. See `docs/UPGRADE-WORKLOG-0.338.152.md`.
+
+## Phase 3 delivery
+
+Phase 3 source architecture and identity hardening continues. RUN434 retains the canonical domain implementations and adds:
+
+- One canonical GHC spend RPC transport shared by Wallet and Marketplace.
+- Dedicated operational key isolation so A2U worker credentials cannot authorize unrelated financial operator workflows.
+- Server-owned operator audit attribution instead of caller-supplied actor/approver labels.
+- A 17-check architecture boundary contract and a deterministic 284-route writer inventory.
+
+The complete static suite passes with **5,330 PASS lines and zero FAIL lines**; prebuild dry-run discovers **460 checks**. RUN434 architecture checks pass **17/17**, operator-key runtime checks **6/6**, and RUN435 identity-input classification **16/16**. Release hygiene passes **17/17**, project truth **11/11**, and the migration manifest is synchronized at **246/246**. Actual prebuild is blocked by this workspace running Node 22.16.0 instead of required Node 24.15.0; dependencies are not installed, so typecheck, lint and production build remain unverified. Disposable-PostgreSQL, Testnet migration reconciliation, two-account/multidevice and concurrency acceptance remain outstanding.
+
+RUN435 adds a 16-assertion identity-input classification gate across the eight routes flagged by the route inventory. RUN437 adds a SELECT-only Testnet catalog reconciliation pack for the 17 RUN384 indexes, RUN384/RUN390 grants, RUN388/RUN396/RUN405/RUN429 RPCs, session-cap proposal, and migration-history anomalies. It does not repair history or mutate a database. See [RUN435 identity input classification](docs/RUN435-PHASE3-IDENTITY-INPUT-CLASSIFICATION-2026-11-26.md), [current source of truth](docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md), [Phase 3 authority audit](docs/RUN434-PHASE3-AUTHORITY-AUDIT-2026-11-26.md), [RUN435 identity classification](docs/RUN435-PHASE3-IDENTITY-INPUT-CLASSIFICATION-2026-11-26.md), and [current upgrade worklog](docs/UPGRADE-WORKLOG-0.338.152.md).
+
+---
+
+## Historical implementation records
+
+The records below preserve earlier release history. They are not current deployment or database instructions; the current source-of-truth document above takes precedence.
+
+## RUN424 — identity and financial integrity hardening
+
+RUN424 corrects the GHC withdrawal quote so reservations are subtracted exactly once, requires the full authoritative wallet snapshot contract, and ensures production Pi Browser session cookies are cleared with matching `Secure` and `Partitioned` attributes. The changes are covered by a dedicated regression gate registered in prebuild and static verification. No Supabase migration or financial record was changed. Pi remains Testnet-only; automated payouts and GHC withdrawals remain disabled in the inspected Preview configuration. RUN425 additionally repairs idempotent profile synchronization on Pi sign-in after live Vercel logs showed HTTP 409 conflicts; this does not bypass Pi token verification or make profile sync a login prerequisite.
 
 ## RUN397 — Testnet registration rewards, referral integrity and release cleanup
 
@@ -54,7 +95,7 @@ Extends the private evidence engine with public respondent uploads scoped to a p
 
 ## Previous implementation — 0.338.89 / Research Studio & Research Intelligence Foundation
 
-Extends the authenticated Research Studio with previous-question conditional branching across owner editor, preview and server-side public submission validation. Challenge-on-Post creation and joining now use durable challenge and participant records, with a row-locked service-role-only participation RPC; canonical challenge state is no longer stored in browser localStorage. Adds an additive REVIEW_REQUIRED SQL foundation for evidence metadata, team roles, configurable geographic hierarchies, election contests/candidates/agent assignments/tallies, examination attempts, challenge events, poll policies and audit history. The earlier Research Studio migration `20261116171144_gh_research_studio_public_forms` remains applied on Testnet. New migration `20261116182000_gh_research_intelligence_platform_foundation` is source-only and unapplied. Source checks at that increment: Research Intelligence 20/20, logic runtime 8/8, Field Research 23/23, project truth 11/11 and migration inventory 227/227. Full Node 24.15.0 dependency-backed typecheck/lint/build and browser/device acceptance remain outstanding; the current workspace runs Node 22.16.0 and has no project dependencies. The supplied archive omits `.github/workflows/ci.yml` and `.gitignore`; preserve those hidden files from the existing repository when syncing this bundle (see `docs/ARCHIVE-HIDDEN-METADATA-GAP.md`). At that increment, the evidence upload-to-response workflow was outstanding; it is now partially implemented in 0.338.90. Full geographic import, election management UI/APIs, exam runtime/scoring, granular role authorization, advanced analytics, and the full 30-point Challenge/Polls transformations remain later stages. No GitHub push or Vercel deployment was performed. Production remains NOT APPROVED.
+Extends the authenticated Research Studio with previous-question conditional branching across owner editor, preview and server-side public submission validation. Challenge-on-Post creation and joining now use durable challenge and participant records, with a row-locked service-role-only participation RPC; canonical challenge state is no longer stored in browser localStorage. Adds an additive REVIEW_REQUIRED SQL foundation for evidence metadata, team roles, configurable geographic hierarchies, election contests/candidates/agent assignments/tallies, examination attempts, challenge events, poll policies and audit history. The earlier Research Studio migration `20261116171144_gh_research_studio_public_forms` remains applied on Testnet. New migration `20261116182000_gh_research_intelligence_platform_foundation` is source-only and unapplied. Source checks at that increment: Research Intelligence 21/21, logic runtime 8/8, Field Research 23/23, project truth 11/11 and migration inventory 227/227. Full Node 24.15.0 dependency-backed typecheck/lint/build and browser/device acceptance remain outstanding; the current workspace runs Node 22.16.0 and has no project dependencies. The supplied archive omits `.github/workflows/ci.yml` and `.gitignore`; preserve those hidden files from the existing repository when syncing this bundle (see `docs/ARCHIVE-HIDDEN-METADATA-GAP.md`). At that increment, the evidence upload-to-response workflow was outstanding; it is now partially implemented in 0.338.90. Full geographic import, election management UI/APIs, exam runtime/scoring, granular role authorization, advanced analytics, and the full 30-point Challenge/Polls transformations remain later stages. No GitHub push or Vercel deployment was performed. Production remains NOT APPROVED.
 
 ## Candidate addition — Marketplace Phase 3 (saved delivery addresses, foundation)
 
@@ -167,3 +208,20 @@ The 2026-11-24 Testnet Pi Browser diagnostics showed enforced `connect-src` bloc
 ## RUN380 — Pi-only Research and Field access
 
 Research share URLs, survey submissions, examination attempts, evidence uploads and Field reporting are restricted to Pioneers who complete official Pi SDK authentication and server-side Pi Platform verification before a durable GreenHaven session is issued. The old shared-code Field Desk unlock is retired. `/field` remains available as an authenticated Pioneer reporting workspace; `/r/:slug` is a share identifier only and no longer grants anonymous participation. Only legal/help pages and the Pi domain-validation resource remain public. See `docs/RUN380-PI-ONLY-RESEARCH-ACCESS-CONTROL.md` for implementation details and verification limits.
+
+
+**Latest upgrade:** RUN426 Phase 0 establishes the research-backed Community, Messages and Discovery architecture, UX, accessibility, performance and release-acceptance foundation. See `docs/RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.md`.
+
+
+### RUN438 — Phase 3 provenance hardening (retained)
+
+RUN438 extends the read-only Testnet reconciliation pack with full stored-function definitions/security metadata and exact RUN384 index definitions. This improves evidence quality without repairing migration history or executing business operations. Operational acceptance remains blocked pending PostgreSQL 17 rehearsal, Node 24.15.x build verification and two-account tests. See `docs/UPGRADE-WORKLOG-0.338.150.md`.
+
+
+### RUN439 — Phase 4 Identity & Authentication kickoff
+
+RUN439 starts Phase 4 source work in parallel with outstanding Phase 3 operational acceptance. It adds runtime regression coverage for a changed server-verified canonical GreenHaven mapping under the same Pi subject, ensuring old account tokens and display identity are not inherited. Existing group invitation, contact sharing and community directory contracts remain session-bound and privacy-limited. See `docs/UPGRADE-WORKLOG-0.338.152.md`.
+
+Phase 3 is not declared complete: PostgreSQL rehearsal, Testnet migration-effect reconciliation, Node 24.15.x build verification, financial retry/concurrency testing and two-account device acceptance remain required.
+
+RUN439 begins Phase 4 Identity & Authentication source work in parallel at the user’s direction. It adds a regression for canonical GH principal remapping under a stable Pi provider subject and preserves strict account-state reset. Phase 3 operational acceptance remains blocked; no Testnet migration, deployment or Mainnet action is implied. See `docs/UPGRADE-WORKLOG-0.338.151.md`.

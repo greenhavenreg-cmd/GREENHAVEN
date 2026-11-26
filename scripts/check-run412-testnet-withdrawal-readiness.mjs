@@ -9,6 +9,7 @@ const requestRoute = read('app/api/economy/earnings/withdrawals/route.ts')
 const sheet = read('components/ghc/pi-withdraw-sheet.tsx')
 const env = read('.env.example')
 const pkg = JSON.parse(read('package.json'))
+const release = read('lib/app-release.ts')
 const checks = [
   ['Canonical server-only PIN-proof key is supported', /process\.env\.GH_PIN_PROOF_SECRET/.test(proof)],
   ['Legacy server-only key is accepted as fallback', /process\.env\.GHC_PIN_PROOF_SECRET/.test(proof)],
@@ -17,7 +18,7 @@ const checks = [
   ['Missing-key response confirms no balance reservation occurred', /balance has not been reserved/.test(requestRoute)],
   ['Wallet error gives actionable Testnet environment guidance', /Set GH_PIN_PROOF_SECRET/.test(sheet) && /funds are unchanged/.test(sheet)],
   ['Environment template keeps payout gates fail-closed by default', /PI_EARNINGS_PAYOUT_EXECUTION_ENABLED=0/.test(env) && /PI_A2U_ENABLED=0/.test(env)],
-  ['Package and source contract use coordinated release version', pkg.version === '0.338.137'],
+  ['Package and source contract use coordinated release version', /^0\.338\.\d+$/.test(pkg.version) && release.includes(`APP_RELEASE_VERSION = \"${pkg.version}\"`)],
 ]
 let failed = 0
 for (const [label, ok] of checks) { console.log(`${ok ? 'PASS' : 'FAIL'} ${label}`); if (!ok) failed++ }

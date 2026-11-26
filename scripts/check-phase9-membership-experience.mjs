@@ -14,7 +14,7 @@ const release = read('lib/app-release.ts')
 const pkg = JSON.parse(read('package.json'))
 const lock = JSON.parse(read('package-lock.json'))
 const checks = [
-  ['Premium membership status presentation is server-authoritative, not local-cache colored', screen.includes('serverStatusState === "ready" && authoritativeStatus?.active') && !screen.includes('status?.active')],
+  ['Premium membership presentation uses only current or last server-confirmed status', screen.includes('const authoritativeStatus = membershipAuthorityReady ? serverStatus : null') && screen.includes('serverStatusState === "stale"') && !screen.includes('readLocalMembershipFallback') && !screen.includes('getBoundDomainServices()?.membership?.getStatus?.()')],
   ['Membership activity is loaded through an authenticated no-store endpoint', screen.includes('/api/membership/lifecycle') && screen.includes('credentials: "include"') && screen.includes('cache: "no-store"')],
   ['Lifecycle history is independently cancellable and account-scoped', screen.includes('lifecycleRequestRef.current?.abort()') && screen.includes('setMembershipLifecycle([])')],
   ['Renewal continuity copy explicitly pauses premium access during the gap', screen.includes('premium features remain paused during any gap') && screen.includes('no grace access is being granted')],

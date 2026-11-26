@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { assertOperatorKey } from "@/lib/server/marketplace/operational-rpc"
+import { OPERATOR_KEY_AUDIT_ACTOR } from "@/lib/server/security/operator-audit-actor"
 import {
   applyPayoutCorrection,
   dryRunPayoutCorrection,
@@ -45,7 +46,8 @@ export async function POST(request: Request) {
       currency: currency === "GHC" ? "GHC" : "PI",
       correctionType: String(body.correctionType || "settlement_evidence_correction") as CorrectionType,
       amount: Number(body.amount),
-      approvedBy: String(body.approvedBy || "operator").trim(),
+      // A shared key cannot identify a human approver. Ignore caller-supplied labels.
+      approvedBy: OPERATOR_KEY_AUDIT_ACTOR,
       approvalRef: String(body.approvalRef || "").trim(),
       idempotencyKey: String(body.idempotencyKey || "").trim(),
     })

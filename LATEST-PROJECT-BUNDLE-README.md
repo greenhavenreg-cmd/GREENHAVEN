@@ -1,135 +1,27 @@
-# GreenHaven — Current Project Bundle
+# GreenHaven — Reconciled R2 Project Bundle
 
-**Package:** `gh-connect@0.338.119`  
-**Working increment:** Phase 9 coordinated onboarding, identity, wallet-consent and Storage acceptance, derived in place from the user-designated `GREENHAVEN-0.338.118-PHASE-D-COMMUNITIES-STORAGE-2026-11-24-1.zip`.  
-**Date:** 2026-11-24  
-**Release status:** **NOT APPROVED** for production.
+**Package:** `gh-connect@0.338.138`  
+**Baseline:** `GREENHAVEN-0.338.137-PHASE1-6-INTEGRATED-CLEAN-2026-11-26.zip`  
+**Working archive:** `GREENHAVEN-0.338.138-RUN424-IDENTITY-FINANCIAL-INTEGRITY-2026-11-26.zip`  
+**Date:** 26 November 2026  
+**Status:** Static source verification passed; not approved for production or Mainnet.
 
+This R2 working copy preserves the integrated Phase 1–6 application, restores the exact GitHub repository integrity files, preserves historical evidence, tightens Membership status display to server-confirmed state, reduces redundant Rewards/Membership copy, and updates regression contracts.
 
-## Current Phase 9 delivery — 0.338.119
+## Operational status
 
-The current candidate adds `scripts/check-run395-phase9-release-acceptance.mjs`, a 24-assertion cross-workstream gate registered in `verify:static` and `prebuild:checks`. It verifies the already-implemented server-authoritative returning-user classification, optional onboarding/profile enrichment, verified Pi username projection, explicit wallet consent and withdrawal authorization boundary, private owner-scoped Storage lifecycle, safe bucket provisioning and migration non-mutation. Focused Phase A/B/C, Phase 5/6, Phase D and identity/security contracts passed. Node 24.15.x dependency-backed typecheck/lint/build, browser/device acceptance and live Testnet/Mainnet verification remain outstanding. Production is NOT APPROVED. See `GREENHAVEN-0.338.119-PHASE9-COORDINATED-ONBOARDING-IDENTITY-STORAGE-2026-11-24-REPORT.md`.
-
-## Current delivery identity
-
-This candidate preserves the GreenHaven application and its canonical identity, financial, community, commerce and media authorities. Phase 9 coordinates the previously implemented onboarding and identity repairs with progressive profile completion, explicit wallet-consent boundaries and the private Supabase Storage lifecycle. The canonical Phase 7/8 domain register remains `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`; its historical numbering is not a single sequential release plan.
-
-The new RUN395 release gate passes 24/24 assertions, and the full `npm run verify:static` suite passes. Focused upstream contracts are recorded in the Phase 9 delivery report. The project requires Node `^24.15.0`; this workspace has Node 22.16.0 and no installed dependencies. Typecheck, lint and production build were stopped by the runtime guard; browser/device acceptance remains outstanding.
-
-The migration inventory contains 239 synchronized source files. No migration was added, edited, replayed or applied. No live database or Storage mutation, payment, payout, refund, reward issuance, membership entitlement, wallet balance change, Pi authorization, Mainnet operation, GitHub push or Vercel deployment occurred. Production remains **NOT APPROVED**.
-
-## Historical implementation records
-
-Phase D work is recorded in `docs/PHASE-D-COMMUNITIES-STORAGE-2026-11-24.md`; the focused source gates are `check-phaseD-communities-completion.mjs`, `test-phaseD-community-policy.mjs` and `check-phaseD-storage-completion.mjs`. The detailed RUN390, RUN383, RUN372 and earlier sections below are retained as historical evidence only. Their package versions and baseline references do not supersede the current 0.338.119 release pointer.
-
-## Historical RUN372 — canonical identity principal consolidation
-
-RUN341 separates the actual Pi app UID from the canonical internal GreenHaven user ID, prevents old account tokens/profile/onboarding/verification state from leaking across account switches, hardens the App Studio bridge to require durable identity + session + HttpOnly cookie round-trip, fixes last-seen persistence through the shared bounded Supabase REST client, and recognizes the framed Pi app CDN sandbox referrer. Two legacy regression checks were aligned with the true canonical identity model. Identity contract 11/11, lifecycle runtime 24 assertions, and full static verification pass. No database writes/migrations, account mutations, payments, GitHub push, Vercel deployment or Mainnet actions occurred. Full Node 24.15.x typecheck/lint/build and live Testnet acceptance remain outstanding. See `docs/RUN341-IDENTITY-AUDIT-AND-MAINTENANCE-2026-11-23.md`.
-
-## RUN333 baseline changes (retained)
-
-1. Used the existing GH Connect Supabase Testnet project directly; no new Supabase branch was created.
-2. Applied `20261118033839_revoke_client_select_on_server_only_tables` to revoke redundant `SELECT` grants from `PUBLIC`, `anon`, and `authenticated` on eight RLS-enabled server-only tables. Postflight confirms service-role CRUD remains intact.
-3. Reconciled the Testnet history to 46 entries and regenerated the 230-file source migration inventory, manifest, checklist and apply-order guide. Twenty applied history entries still have no matching source filename and eleven same-slug/different-version candidates remain unverified.
-4. Added the authenticated field-agent election tally desk, own-assignment acceptance, provenance-gated polling-unit selection and owner/reviewer-only read-only independent tally comparison. Submissions remain disabled until the held atomic tally RPC and approved geography dataset are installed.
-5. Hardened the held tally SQL proposal to require active project membership, exact authoritative polling-unit code, source reference/version and the complete active candidate set.
-6. Added per-evidence advisory transaction locking to the held evidence hash-chain trigger to prevent concurrent sequence forks.
-7. Corrected final-release audit network classification to use `PI_NETWORK` rather than `PI_ENV`, and made the reported release version derive from `APP_RELEASE_VERSION`.
-8. Preserved server-side financial authority, Testnet-only payout fences, no mock backends, and Mainnet separation.
-
-## RUN383 — identity/privacy grants and release-gate repair
-
-1. Read-only Vercel Preview runtime inspection found three `/api/profile/me` upsert failures with HTTP 403.
-2. Read-only Supabase catalog inspection confirmed no service_role SELECT/INSERT/UPDATE grants on `gh_user_profiles`, `gh_user_achievements`, `gh_user_progress`, or `gh_user_mutes`; RLS was enabled and client SELECT remained denied.
-3. Added `20261124095500_run383_identity_privacy_service_role_grants.sql` with explicit least-privilege grants and client-role revocations. It is classified REVIEW_REQUIRED; it has not been applied.
-4. Confirmed Testnet migration history includes daily-claim 48-hour lock/issuance and registration-bonus reconciliation migrations. The daily claim RPCs and registration bonus RPCs are SECURITY DEFINER, service_role-only.
-5. Confirmed the Testnet Preview welcome-bonus flag is false while Pi sandbox/network flags are Testnet; the 3 PI bonus remains intentionally disabled pending explicit financial-feature approval.
-6. Added the missing blank server-only `GHC_CREATOR_REWARD_OPERATOR_KEY` placeholder to `.env.example` and registered its 7/7 contract gate.
-7. Corrected the privileged reward body-bound regression to check the shared bounded-reader contract; 13/13.
-8. Full static verification passes (63/63 inherited summary plus RUN383 9/9 and operator-key 7/7); migration inventory 233/233; documentation hygiene passes.
-9. Dependency registry access remains unavailable (`EAI_AGAIN`); no package versions or lockfile integrity data were edited. The stored dependency audit remains a release blocker.
-10. Vercel reports a `readable-secret` issue on the Testnet Preview `GHC_OPERATOR_RECONCILE_KEY`; an attempted type reclassification returned 404. No Vercel environment value was changed.
-
-## RUN337 GitHub Actions audit / packaging repair
-
-1. Restored the exact safe `.env.example` template from the parent of the failing GitHub commit. It contains blank privileged secrets, Testnet-only Pi defaults and disabled payout/A2U execution. Local populated env files remain excluded.
-2. Corrected `.github/workflows/dependency-security.yml` so npm audit exit code 1 for valid vulnerability findings is reported as a security finding rather than a generic audit-command failure. The workflow still fails closed on any known vulnerability and preserves the JSON artifact.
-3. Added `scripts/check-run337-github-audit-recovery.mjs` (7/7) to verify environment-template inclusion, secret hygiene, Testnet defaults and fail-closed audit behavior. Registered in static, prebuild, pretypecheck and prelint gates.
-4. Updated the RUN332 audit source assertion and registered RUN336/RUN337 reports with documentation hygiene.
-5. Inspected GitHub audit artifact 14397778034: 29 findings (2 critical, 21 high, 5 moderate, 1 low). Dependency manifest and lockfile were intentionally not modified because this container cannot access the npm registry and the official `pi-backend@0.1.3` → `stellar-sdk@10.4.1` chain has no safe automatic fix in the report. No lockfile hashes were fabricated, no `npm audit fix --force` was used, and the security gate was not bypassed.
-
-RUN337 repairs the prebuild `.env.example` failure and makes the audit failure diagnostic accurate. The complete audit JSON is preserved in `docs/security/RUN337-NPM-AUDIT-44237574920.json`. It does **not** make the dependency audit pass: 29 findings (2 critical, 21 high, 5 moderate, 1 low) remain. Dependency remediation and a fresh Node 24.15.x clean install/audit remain release blockers. See `docs/RUN337-GITHUB-AUDIT-AND-ENV-TEMPLATE-REPAIR-2026-11-18.md`.
-
-## RUN383 dependency security status
-
-The stored npm audit artifact still reports 29 findings (2 critical, 21 high, 5 moderate, 1 low). The current lock contains affected package versions. The npm registry request failed with `EAI_AGAIN`, and this workspace is Node 22.16.0 rather than the required Node 24.15.x. No dependency or lockfile changes were made without registry metadata and a clean install/test. Dependency remediation remains a release blocker.
-
-## RUN336 GitHub / Vercel build cleanup
-
-1. Election tally optional counts now use explicit `number | null | "invalid"` normalization; required vote counts are explicitly `number` before arithmetic. Invalid input, safe-integer, non-negative, upper-bound, candidate-total, voter and ballot consistency checks remain.
-2. Fixed the missing `isPublicRoutePath` import in `components/app-wrapper.tsx`.
-3. Added `assignmentId` to the field-agent assignment model to match the authenticated server response and acceptance route.
-4. Added the missing React `useRef` import in Communities.
-5. Replaced the invalid `selected.isJoined` access with the already resolved `joined` membership decision.
-6. Added the numeric accumulator generic to `safeCommunityCountTotal`.
-7. Research Studio contest, candidate and exam effects include memoized callback dependencies; no exhaustive-deps suppression was added.
-8. Updated the dependent Phase 4 assertion to verify the computed membership state rather than the nonexistent property.
-9. Added the 12-check RUN336 source gate to `verify:static`, `prebuild:checks`, `pretypecheck` and `prelint`.
-
-Dependency warning triage is recorded in `docs/RUN336-GITHUB-VERCEL-BUILD-CLEANUP-2026-11-18.md`. No lockfile integrity data was hand-edited, no Pi SDK transitive package was overridden, and no incompatible ESLint major was forced into Next 15. The RUN337 report documents the exact 29-finding audit artifact and why the dependency lock remains unchanged.
-
-RUN390 repairs the live Testnet privilege gaps behind the Membership status unavailable, `FEED_PRIVACY_FILTER_UNAVAILABLE`, and Marketplace server catalog unavailable states. Its four-table, service_role-SELECT-only migration preserves RLS and client denial; it is REVIEW_REQUIRED and unapplied.
+- GitHub: `greenhavenreg-cmd/GREENHAVEN`, branch `testnet`, still at commit `bc42129e7ebf5d5259f9846a79118a0c855ed9a6`.
+- Vercel: project `greenhaven`; latest inspected Preview is READY but was built from the earlier commit, not this R2 candidate.
+- Supabase: Testnet project `jhlsjnmfpakvibuuoygx`; 245 source migration files versus 240 remote history rows. Six source migrations are held; five migration names have version drift and Run 406 has a duplicate history name.
+- Pi: Testnet/Sandbox only.
 
 ## Verification
 
-- RUN336 build cleanup checks: 12/12 PASS.
-- Updated RUN335 tally regression checks: 8/8 PASS. A strict standalone TypeScript 5.8.3 check of the exact count-normalization/comparison pattern also passes.
-- Tally count-normalization/comparison fixture: strict TypeScript 5.8.3 check PASS.
-- Changed tally route and Research Studio TSX syntax transpilation: PASS.
-- `npm run verify:static`: PASS (full source/regression suite).
-- Prebuild manifest dry-run: 392 checks discovered; dry-run only, not a claim that all 392 executed.
-- RUN333 security reconciliation source gate: 11/11.
-- Election tally UI/reconciliation source gate: 13/13.
-- Election reconciliation runtime tests: 6/6.
-- Final release audit environment tests: 4/4.
-- Migration source manifest: 230/230.
-- Project truth: 11/11.
-- Changed TypeScript/TSX syntax transpilation: 7/7 with TypeScript 5.8.3; full project typecheck remains outstanding.
-- Full dependency-backed `tsc --noEmit`, ESLint and `next build` were not certified: this packaging environment has no `node_modules` and runs Node 22.16.0; project requires `^24.15.0`.
-- `next build`: not run. The Vercel Node 24.15.x build must be rerun to confirm full project typecheck, lint and production build. Browser/device acceptance also remains outstanding.
+`npm run verify:static` passes 63/63; release hygiene passes 17/17; project truth passes 11/11. Local Node is 22.16.0 while the project requires 24.15.0, so typecheck, lint and a supported-runtime build remain outstanding. No GitHub push, Vercel deployment or Supabase migration was performed.
 
-## Database and release gates
-
-- Testnet migration history: 46 entries; source inventory: 230 SQL migrations.
-- Twenty historical applied migration source files are missing; eleven version-drift candidates are not proven equivalent. Do not reconstruct, repair or replay them by guess.
-- The research foundation, media evidence engine and scoped evidence-chain migrations remain held pending exact source review and a safe rehearsal. Testnet currently has `gh_research_projects`, but dependent membership, geography, election, assignment, tally and atomic tally RPC objects are absent.
-- Trusted scanner provider/worker and provenance-backed authoritative geography dataset remain external prerequisites.
-- GitHub branch protection and source push remain outstanding. No Vercel deployment was triggered; fresh Testnet Preview verification is required.
-- Mainnet project was not modified. No balances, payment, payout, reward, membership, election or user data rows were changed.
-
-## Safety rule
-
-Never run a bulk migration push while any migration source/history discrepancy or held migration remains. Testnet and Mainnet must be reconciled independently. Production remains NOT APPROVED until the supported-runtime build, exact database history/catalog reconciliation, provider acceptance, Pi Browser/device tests, and release-owner approval all pass.
+See `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md` and `docs/ENGINEERING-AUDIT-2026-11-26.md` for exact migration discrepancies, security observations, verification results and remaining release gates.
 
 
-## RUN338 Pi authentication diagnostics and Supabase review
+RUN424 adds wallet reservation arithmetic and partitioned session-cookie clearing hardening. See `docs/RUN424-IDENTITY-FINANCIAL-INTEGRITY-2026-11-26.md`.
 
-RUN338 adds token-free Pi SDK/authentication stage codes, backend `/api/auth/pi` stage telemetry, and a post-login HttpOnly cookie round-trip check through `/api/auth/session`. The client now refuses to mark the server session ready until the durable cookie-backed session and Pi identity mapping are confirmed. The read-only Testnet SQL diagnostic script is `docs/RUN338-PI-AUTH-SUPABASE-DIAGNOSTICS.sql`; the read-only database findings and exact limits are documented in `docs/RUN338-PI-AUTH-DIAGNOSTICS-AND-SUPABASE-REVIEW.md`.
-
-RUN338 does **not** claim dependency remediation complete. npm registry access timed out, so package versions and the lockfile were left unchanged rather than fabricating lock metadata. The 29-finding audit remains a blocker; in particular, `pi-backend` → `stellar-sdk` is used by A2U and withdrawal flows and requires compatible Testnet verification before any override. No Supabase write, migration, grant change, GitHub push, Vercel deployment, or Mainnet operation occurred.
-
-
-## RUN339 — optional ecosystem provider isolation
-
-RUN339 introduces a guarded optional-provider execution boundary that consults the existing canonical ecosystem service-release helper before invoking a provider callback. The callback is the only place where a provider's dynamic import/initialization should occur; Coming Soon, unavailable and unknown services are rejected before that callback runs. Provider exceptions are returned as a typed `PROVIDER_FAILURE` result and are not propagated into core services.
-
-The authenticated app's startup prefetch now warms only released, frequently used surfaces; the ecosystem roadmap screen is loaded only on explicit navigation. Prefetch failures are swallowed as non-fatal. Realtime transport startup and event recovery are best-effort, preserving HTTP-backed core screen availability if realtime initialization or recovery fails.
-
-Regression coverage: unreleased provider callback is never invoked; released provider success is returned; provider exception is contained; unknown service callback is never invoked. Existing ecosystem registry, server release helper, Events and Charity release checks are preserved. This does not claim every unreleased provider adapter has been migrated to the new wrapper: any future provider integration must use `runOptionalEcosystemProvider` and must keep provider imports inside its guarded callback.
-
-No database migrations, Supabase writes, GitHub push, Vercel deployment, or Mainnet operations were performed. Production approval status remains unchanged.
-
-
-## RUN372 — canonical identity principal consolidation
-
-The Pi UID is treated as an authentication-provider subject. A GreenHaven account ID is established only by the durable, server-verified Pi→GreenHaven mapping. SDK-only and unverified Pi sessions remain unbound; account switches clear previous account state. Existing database and financial ownership identifiers are preserved pending a verified Testnet migration inventory. No database migration, payment operation or deployment was performed.
+RUN425 also repairs the idempotent profile upsert used during Pi sign-in; see `docs/RUN424-IDENTITY-FINANCIAL-INTEGRITY-2026-11-26.md`.

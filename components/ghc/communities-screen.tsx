@@ -28,6 +28,8 @@ import {
   Sparkles,
   MapPin,
   ArrowLeft,
+  Shield,
+  MailOpen,
 } from "lucide-react"
 import { useGHCMessaging } from "@/contexts/ghc-context"
 import { useRegionalContext } from "@/contexts/regional-context"
@@ -68,7 +70,7 @@ import {
 } from "@/lib/domains/adapters/community-ui-authority"
 import type { CommunityJoinReasonId } from "@/lib/domains/contracts/communities"
 
-type DirectoryTab = "my" | "discover"
+type DirectoryTab = "my" | "managed" | "invitations" | "discover"
 type CommunityAttentionFilter = "all" | "board" | "chat" | "requests"
 type CommunityFilterPrefs = { searchQuery: string; sortBy: "recent" | "active" | "unread" | "name"; privacyFilter: "all" | "public" | "request" | "invite"; categoryFilter: string; communityAttentionFilter: CommunityAttentionFilter }
 const DEFAULT_COMMUNITY_FILTERS: CommunityFilterPrefs = { searchQuery: "", sortBy: "recent", privacyFilter: "all", categoryFilter: "all", communityAttentionFilter: "all" }
@@ -128,6 +130,8 @@ type CommunityRow = {
   isMuted?: boolean
   events?: unknown[]
   announcements?: unknown[]
+  invitationId?: string
+  invitationCreatedAt?: number
   polls?: unknown[]
 }
 
@@ -313,8 +317,6 @@ export function CommunitiesScreen() {
     createGroup,
     joinCommunity,
     leaveCommunity,
-    acceptCommunityInvitation,
-    declineCommunityInvitation,
     createBoardPost,
     replyToBoardPost,
     reactToBoardPost,
@@ -394,6 +396,8 @@ export function CommunitiesScreen() {
 
   /** Server public directory from GET /api/communities — no fabricated rows */
   const [remoteDirectory, setRemoteDirectory] = useState<CommunityRow[]>([])
+  const [durableInvitations, setDurableInvitations] = useState<CommunityRow[]>([])
+  const [invitationsUnavailable, setInvitationsUnavailable] = useState(false)
   const [directoryLoading, setDirectoryLoading] = useState(true)
   const [directoryDurable, setDirectoryDurable] = useState<boolean | null>(null)
   const [directoryError, setDirectoryError] = useState<string | null>(null)
@@ -403,6 +407,59 @@ export function CommunitiesScreen() {
   const [directoryTick, setDirectoryTick] = useState(0)
   const [directoryHasMore, setDirectoryHasMore] = useState(false)
   const [directoryLoadingMore, setDirectoryLoadingMore] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    const requestIdentity = communityIdentityId
+    if (!requestIdentity || requestIdentity === "anonymous") {
+      setDurableInvitations([])
+      setInvitationsUnavailable(false)
+      return
+    }
+    void fetch("/api/communities/invitations", { credentials: "include", cache: "no-store" })
+      .then(async (response) => ({ ok: response.ok, payload: await response.json().catch(() => null) }))
+      .then(({ ok, payload }) => {
+        if (cancelled || activeCommunityIdentityRef.current !== requestIdentity) return
+        if (!ok || payload?.ok !== true || payload?.durable !== true || !Array.isArray(payload.invitations)) {
+          throw new Error("COMMUNITY_INVITATIONS_UNAVAILABLE")
+        }
+        const viewerId = IdentityService.getCurrentUserId() || ""
+        const rows: CommunityRow[] = payload.invitations.flatMap((invite: any) => {
+          const id = typeof invite?.communityId === "string" ? invite.communityId : ""
+          const invitationId = typeof invite?.id === "string" ? invite.id : ""
+          if (!id || !/^ginv_[a-f0-9]{32}$/i.test(invitationId)) return []
+          return [{
+            id,
+            conversationType: "group" as const,
+            groupName: String(invite.communityName || "Community"),
+            participantName: String(invite.communityName || "Community"),
+            participantId: String(invite.createdBy || ""),
+            lastMessage: "Community invitation",
+            lastMessageTime: Number(invite.createdAt) || 0,
+            members: [],
+            createdBy: String(invite.createdBy || invite.invitedBy || ""),
+            description: String(invite.description || invite.purpose || ""),
+            privacy: String(invite.privacy || "invite-only"),
+            category: String(invite.category || "general"),
+            groupPhoto: typeof invite.coverImage === "string" ? invite.coverImage : undefined,
+            kind: "community",
+            communityId: id,
+            invitedMembers: viewerId ? [viewerId] : [],
+            invitationId,
+            invitationCreatedAt: Number(invite.createdAt) || 0,
+            memberCount: Number(invite.memberCount) || 0,
+          }]
+        })
+        setDurableInvitations(rows)
+        setInvitationsUnavailable(false)
+      })
+      .catch(() => {
+        if (cancelled || activeCommunityIdentityRef.current !== requestIdentity) return
+        setDurableInvitations([])
+        setInvitationsUnavailable(true)
+      })
+    return () => { cancelled = true }
+  }, [communityIdentityId, directoryTick])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -612,6 +669,7 @@ export function CommunitiesScreen() {
       if (id && id !== selectedCommunityId) return
       if (!detail?.skipHubRemount) setHubKey((k) => k + 1)
       setDirectoryLoading(true)
+      setDirectoryTick((n) => n + 1)
       // The directory loader is intentionally mounted once; this event only
       // forces the selected hub to re-read its durable parent snapshot.
       window.setTimeout(() => setDirectoryLoading(false), 150)
@@ -676,6 +734,8 @@ export function CommunitiesScreen() {
     setPlatformSnapshots({})
     setPlatformLoading(false)
     setRemoteDirectory([])
+    setDurableInvitations([])
+    setInvitationsUnavailable(false)
     setDirectoryOffset(0)
     setDirectoryLoading(true)
     setDirectoryTick((value) => value + 1)
@@ -717,8 +777,10 @@ export function CommunitiesScreen() {
       if (isCommunityConversationRow(c as any)) map.set(c.id, c as unknown as CommunityRow)
     }
     for (const c of fromState) map.set(c.id, c)
+    // Server-authoritative invitations are included only after the inbox RPC succeeds.
+    for (const c of durableInvitations) map.set(c.id, c)
     return Array.from(map.values())
-  }, [fromState, seeds, remoteDirectory])
+  }, [fromState, seeds, remoteDirectory, durableInvitations])
 
   const isJoined = useCallback(
     (c: CommunityRow) => {
@@ -734,10 +796,29 @@ export function CommunitiesScreen() {
     [communityGroups, isJoined]
   )
 
-  const discoverCommunities = useMemo(
-    () => communityGroups.filter((c) => !isJoined(c)),
-    [communityGroups, isJoined]
+  // Invitation state comes from the authenticated, durable community invitation RPC.
+  // Notifications and client conversation caches are never treated as invitation authority.
+  const invitationCommunities = useMemo(
+    () => durableInvitations.filter((c) => Boolean(c.invitationId)),
+    [durableInvitations]
   )
+
+  const discoverCommunities = useMemo(
+    () => communityGroups.filter((c) => {
+      const state = resolveMembershipState(c, IdentityService.getCurrentUserId() || "")
+      return state === "discoverable" || state === "pending"
+    }),
+    [communityGroups, communityIdentityId]
+  )
+
+  // Management is derived only from the canonical membership role/creator identity.
+  // Client-side hints never grant permissions; every management action is re-authorized by its API.
+  const managedCommunities = useMemo(() => communityGroups.filter((community) => {
+    const roleEntry = Object.entries(community.groupRoles || {}).find(([memberId]) => isSameIdentity(memberId))
+    const role = String(roleEntry?.[1] || "").toLowerCase()
+    const isCreator = Boolean(community.createdBy && isSameIdentity(community.createdBy))
+    return isCreator || ["owner", "admin", "moderator"].includes(role)
+  }), [communityGroups])
 
   const categories = useMemo(() => {
     const set = new Set<string>()
@@ -748,7 +829,13 @@ export function CommunitiesScreen() {
   }, [communityGroups])
 
   const visibleGroups = useMemo(() => {
-    const pool = directory === "my" ? myCommunities : discoverCommunities
+    const pool = directory === "discover"
+      ? discoverCommunities
+      : directory === "managed"
+        ? managedCommunities
+        : directory === "invitations"
+          ? invitationCommunities
+          : myCommunities
     const q = searchQuery.trim().toLowerCase()
     // Phase 1 honesty: "My" lists membership truth — do not hide joined spaces behind
     // Discover-oriented privacy/category chips. Search still applies so users can find
@@ -758,7 +845,7 @@ export function CommunitiesScreen() {
         if (directory === "discover") {
           if (categoryFilter !== "all" && (c.category || "") !== categoryFilter) return false
           if (!matchesPrivacyFilter(c.privacy, privacyFilter)) return false
-        } else if (communityAttentionFilter !== "all") {
+        } else if ((directory === "my" || directory === "managed") && communityAttentionFilter !== "all") {
           if (communityAttentionFilter === "board" && Number(c.boardUnread || 0) <= 0) return false
           if (communityAttentionFilter === "chat" && Number(c.chatUnread || c.unreadCount || 0) <= 0) return false
           if (communityAttentionFilter === "requests") {
@@ -781,7 +868,7 @@ export function CommunitiesScreen() {
         }
         return (b.lastMessageTime || 0) - (a.lastMessageTime || 0)
       })
-  }, [directory, myCommunities, discoverCommunities, searchQuery, categoryFilter, privacyFilter, sortBy, communityAttentionFilter])
+  }, [directory, myCommunities, managedCommunities, invitationCommunities, discoverCommunities, searchQuery, categoryFilter, privacyFilter, sortBy, communityAttentionFilter])
 
   const communityPulse = useMemo(() => {
     const boardUnread = myCommunities.reduce((sum, c) => sum + communityUnreadCount({ boardUnread: c.boardUnread }), 0)
@@ -914,21 +1001,33 @@ export function CommunitiesScreen() {
   }
 
   const handleAcceptCommunityInvitation = async (id: string): Promise<boolean> => {
-    if (typeof acceptCommunityInvitation !== "function") return false
+    const invitation = durableInvitations.find((row) => row.id === id)
+    if (!invitation?.invitationId) {
+      addToast("This invitation is no longer available. Refresh and try again.", "error")
+      setDirectoryTick((n) => n + 1)
+      return false
+    }
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       addToast("You are offline — reconnect to accept this invitation", "info")
       return false
     }
     try {
-      const ok = await acceptCommunityInvitation(id)
-      if (ok) {
-        setDirectory("my")
-        setSelectedCommunityId(id)
-        setHubKey((k) => k + 1)
-      } else {
-        addToast("Could not accept this invitation. Please try again.", "error")
+      const response = await fetch(`/api/communities/invitations/${encodeURIComponent(invitation.invitationId)}`, {
+        method: "PATCH", credentials: "include", cache: "no-store",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accept: true }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || payload?.ok !== true || payload?.durable !== true || payload?.accepted !== true) {
+        throw new Error(payload?.error || "INVITATION_ACCEPT_FAILED")
       }
-      return ok
+      setDurableInvitations((rows) => rows.filter((row) => row.invitationId !== invitation.invitationId))
+      setDirectory("my")
+      setSelectedCommunityId(id)
+      setDirectoryTick((n) => n + 1)
+      setHubKey((k) => k + 1)
+      window.dispatchEvent(new CustomEvent("ghc:community-refresh", { detail: { communityId: id } }))
+      addToast("Community invitation accepted", "success")
+      return true
     } catch {
       addToast("Could not accept this invitation. Please try again.", "error")
       return false
@@ -936,16 +1035,29 @@ export function CommunitiesScreen() {
   }
 
   const handleDeclineCommunityInvitation = async (id: string): Promise<boolean> => {
-    if (typeof declineCommunityInvitation !== "function") return false
+    const invitation = durableInvitations.find((row) => row.id === id)
+    if (!invitation?.invitationId) {
+      addToast("This invitation is no longer available. Refresh and try again.", "error")
+      setDirectoryTick((n) => n + 1)
+      return false
+    }
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       addToast("You are offline — reconnect to decline this invitation", "info")
       return false
     }
     try {
-      const ok = await declineCommunityInvitation(id)
-      if (ok) setDirectoryTick((n) => n + 1)
-      else addToast("Could not decline this invitation. Please try again.", "error")
-      return ok
+      const response = await fetch(`/api/communities/invitations/${encodeURIComponent(invitation.invitationId)}`, {
+        method: "PATCH", credentials: "include", cache: "no-store",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accept: false }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || payload?.ok !== true || payload?.durable !== true || payload?.accepted !== false) {
+        throw new Error(payload?.error || "INVITATION_DECLINE_FAILED")
+      }
+      setDurableInvitations((rows) => rows.filter((row) => row.invitationId !== invitation.invitationId))
+      setDirectoryTick((n) => n + 1)
+      addToast("Invitation declined", "info")
+      return true
     } catch {
       addToast("Could not decline this invitation. Please try again.", "error")
       return false
@@ -1342,7 +1454,7 @@ export function CommunitiesScreen() {
             title="Explore communities"
             description="Search your spaces or discover communities by topic, access and activity."
             resultCount={visibleGroups.length}
-            activeCount={Number(Boolean(searchQuery.trim())) + Number(directory === "discover" && categoryFilter !== "all") + Number(directory === "discover" && privacyFilter !== "all") + Number(directory === "my" && communityAttentionFilter !== "all")}
+            activeCount={Number(Boolean(searchQuery.trim())) + Number(directory === "discover" && categoryFilter !== "all") + Number(directory === "discover" && privacyFilter !== "all") + Number((directory === "my" || directory === "managed") && communityAttentionFilter !== "all")}
             persistentContent={<div className="relative">
               <Search
                 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
@@ -1372,7 +1484,7 @@ export function CommunitiesScreen() {
               ...(searchQuery ? [{ id: "search", label: `Search: ${searchQuery}`, onRemove: () => setSearchQuery("") }] : []),
               ...(directory === "discover" && categoryFilter !== "all" ? [{ id: "category", label: `Topic: ${categoryFilter}`, onRemove: () => setCategoryFilter("all") }] : []),
               ...(directory === "discover" && privacyFilter !== "all" ? [{ id: "privacy", label: `Access: ${privacyFilterLabel(privacyFilter)}`, onRemove: () => setPrivacyFilter("all") }] : []),
-              ...(directory === "my" && communityAttentionFilter !== "all" ? [{ id: "attention", label: `Attention: ${communityAttentionFilter}`, onRemove: () => setCommunityAttentionFilter("all") }] : []),
+              ...((directory === "my" || directory === "managed") && communityAttentionFilter !== "all" ? [{ id: "attention", label: `Attention: ${communityAttentionFilter}`, onRemove: () => setCommunityAttentionFilter("all") }] : []),
             ]} onClearAll={() => { setSearchQuery(""); setCategoryFilter("all"); setPrivacyFilter("all"); setCommunityAttentionFilter("all") }} />
 
             <div
@@ -1393,6 +1505,34 @@ export function CommunitiesScreen() {
               >
                 <Users size={14} aria-hidden />
                 {msg("myCommunities")} ({myCommunities.length})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={directory === "managed"}
+                onClick={() => changeDirectory("managed")}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-1.5 text-[11px] font-bold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                  directory === "managed"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Shield size={14} aria-hidden />
+                Managed ({managedCommunities.length})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={directory === "invitations"}
+                onClick={() => changeDirectory("invitations")}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-1.5 text-[11px] font-bold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                  directory === "invitations"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <MailOpen size={14} aria-hidden />
+                Invitations ({invitationCommunities.length})
               </button>
               <button
                 type="button"
@@ -1461,7 +1601,16 @@ export function CommunitiesScreen() {
                 </div>
               </>
             ) : (
-              <div className="mt-2 flex items-center justify-end">
+              <div className="mt-2 flex items-center justify-between gap-2">
+                {directory === "managed" ? (
+                  <div className="flex min-w-0 gap-1 overflow-x-auto scrollbar-hide" aria-label="Managed community attention filter">
+                    {(["all", "requests", "board", "chat"] as CommunityAttentionFilter[]).map((id) => (
+                      <button key={id} type="button" aria-pressed={communityAttentionFilter === id} onClick={() => setCommunityAttentionFilter(id)} className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${communityAttentionFilter === id ? "bg-[var(--gh-green)] text-white" : "border border-border/70 bg-card text-muted-foreground"}`}>
+                        {id === "all" ? "All" : id === "requests" ? "Requests" : id === "board" ? "Board" : "Chat"}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 <label className="shrink-0 text-[11px] text-muted-foreground">
                   <span className="sr-only">Sort</span>
                   <select
@@ -1508,7 +1657,7 @@ export function CommunitiesScreen() {
         onScroll={onHeaderScroll}
       >
         <div className="mx-auto max-w-2xl space-y-3 px-3 pb-8 pt-3 sm:px-5" role="region" aria-label="Community directory">
-          {myCommunities.length > 0 ? (
+          {directory === "my" && myCommunities.length > 0 ? (
             <section className="rounded-[1.35rem] border border-border/60 bg-card p-3.5 shadow-sm" aria-label="Community action center">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -1630,27 +1779,55 @@ export function CommunitiesScreen() {
           {!directoryLoading && visibleGroups.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border bg-muted/30 px-4 py-10 text-center">
               <p className="text-[14px] font-bold text-foreground">
-                {directory === "my"
+                {directory === "invitations" && invitationsUnavailable
+                  ? "Invitations could not be verified"
+                  : directory === "my"
                   ? myCommunities.length === 0
                     ? "No communities yet"
                     : "No communities match your search"
-                  : discoverCommunities.length === 0
-                    ? myCommunities.length > 0
-                      ? "You're already in every community we found"
-                      : "No communities to discover yet"
-                    : "No communities match"}
+                  : directory === "invitations"
+                    ? invitationCommunities.length === 0 ? "No pending invitations" : "No invitations match your search"
+                    : directory === "managed"
+                      ? managedCommunities.length === 0 ? "No managed communities yet" : "No managed communities match your search"
+                      : discoverCommunities.length === 0
+                        ? myCommunities.length > 0
+                          ? "You're already in every community we found"
+                          : "No communities to discover yet"
+                        : "No communities match"}
               </p>
               <p className="mt-1 text-[12px] text-muted-foreground">
-                {directory === "my"
+                {directory === "invitations" && invitationsUnavailable
+                  ? "Invitations could not be verified"
+                  : directory === "my"
                   ? myCommunities.length === 0
                     ? "Join a space from Discover, or create one for your city or interest."
                     : "Clear search to see all of your communities."
-                  : discoverCommunities.length === 0
-                    ? "Create a new space, or open My communities for spaces you already joined."
-                    : "Try another search or category."}
+                  : directory === "invitations"
+                    ? "Invitations sent to your GreenHaven identity will appear here. Check again when someone invites you."
+                    : directory === "managed"
+                      ? "Communities where you are an owner, admin or moderator will appear here."
+                      : discoverCommunities.length === 0
+                        ? "Create a new space, or open My communities for spaces you already joined."
+                        : "Try another search or category."}
               </p>
               <div className="mt-3 flex flex-wrap justify-center gap-2">
-                {directory === "my" ? (
+                {directory === "invitations" && invitationsUnavailable ? (
+                  <button
+                    type="button"
+                    onClick={() => setDirectoryTick((n) => n + 1)}
+                    className="rounded-full border border-border px-4 py-2 text-[12px] font-bold text-foreground"
+                  >
+                    Retry invitations
+                  </button>
+                ) : directory === "invitations" ? (
+                  <button
+                    type="button"
+                    onClick={() => changeDirectory("discover")}
+                    className="rounded-full bg-[var(--gh-green)] px-4 py-2 text-[12px] font-bold text-white"
+                  >
+                    Discover communities
+                  </button>
+                ) : directory === "my" ? (
                   <button
                     type="button"
                     onClick={() => changeDirectory("discover")}
@@ -1682,7 +1859,7 @@ export function CommunitiesScreen() {
             <>
             <p className="px-0.5 text-[11px] font-medium text-muted-foreground" aria-live="polite">
               {visibleGroups.length}{" "}
-              {directory === "my" ? "in My communities" : "to discover"}
+              {directory === "discover" ? "to discover" : directory === "managed" ? "managed by you" : "in My communities"}
               {searchQuery.trim() ? " matching search" : ""}
             </p>
             <div className="gh-community-directory-grid">
@@ -1692,12 +1869,10 @@ export function CommunitiesScreen() {
               const viewerId = IdentityService.getCurrentUserId() || ""
               const membershipState = resolveMembershipState(community, viewerId)
               const membershipStatus = membershipState === "pending" || membershipState === "invited" ? membershipState : undefined
-              const role =
-                community.createdBy === "current-user"
-                  ? "owner"
-                  : joined
-                    ? "member"
-                    : "guest"
+              const roleEntry = Object.entries(community.groupRoles || {}).find(([memberId]) => isSameIdentity(memberId))
+              const role = community.createdBy && isSameIdentity(community.createdBy)
+                ? "owner"
+                : roleEntry?.[1] || (joined ? "member" : "guest")
               return (
                 <GroupCard
                   key={community.id}
@@ -1769,6 +1944,14 @@ export function CommunitiesScreen() {
                       onClick: () => setDirectoryTick((n) => n + 1),
                     }
               }
+            />
+          ) : directory === "managed" ? (
+            <EmptyState
+              variant="communities"
+              title="No communities to manage"
+              description="Communities you own or help moderate will appear here. Management access follows your server-confirmed community role."
+              action={{ label: "Explore communities", onClick: () => changeDirectory("discover") }}
+              secondaryAction={{ label: "Create community", onClick: openCreateCommunity }}
             />
           ) : null}
         </div>

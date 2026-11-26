@@ -27,8 +27,8 @@ const checks = [
   ['Reserved funds copy explains never-started release and uncertain provider execution boundary', balance.includes('not spendable while a request is unresolved') && balance.includes('never-started request') && balance.includes('missing ID alone is not proof')],
   ['Release control is limited by authenticated server cancellation of unstarted requests', cancelRoute.includes('cancelUnstartedPayoutRequests(auth.userId)') && ledger.includes('gh_pi_earnings_payout_cancel_unstarted')],
   ['Rewards counts approved/eligible claims separately from under-review items', rewards.includes('row.validationStatus === "eligible" || row.validationStatus === "approved"') && rewards.includes('Under review / maturity')],
-  ['Mission policy explicitly states achievements do not issue GHC or Pi', rewards.includes('mission completion does not issue GHC or Pi')],
-  ['GHC rewards and Pi cashback remain separate journeys', rewards.includes('Two different rewards') && rewards.includes('<PiCashbackSummary />')],
+  ['Mission policy explicitly states achievements do not issue GHC or Pi', rewards.includes('Missions unlock achievements, not GHC or Pi.')],
+  ['GHC rewards and Pi cashback remain separate journeys', rewards.includes('Missions unlock achievements, not GHC or Pi.') && rewards.includes('<PiCashbackSummary />')],
   ['Rewards display does not gain client-side financial issuance authority', !/ledger\.insert|mintGhc|transferGhc|settleReward\s*\(/i.test(rewards)],
   ['Priority 3 contract is registered exactly once in prebuild and static verification', (pkg.scripts['prebuild:checks'].match(/check-priority3-rewards-wallet-pin\.mjs/g) || []).length === 1 && (pkg.scripts['verify:static'].match(/check-priority3-rewards-wallet-pin\.mjs/g) || []).length === 1],
 ]

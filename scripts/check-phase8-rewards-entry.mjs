@@ -21,7 +21,7 @@ const checks = [
   ["Null, malformed, infinite and negative amounts are not displayed as confirmed balances", centre.includes("function readNonNegativeAmount(value: unknown)") && centre.includes("value >= 0") && centre.includes("readNonNegativeAmount(data.wallet?.balance)")],
   ["Economy snapshot requires explicit server success", centre.includes("data.ok !== true")],
   ["Optional response user identity is checked before display", centre.includes("data.userId !== userId")],
-  ["UI exposes server snapshot freshness and unavailable state", centre.includes("Server snapshot confirmed") && centre.includes("Snapshot unavailable")],
+  ["UI exposes server snapshot freshness and unavailable state", centre.includes("Wallet-confirmed snapshot") && centre.includes("Snapshot unavailable")],
   ["Daily claim amount is parsed only from a finite non-negative server value", client.includes("Number.isFinite(parsedAmount) && parsedAmount >= 0")],
   ["Missing or malformed server amount is never replaced with a client estimate", daily.includes("const amt = server.serverAmount") && !daily.includes("server.serverAmount ?? res.ghc ?? daily.todayGhc")],
   ["A failed daily claim never flashes a claimed-success state", !daily.includes("setJustClaimedFlash(true)") && !daily.includes("justClaimedFlash")],

@@ -218,6 +218,39 @@ async function dbSelectByHash(tokenHash: string): Promise<SessionRecord | null> 
   }
 }
 
+/**
+ * Compare-and-swap a session token during rotation. The old hash and active
+ * state are part of the UPDATE predicate, so concurrent rotations cannot both
+ * report success and a logout/revocation cannot be overwritten by a stale
+ * rotation. PostgREST's returned row count is the CAS result.
+ */
+async function dbRotateSessionToken(input: {
+  id: string
+  oldTokenHash: string
+  newTokenHash: string
+  lastSeenAt: number
+  expiresAt: number
+  userAgentHash: string | null
+  deviceLabel: string | null | undefined
+}): Promise<boolean> {
+  const result = await supabaseRest<Array<{ id: string }>>(
+    `gh_sessions?id=eq.${encodeURIComponent(input.id)}&token_hash=eq.${encodeURIComponent(input.oldTokenHash)}&revoked_at=is.null&select=id`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        token_hash: input.newTokenHash,
+        last_seen_at: new Date(input.lastSeenAt).toISOString(),
+        expires_at: new Date(input.expiresAt).toISOString(),
+        user_agent_hash: input.userAgentHash,
+        meta: input.deviceLabel ? { deviceLabel: input.deviceLabel } : {},
+      }),
+      timeoutMs: 10_000,
+    },
+  )
+  return result.ok && Array.isArray(result.data) && result.data.length === 1 && result.data[0]?.id === input.id
+}
+
 async function dbPatch(
   id: string,
   patch: Record<string, unknown>
@@ -559,18 +592,18 @@ export function isSessionStoreDurable(): boolean {
   return dbConfigured()
 }
 
-async function dbListByUser(ghUserId: string): Promise<SessionRecord[]> {
+async function dbListByUser(ghUserId: string): Promise<SessionRecord[] | null> {
   const env = readGhcServerEnv()
-  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return []
+  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
   try {
     const restResult = await supabaseRest(`gh_sessions?gh_user_id=eq.${encodeURIComponent(ghUserId)}&order=last_seen_at.desc&select=id,token_hash,gh_user_id,created_at,last_seen_at,expires_at,absolute_expires_at,revoked_at,user_agent_hash,meta&limit=50`, { method: "GET", body: undefined, timeoutMs: 10000 })
     const res = { ok: restResult.ok, status: restResult.status, json: async () => restResult.ok ? restResult.data : restResult.body, text: async () => JSON.stringify(restResult.ok ? restResult.data : restResult.body) }
-    if (!res.ok) return []
+    if (!res.ok) return null
     const rows = (await res.json()) as DbRow[]
-    if (!Array.isArray(rows)) return []
+    if (!Array.isArray(rows)) return null
     return rows.map(rowToRecord)
   } catch {
-    return []
+    return null
   }
 }
 
@@ -588,7 +621,13 @@ export async function listSessionsForUser(ghUserId: string): Promise<SessionReco
 
   let fromDb: SessionRecord[] = []
   if (dbConfigured()) {
-    fromDb = await dbListByUser(uid)
+    const durableRows = await dbListByUser(uid)
+    if (!durableRows) {
+      // Do not turn a database outage into an apparently empty account session
+      // list; callers use this for device management and session-cap decisions.
+      throw new Error("SESSION_STORE_UNAVAILABLE")
+    }
+    fromDb = durableRows
     for (const r of fromDb) {
       memById.set(r.id, r)
       // tokenHash known from DB — keep mem index
@@ -633,6 +672,7 @@ export async function revokeSessionByIdForUser(
   let rec = memById.get(sid) || null
   if (!rec && dbConfigured()) {
     const list = await dbListByUser(uid)
+    if (!list) throw new Error("SESSION_STORE_UNAVAILABLE")
     rec = list.find((r) => r.id === sid) || null
   }
   if (!rec) {
@@ -703,6 +743,11 @@ export async function rotateSession(input: {
   const current = await validateSession(raw, { touch: false })
   if (!current || current.revokedAt != null || isExpired(current)) return null
 
+  // Re-check the process-local compare point after the async validation. This
+  // closes the same-instance race in memory-only development/test mode.
+  const latest = memByHash.get(current.tokenHash)
+  if (!latest || latest.id !== current.id || latest.revokedAt != null || latest.tokenHash !== current.tokenHash) return null
+
   const t = now()
   const newRaw = newRawToken()
   const newHash = hashToken(newRaw)
@@ -719,20 +764,27 @@ export async function rotateSession(input: {
   }
 
   if (dbConfigured()) {
-    // Revoke old hash row identity by patching token_hash if schema allows; else revoke + create
-    const persisted = await dbPatch(current.id, {
-      token_hash: newHash,
-      last_seen_at: new Date(t).toISOString(),
-      expires_at: new Date(t + SESSION_IDLE_TTL_MS).toISOString(),
-      user_agent_hash: uaHash,
-      meta: { deviceLabel },
+    // Atomic compare-and-swap: only the request still holding the current hash
+    // can rotate it. A zero-row update means another rotation/revocation won.
+    const persisted = await dbRotateSessionToken({
+      id: current.id,
+      oldTokenHash: current.tokenHash,
+      newTokenHash: newHash,
+      lastSeenAt: t,
+      expiresAt: rotated.expiresAt,
+      userAgentHash: uaHash,
+      deviceLabel,
     })
     if (!persisted) {
-      // Fail closed: do not leave dual-valid tokens
-      console.error("[session] SESSION_ROTATION_UNAVAILABLE")
+      console.warn("[session] SESSION_ROTATION_CONFLICT_OR_UNAVAILABLE")
       return null
     }
   }
+
+  // A competing in-process rotation may have completed while the database CAS
+  // was in flight. Never overwrite its newer cache entry with a stale result.
+  const afterPersist = memByHash.get(current.tokenHash)
+  if (!afterPersist || afterPersist.id !== current.id || afterPersist.revokedAt != null) return null
 
   memByHash.delete(current.tokenHash)
   memByHash.set(newHash, rotated)

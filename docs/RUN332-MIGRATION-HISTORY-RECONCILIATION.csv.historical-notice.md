@@ -1,0 +1,1 @@
+Historical audit evidence recovered from the former GreenHaven archive on 2026-11-26. It is retained for traceability and automated historical regression checks only. The latest integrated source archive and docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md take precedence for current operational decisions. Do not replay migrations based on this record.

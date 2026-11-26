@@ -13,7 +13,7 @@ const checks = [
   ['Community pulse Board action filters to communities with board updates', screen.includes('communityAttentionFilter === "board"') && screen.includes('Number(c.boardUnread || 0) <= 0')],
   ['Community pulse Chat action filters to communities with unread chat', screen.includes('communityAttentionFilter === "chat"') && screen.includes('Number(c.chatUnread || c.unreadCount || 0) <= 0')],
   ['Community pulse Requests action is restricted to moderator roles with pending requests', screen.includes('communityAttentionFilter === "requests"') && screen.includes('["owner", "admin", "moderator"].includes(role)') && screen.includes('c.pendingJoinRequests?.length')],
-  ['Pulse focus controls expose selected state and can be cleared', (screen.match(/aria-pressed=\{communityAttentionFilter ===/g) || []).length === 3 && screen.includes('Clear focus') && screen.includes('setCommunityAttentionFilter("all")')],
+  ['Pulse focus controls expose selected state and can be cleared', ['board', 'chat', 'requests'].every((key) => screen.includes(`aria-pressed={communityAttentionFilter === "${key}"}`)) && screen.includes('Clear focus') && screen.includes('setCommunityAttentionFilter("all")')],
   ['Attention focus participates in memo dependencies', screen.includes('sortBy, communityAttentionFilter])')],
   ['Governance feature flag never masquerades as durable persistence', governance.includes('return "session"') && governance.includes('Session-only until server persistence is confirmed') && !governance.includes('"Server-backed governance log"')],
   ['Legacy event rows receive deterministic fallback IDs', participation.includes('const fallbackId = `evt_${index}_${startsAt}_') && !/Math\.random/.test(participation)],

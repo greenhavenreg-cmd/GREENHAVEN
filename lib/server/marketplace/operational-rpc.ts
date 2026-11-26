@@ -2,9 +2,9 @@
  * Phase 26 — service-role RPC client for operational financial workflows.
  * Never trusts client amounts as authority for balances; only records evidence-backed operations.
  */
-import { createHash, timingSafeEqual } from "node:crypto"
 import { hasPrivilegedDatabase, readGhcServerEnv } from "@/lib/server/economy/env"
 import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
+import { operatorKeyValueAuthorized } from "@/lib/server/security/operator-key"
 
 export function evidenceFingerprint(parts: Record<string, unknown>): string {
   const payload = JSON.stringify(parts, Object.keys(parts).sort())
@@ -12,17 +12,9 @@ export function evidenceFingerprint(parts: Record<string, unknown>): string {
 }
 
 export function assertOperatorKey(headerValue: string | null): boolean {
-  const want = Buffer.from(
-    process.env.GHC_OPERATOR_RECONCILE_KEY || process.env.GHC_A2U_ADMIN_KEY || "",
-    "utf8",
-  )
-  const got = Buffer.from(String(headerValue || ""), "utf8")
-  if (want.length < 32 || got.length !== want.length) return false
-  try {
-    return timingSafeEqual(want, got)
-  } catch {
-    return false
-  }
+  // Operational financial workflows have one dedicated key. The A2U worker key
+  // must never grant authority to disputes, refunds, payout corrections or renewals.
+  return operatorKeyValueAuthorized(headerValue, "GHC_OPERATOR_RECONCILE_KEY")
 }
 
 export async function callOperationalRpc<T extends Record<string, unknown>>(

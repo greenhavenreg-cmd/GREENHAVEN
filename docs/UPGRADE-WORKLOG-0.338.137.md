@@ -24,3 +24,21 @@ Source: user-supplied `GREENHAVEN-0.338.137-RUN412-TESTNET-PI-WITHDRAWAL-PIN-PRO
 
 ## Release boundary and remaining verification
 The source-only verification scope is limited to the targeted regression gates described here; it is not a full project acceptance claim. The supported runtime for full checks is Node.js 24.15.0 (`^24.15.0`). This is a source-level repair. The complete 445-check prebuild, Next.js production build, browser/Pi Browser acceptance, and deployment have not been verified by this change. No Supabase migration was applied and no Vercel environment setting was changed. Pi withdrawals, payments and other financial operations remain governed by their existing authorization and fail-closed controls; this worklog does not authorize or enable them.
+
+
+## R2 reconciliation pass — 26 November 2026
+
+1. Established the Phase 1–6 integrated archive as the active baseline and kept the former Run 423 / Run 411 archive as historical evidence.
+2. Recovered repository ignore, CI, dependency-security and dependency-lock integrity files; verified exact Git blob identity against connected GitHub `testnet`.
+3. Restored the 245-file migration source manifest and byte-verified each SQL migration.
+4. Compared Supabase Testnet migration history by version and name; documented six absent source migrations, five version drifts and duplicate Run 406 history. No migration was applied.
+5. Verified RLS and SECURITY DEFINER client privilege boundaries using read-only catalog queries.
+6. Removed browser-local membership fallback from paid membership status display; stale display is limited to a previous server-confirmed status.
+7. Reduced Rewards and Membership copy and removed redundant developer-style mission explanations.
+8. Updated regression contracts for the concise copy and server-authoritative membership behavior.
+9. Recovered historical release evidence with explicit notices and updated documentation hygiene classification.
+10. Ran `npm run verify:static`: 63/63 passed; release hygiene 17/17; project truth 11/11.
+11. Confirmed local Node 22.16.0 is below the pinned Node 24.15.0 runtime; typecheck, lint and full build remain unverified.
+12. Confirmed GitHub and Vercel still reference the earlier `bc42129` commit; no push or deployment was performed.
+
+Source-level checks do not constitute live Testnet acceptance. Mainnet and production remain NOT APPROVED.

@@ -19,7 +19,7 @@ const checks = [
   ['API fails closed when migration or privileged database configuration is missing', /CASHBACK_STATEMENT_UNAVAILABLE/.test(route) && /CASHBACK_SERVICE_UNAVAILABLE/.test(route)],
   ['atomic amounts are rendered without floating-point conversion and malformed values stay unknown', /BigInt\(value\)/.test(card) && !/Number\(value\).*10_000_000/.test(card) && /return \"—\"/.test(card)],
   ['malformed cashback totals fail closed instead of being coerced to zero', /CASHBACK_PAYOUT_TOTALS_INVALID/.test(route) && /CASHBACK_STATEMENT_TOTALS_INVALID/.test(route) && /BigInt\(payoutStatus\.reservedAtomic\)/.test(route)],
-  ['UI only enables payout when server flags permit Testnet and keeps Mainnet disabled', /payload\?\.withdrawalEnabled/.test(card) && /Testnet only/.test(card) && /Mainnet payouts are not enabled/.test(card)],
+  ['UI only enables payout when server flags permit Testnet and keeps Mainnet disabled', /payload\?\.withdrawalEnabled/.test(card) && /Testnet · paid after provider confirmation/.test(card) && /PI_A2U_ENABLED === \"true\"/.test(read('app/api/economy/rewards/pi-cashback/route.ts')) && /PI_A2U_TESTNET_ONLY === \"true\"/.test(read('app/api/economy/rewards/pi-cashback/route.ts')) && /resolvePiSandbox\(\)/.test(read('app/api/economy/rewards/pi-cashback/route.ts'))],
   ['UI is embedded inside Rewards Center and Wallet, not a new top-level section', /<PiCashbackSummary \/>/.test(rewards) && /<PiCashbackSummary \/>/.test(wallet)],
   ['migration is marked for review and not auto-applied', /20261029010002_pi_cashback_user_statement_rpc\.sql/.test(inventory) && /REVIEW_REQUIRED/.test(inventory) && /disposable PostgreSQL/.test(inventory)],
 ]

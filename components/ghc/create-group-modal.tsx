@@ -13,6 +13,9 @@ import { uploadDurableMedia, isMediaStorageUnavailable } from "@/lib/media/uploa
 import { toRelativeMediaFacadeUrl } from "@/lib/media/resolve-display-url"
 import { quoteCommunityCreateFeeClient, type CommunityFeeRail } from "@/lib/community/create-fee-client"
 import { RULE_TEMPLATES } from "@/lib/domains/community-registry"
+import { IdentityService } from "@/lib/identity/identity-service"
+import { clearCommunityCreateDraft, loadCommunityCreateDraft, saveCommunityCreateDraft } from "@/lib/community/create-draft"
+import { confirmDialog } from "@/lib/ui/global-interactions"
 
 export interface CreateGroupFormData {
   /** Stable client-generated identity reused for payment retries. */
@@ -58,13 +61,18 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
     invitedMembers: [],
     feeCurrency: isPiOnlyCommerceClient() ? "PI" : "GHC",
   })
-  const [feeRail, setFeeRail] = useState<CommunityFeeRail>("GHC")
+  const defaultFeeRail: CommunityFeeRail = isPiOnlyCommerceClient() ? "PI" : "GHC"
+  const [feeRail, setFeeRail] = useState<CommunityFeeRail>(defaultFeeRail)
   const [feePaymentConfirmed, setFeePaymentConfirmed] = useState(false)
   const [coverUploading, setCoverUploading] = useState(false)
   const feeQuote = quoteCommunityCreateFeeClient(feeRail)
   const [currentRule, setCurrentRule] = useState("")
   const [currentMember, setCurrentMember] = useState("")
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [draftReady, setDraftReady] = useState(false)
+  const [draftRestored, setDraftRestored] = useState(false)
+  const suppressDraftWriteRef = useRef(false)
+  const draftOwnerId = IdentityService.getCurrentUserId()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const submittingRef = useRef(false)
   const draftIdRef = useRef<string>("")
@@ -255,17 +263,81 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
     }))
   }
 
+  // Resume only this account's unfinished draft. Payment confirmation is deliberately
+  // not restored from browser storage; the server must re-confirm any completed fee.
+  useEffect(() => {
+    if (!isOpen) {
+      setDraftReady(false)
+      return
+    }
+    const draft = typeof window !== "undefined"
+      ? loadCommunityCreateDraft(window.localStorage, draftOwnerId)
+      : null
+    if (draft) {
+      draftIdRef.current = draft.formData.id || ""
+      setFormData(draft.formData)
+      setStep(draft.step)
+      setFeeRail(draft.feeRail)
+      setDraftRestored(true)
+    } else {
+      draftIdRef.current = ""
+      setDraftRestored(false)
+    }
+    setFeePaymentConfirmed(false)
+    setDraftReady(true)
+  }, [isOpen, draftOwnerId])
+
+  useEffect(() => {
+    if (!isOpen || !draftReady || typeof window === "undefined") return
+    if (suppressDraftWriteRef.current) {
+      suppressDraftWriteRef.current = false
+      return
+    }
+    saveCommunityCreateDraft(window.localStorage, draftOwnerId, {
+      step,
+      feeRail,
+      formData,
+      updatedAt: Date.now(),
+    })
+  }, [isOpen, draftReady, draftOwnerId, step, feeRail, formData])
+
+  const discardDraft = async () => {
+    const confirmed = await confirmDialog({
+      title: "Discard community draft?",
+      message: "This removes the saved draft from this device. This cannot be undone.",
+      confirmLabel: "Discard draft",
+      cancelLabel: "Keep draft",
+      danger: true,
+    })
+    if (!confirmed) return
+    if (typeof window !== "undefined") clearCommunityCreateDraft(window.localStorage, draftOwnerId)
+    draftIdRef.current = ""
+    setDraftRestored(false)
+    setStep(1)
+    setFeeRail(defaultFeeRail)
+    setFeePaymentConfirmed(false)
+    setFormData({ name: "", description: "", category: "General", privacy: "public", coverImage: undefined, welcomeMessage: "", rules: [], invitedMembers: [], feeCurrency: isPiOnlyCommerceClient() ? "PI" : "GHC" })
+  }
+
   const handleSubmit = async () => {
     if (isLoading || coverUploading || submittingRef.current) return
     if (validateStep(4)) {
       submittingRef.current = true
       try {
         if (!draftIdRef.current) draftIdRef.current = `comm_${crypto.randomUUID()}`
-        const result = await onSubmit({ ...formData, id: formData.id || draftIdRef.current })
+        const submission = { ...formData, id: formData.id || draftIdRef.current }
+        setFormData(submission)
+        if (typeof window !== "undefined") {
+          saveCommunityCreateDraft(window.localStorage, draftOwnerId, { step, feeRail, formData: submission, updatedAt: Date.now() })
+        }
+        const result = await onSubmit(submission)
         // A false result means payment/create failed; preserve every field and stay here.
         if (result === false) return
         // Reset form only after the parent confirms durable creation.
         draftIdRef.current = ""
+        if (typeof window !== "undefined") clearCommunityCreateDraft(window.localStorage, draftOwnerId)
+        suppressDraftWriteRef.current = true
+        setDraftRestored(false)
         setFeePaymentConfirmed(false)
         setStep(1)
         setFormData({
@@ -279,7 +351,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
           invitedMembers: [],
           feeCurrency: isPiOnlyCommerceClient() ? "PI" : "GHC",
         })
-        setFeeRail("GHC")
+        setFeeRail(defaultFeeRail)
       } catch (err) {
         // Parent owns the visible error; preserve the draft for a safe retry.
         console.error("[Create Group Error]", err)
@@ -371,6 +443,13 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
             <p className="text-xs text-red-700">{error}</p>
           </div>
         )}
+
+        {draftRestored ? (
+          <div className="mx-4 mb-3 flex items-center justify-between gap-3 rounded-xl border border-emerald-200/70 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100" role="status">
+            <span>Your community draft has been restored on this device.</span>
+            <button type="button" onClick={discardDraft} className="min-h-9 shrink-0 rounded-lg px-2 font-semibold underline underline-offset-2">Discard</button>
+          </div>
+        ) : null}
 
         {/* Step Guidance */}
         <div className="mx-4 mb-3 px-3 py-2 bg-muted/40 border border-border/70 rounded-lg">

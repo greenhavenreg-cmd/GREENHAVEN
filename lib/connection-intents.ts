@@ -55,11 +55,11 @@ export function loadConnectionIntents(userId = "current-user"): ConnectionIntent
   }
 }
 
-export function saveConnectionIntents(userId: string, intents: ConnectionIntentId[]) {
+export function saveConnectionIntentsWithStatus(userId: string, intents: ConnectionIntentId[]): boolean {
   try {
-    if (typeof localStorage === "undefined") return
+    if (typeof localStorage === "undefined") return false
     const key = safeIntentStorageUserId(userId)
-    if (!key) return
+    if (!key) return false
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")
     const all: Record<string, unknown> = parsed && typeof parsed === "object" && !Array.isArray(parsed)
       ? { ...(parsed as Record<string, unknown>) }
@@ -67,9 +67,15 @@ export function saveConnectionIntents(userId: string, intents: ConnectionIntentI
     all[key] = normalizeIntents(intents)
     const bounded = Object.fromEntries(Object.entries(all).slice(-MAX_STORED_ACCOUNTS))
     localStorage.setItem(STORAGE_KEY, JSON.stringify(bounded))
+    return true
   } catch {
-    /* */
+    return false
   }
+}
+
+/** Backward-compatible helper; callers that need confirmation use the status API. */
+export function saveConnectionIntents(userId: string, intents: ConnectionIntentId[]): void {
+  void saveConnectionIntentsWithStatus(userId, intents)
 }
 
 /** Map legacy primaryMode into intents when none saved */

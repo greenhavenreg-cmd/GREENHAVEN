@@ -2,7 +2,7 @@
 /** Source-only route inventory. Heuristic flags are review leads, not proof of security coverage. */
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
-const root = process.cwd(), apiRoot = join(root, 'app/api'), docsDir = join(root, 'docs')
+const root = process.cwd(), apiRoot = join(root, 'app/api'), docsDir = join(root, 'docs/archive/historical-implementation-records')
 const files = []
 function walk(dir) { for (const e of readdirSync(dir, { withFileTypes: true })) { const p = join(dir, e.name); if (e.isDirectory()) walk(p); else if (e.isFile() && e.name === 'route.ts') files.push(p) } }
 walk(apiRoot); files.sort()

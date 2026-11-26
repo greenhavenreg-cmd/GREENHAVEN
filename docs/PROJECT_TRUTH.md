@@ -1,19 +1,28 @@
-# Current project truth — 0.338.137 Run 414 Release Metadata Synchronization (2026-11-25)
+> **Current authority notice (26 November 2026):** This document is historical context. The working package candidate is `gh-connect@0.338.154` (RUN442 Testnet Migration Reconciliation & Controlled Application), documented in `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md`. The last user-designated accepted source archive remains `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`; 0.338.154 is not yet accepted, pushed or deployed.
 
-**Current source:** `gh-connect@0.338.137`, based on the supplied Run 412 Testnet Pi-withdrawal PIN proof/readiness source and Run 413 release-version alignment. Run 414 synchronizes the four authoritative release metadata records required by the Run #300 release-integrity gate. This is metadata synchronization only; it does not enable withdrawals, change payout flags, apply migrations, or prove runtime/provider acceptance. Full prebuild, build, and live Testnet acceptance remain unverified until the deployment pipeline completes.
 
-**Current source version:** `0.338.137`  
-**Package identity:** `gh-connect@0.338.137`  
-**User-designated baseline:** `GREENHAVEN-0.338.137-RUN412-TESTNET-PI-WITHDRAWAL-PIN-PROOF-READINESS-2026-11-25.zip` (continued through Runs 413–414)  
+# Current project truth — 0.338.154 RUN442 Testnet Migration Reconciliation candidate (2026-11-26)
+
+**Current package candidate:** `gh-connect@0.338.154`, derived from the user-designated 0.338.139 RUN426 archive through RUN427–RUN441. It is not yet accepted, pushed or deployed. RUN442 applied three additive, individually preflighted migrations to Testnet and postflight-verified 17 indexes, 13 service-role grant contracts and RUN390 read grants. Four migrations remain held for disposable PostgreSQL 17/security/financial/concurrency validation; no financial data or provider state changed. Full Node 24.15.x typecheck/lint/build and end-to-end Testnet acceptance remain outstanding.
+
+**Current source version:** `0.338.154` (working candidate)
+**Coordinated programme:** `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`  
+**Package identity:** `gh-connect@0.338.154`  
+**User-designated parent baseline:** `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`; current candidate is its controlled derivative.  
 **Delivery report:** `RUN414-RELEASE-METADATA-SYNCHRONIZATION-REPORT.md`  
 **Marketplace audit:** `docs/RUN411-MARKETPLACE-COMMERCE-RELIABILITY-AUDIT-2026-11-25.md`
+
+
+## RUN442 current Testnet migration state (26 November 2026)
+
+Three migrations were individually applied and postflight-verified on Testnet `jhlsjnmfpakvibuuoygx`: 17 RUN384 research FK indexes (17/17), RUN384 service REST table grants (13/13), and RUN390 Membership/Feed/Marketplace read grants. Supabase recorded generated history versions `20261126153605`, `20261126153609`, and `20261126153614`; original source versions remain drifted. Four migrations remain held: RUN388 quota RPC, RUN396 payout history RPC, RUN405 registration backfill replacement, and RUN429 Community invitations. No financial data/provider state was changed. See `docs/RUN442-TESTNET-MIGRATION-APPLICATION-REPORT-2026-11-26.md`.
 
 - Correct workspace census after Run 397: one verified Pi identity (`EUCLIDABO`), one profile, one GHC account, nine session rows for that same account, no PI earnings entries before the campaign, and four GHC transaction rows. After applying the campaign, one 100 PI `available` entry exists; withdrawal quote eligibility is true, but provider execution remains disabled.
 - Run 397 raises the cumulative registration reward target to 100 PI on Testnet only. Existing valid registration-bonus ledger credits are counted toward the target; the new campaign uses a distinct idempotency key and account lock. The app requires both `GHC_REGISTRATION_BONUS_ENABLED=1`, `NEXT_PUBLIC_PI_SANDBOX=true`, `PI_NETWORK=testnet`, and a non-Production Vercel environment, and fails closed until the new campaign RPC is present.
 - A service-role-only bounded backfill was run with the explicit Testnet confirmation. It processed one account and credited one available 100 PI ledger entry. It did not import the five other identities from the previously inspected database because they are not present as verified identities in this correct project.
 - Referral rewards are 5% of a verified qualifying membership charge, capped at 25 GHC per referral and 50 qualifying rewards per inviter per rolling 30 days. A new service-role summary RPC avoids old REST pagination undercounts. Settlement remains operator-gated.
-- The registration migration `20261125130000_run397_testnet_registration_bonus_100_pi.sql` is applied and recorded as `20261125065113`. Run 406 also applied the referral quality-cap/summary migration and the RLS-preserving server-read grant migration; the latter was recorded twice under adjacent versions by the migration tool and both ACL postflights passed. The canonical source inventory contains 245 SQL migrations while the database has 239 recorded migration rows; remaining source/history discrepancies are unresolved.
-- Run 397 source checks pass 16/16; Run 396 wallet/payout/membership checks pass 17/17; membership release checks pass 16/16 and 18/18; rewards history passes 20/20; cross-feature wallet/rewards/membership closeout passes 43/43. Full Node 24.15.x dependency-backed typecheck, lint, production build and browser/device acceptance remain unverified.
+- Historical RUN406/RUN397 snapshot: the registration campaign was recorded as `20261125065113`; RUN406 server-read grants were recorded twice under adjacent versions. At that earlier snapshot the inventory contained 245 SQL migrations and Testnet had 239 history rows. RUN442 supersedes those counts with 246 source files and 243 Testnet history rows; see the RUN442 migration report.
+- Run 397 source checks pass 16/16; Run 396 wallet/payout/membership checks pass 17/17; membership release checks pass 16/16 and 18/18; rewards history passes 21/21; cross-feature wallet/rewards/membership closeout passes 43/43. Full Node 24.15.x dependency-backed typecheck, lint, production build and browser/device acceptance remain unverified.
 - Node 22.16.0 is available in this workspace; the project requires Node `^24.15.0`. Dependencies are not installed. The registration migration and one 100 PI ledger credit were applied on Testnet. No Pi A2U transfer, payout execution, GHC balance mutation, Mainnet change, Git push or Vercel deployment occurred. Production remains **NOT APPROVED**.
 
 Run 407 grants SELECT, INSERT and UPDATE on `gh_earnings_ledger_entries` to `service_role` only. Postflight confirmed DELETE=false, anon/authenticated SELECT=false and RLS=true. The source migration is `20261125090000_run407_service_role_earnings_ledger_privileges.sql`; because the live migration history must be reconciled, it remains REVIEW_REQUIRED for any target and must not be blindly replayed.\n\n## Historical RUN390 project-truth snapshot (0.338.111)
@@ -292,3 +301,43 @@ Both identity/session tables and their base migration-history rows exist in the 
 
 ## Run 402 update (2026-11-25)
 Release source version is `0.338.132`. Run 406 restores least-privilege server-side reads for social visibility, marketplace catalog and membership entitlements; exposes registration rewards in Wallet without automatic claims; and refines wallet presentation. Run 403 keeps reward status visible when paused; Run 405 expands bounded backfill account discovery, preserves canonical Pi usernames, and documents source-to-destination reconciliation steps. Run 402 covers net-first withdrawal fee handling and Testnet-only marketplace/community fee configuration. GitHub push, Vercel deployment, full migration-history reconciliation, remaining-account mapping, and live payout acceptance remain blockers.
+
+
+## RUN431 Phase 2 Discovery preferences integration
+
+Full `npm run verify:static` passes with zero failures (5,247 PASS output lines); documentation hygiene, release hygiene (17/17) and project truth (11/11) pass. Prebuild dry-run discovers 452 checks, but actual prebuild is blocked by Node 22.16.0 instead of required Node 24.15.0.
+
+RUN430 hardens saved collection local-storage failure handling and adds a cross-feature source contract for feed engagement, comments, reactions, saves, shares, stories and notification targets. It does not add a database migration or claim that device-local collections sync across devices. See `docs/RUN430-PHASE2-SOCIAL-ENGAGEMENT-2026-11-26.md`.
+
+
+## RUN431 Phase 2 Discovery preferences integration
+
+Discover connection-intent preferences now persist through the authenticated, server-authoritative social profile update path. The Discovery context exposes the existing profile update and toast actions; local intent storage remains a non-authoritative compatibility mirror. The source contract checks context wiring, confirmation messaging, authenticated profile ownership and the server profile field. No migration or live database mutation was introduced.
+
+
+## RUN432 Phase 2 Community creation draft recovery
+
+The Community creation wizard now restores account-scoped draft state, including the current step and stable create idempotency ID. Transient image previews and payment-confirmation state are excluded. Draft retention is bounded to 30 days and successful creation clears the saved draft. RUN432 adds a 10-check source contract and 15 helper assertions; no database migration is introduced.
+
+
+## RUN433 Phase 2 integrated social transformation
+
+The five-stage source audit now maps the Community, Messaging, Discovery and integration journeys to their existing canonical components, APIs, RPCs and authorization boundaries. RUN431 adds server-authoritative connection-intent preference persistence; RUN432 adds resumable Community creation drafts; RUN433 adds a 22-check integration contract. Direct calling remains disabled until TURN/signaling and production policy are verified. No database migration or live data mutation is part of RUN433.
+
+
+## RUN434 Phase 3 — Architecture, Identity & Durable Operation Boundaries (2026-11-26)
+
+RUN434 scans 284 API route handlers and records route-level RPC/table references, auth/session/body/rate-limit/idempotency signals and caller-supplied identity fields. It consolidates duplicated `ghc_execute_spend` transport into one server-side helper, restricts the operational reconciliation key to `GHC_OPERATOR_RECONCILE_KEY` (no A2U worker-key fallback), and replaces caller-supplied operator audit actor labels with the explicit `service:operator-key` principal. Focused architecture boundary checks pass 17/17 and operator-key runtime checks pass 6/6. The generic transactional outbox remains proposal-only because it is not integrated atomically into owner RPCs or verified under worker/consumer failure. Testnet read-only catalog evidence confirms 322 public SECURITY DEFINER functions with zero anon/authenticated EXECUTE grants and 37 RLS/no-policy tables with zero anon/authenticated DML grants. No database migration or live data mutation occurred. Full `npm run verify:static` passes with 5,306 PASS output lines and zero FAIL lines; prebuild dry-run discovers 458 checks. Nine changed TypeScript files parse without syntax errors. Supported Node 24.15.x dependency-backed typecheck/lint/build, disposable PostgreSQL, Testnet history reconciliation, two-account/session concurrency and Mainnet evidence remain open. Production remains NOT APPROVED. See `docs/RUN434-PHASE3-AUTHORITY-AUDIT-2026-11-26.md`.
+
+
+## RUN435 Phase 3 identity input classification (2026-11-26)
+
+RUN435 reviews all eight routes flagged by RUN434 for caller-supplied identity-like body fields. Authenticated session identity remains the actor/owner; client actor aliases are ignored or stripped; target/counterparty IDs are separately resolved or validated. The registered regression contract passes 16/16. This does not clear the held atomic session-cap proposal or the database, multi-account, Node 24.15.x, Testnet migration-history and Mainnet evidence gates. No migration/live data mutation/push/deploy/payment/Mainnet action occurred. Production remains NOT APPROVED.
+
+
+## RUN440 update
+
+The session rotation path now uses a durable compare-and-swap update keyed by session ID, prior token hash and unrevoked state. A response is successful only for exactly one returned row; conflicts and storage errors fail closed. The memory-only path rechecks the current token mapping to prevent same-process concurrent rotations from both succeeding. RUN440 source contract passes 12/12; runtime concurrency/outage regression passes 7 assertions. No SQL migration, live database change, push, deployment or Mainnet action occurred.
+
+
+RUN441 Phase 4 update: 34 runtime assertions pass for canonical account remapping, multi-device session isolation, owner-only revocation, step-up proof account/session scope and revocation, and out-of-order profile hydration. Source contract passes 21/21. Two held SQL corrections address Community invitation lock-order inversion and Messenger member-count concurrency. The disposable PostgreSQL 17 rehearsal was not executed because no PostgreSQL/psql/Docker runtime was available. No migration or live database mutation occurred; RUN429 remains REVIEW_REQUIRED.

@@ -23,7 +23,7 @@ A deterministic dependency-free lexical scanner inventories `app/api/**/route.ts
 | likelySensitiveWithoutMatchingAuth | 15 |
 | webhookOrCallbackSignals | 6 |
 
-Full per-route inventory: `docs/PHASE-3-API-ARCHITECTURE-INVENTORY-2026-11-09.csv`.
+Full per-route inventory: `docs/archive/historical-implementation-records/PHASE-3-API-ARCHITECTURE-INVENTORY-2026-11-09.csv`.
 
 ## Manual review queues
 

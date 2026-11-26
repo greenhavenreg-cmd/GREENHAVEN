@@ -198,7 +198,10 @@ if (!res.ok) return null
     if (!data || typeof data !== "object" || Array.isArray(data)) return null
     // A malformed snapshot must never be rendered as a legitimate zero balance.
     const numeric = ["balance", "ledgerBalance", "locked", "pending", "lifetimeEarned", "lifetimeSpent", "lifetimePurchased"] as const
-    const values = Object.fromEntries(numeric.map((key) => [key, Number(data[key] ?? (key === "ledgerBalance" ? data.balance : undefined))])) as Record<(typeof numeric)[number], number>
+    // Every balance dimension is part of the authoritative snapshot contract.
+    // Do not silently substitute spendable balance for ledgerBalance: callers
+    // need both values to reconcile reservations without double-subtracting.
+    const values = Object.fromEntries(numeric.map((key) => [key, Number(data[key])])) as Record<(typeof numeric)[number], number>
     if (numeric.some((key) => !Number.isFinite(values[key])) || values.balance < 0 || values.ledgerBalance < 0 ||
         values.locked < 0 || values.pending < 0 || values.lifetimeEarned < 0 || values.lifetimeSpent < 0 || values.lifetimePurchased < 0 ||
         (data.userId != null && String(data.userId) !== userId)) return null

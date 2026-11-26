@@ -40,6 +40,19 @@ function digest(value: string): Buffer {
   return createHash("sha256").update(value, "utf8").digest()
 }
 
+/** Compare one supplied key against exactly one configured purpose key. */
+export function operatorKeyValueAuthorized(
+  suppliedValue: string | null | undefined,
+  envName: string,
+  minBytes = OPERATOR_KEY_MIN_BYTES,
+): boolean {
+  const expected = String(process.env[envName] || "").trim()
+  const supplied = String(suppliedValue || "")
+  if (!expected || Buffer.byteLength(expected, "utf8") < minBytes || !supplied) return false
+  // Fixed-size SHA-256 digests keep the comparison constant-time without leaking key length.
+  return timingSafeEqual(digest(supplied), digest(expected))
+}
+
 /**
  * Authorize a privileged request against a single purpose-specific operator key.
  * Returns false when the env is missing, too short, or the supplied header does not match.
@@ -49,11 +62,6 @@ export function operatorKeyAuthorized(request: Request, options: OperatorKeyOpti
     // Fail closed: multi-env fallback chains are no longer permitted.
     return false
   }
-  const minBytes = options.minBytes ?? OPERATOR_KEY_MIN_BYTES
-  const envName = options.envNames[0]
-  const expected = String(process.env[envName] || "").trim()
-  if (!expected || Buffer.byteLength(expected, "utf8") < minBytes) return false
-
   let supplied = ""
   for (const header of options.headers) {
     const candidate = String(request.headers.get(header) || "")
@@ -62,9 +70,7 @@ export function operatorKeyAuthorized(request: Request, options: OperatorKeyOpti
       break
     }
   }
-  if (!supplied) return false
-  // Length check before digest comparison is safe: both digests are fixed-size SHA-256.
-  return timingSafeEqual(digest(supplied), digest(expected))
+  return operatorKeyValueAuthorized(supplied, options.envNames[0], options.minBytes ?? OPERATOR_KEY_MIN_BYTES)
 }
 
 /** Header/env contract used by operator diagnostics and reconciliation endpoints. */

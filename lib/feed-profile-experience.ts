@@ -95,30 +95,45 @@ export function loadCollections(scopeId?: string): SavedCollection[] {
   }
 }
 
-export function savePostToCollection(collectionId: string, postId: string, scopeId?: string): SavedCollection[] {
+/** Persist a collection snapshot without treating a blocked/quota-exceeded write as success. */
+function persistCollections(next: SavedCollection[], scopeId?: string): boolean {
+  try {
+    localStorage.setItem(collectionsStorageKey(scopeId), JSON.stringify(next))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function savePostToCollectionWithStatus(
+  collectionId: string,
+  postId: string,
+  scopeId?: string,
+): { collections: SavedCollection[]; persisted: boolean } {
   const cols = loadCollections(scopeId)
   const next = cols.map((c) =>
     c.id === collectionId
       ? { ...c, postIds: Array.from(new Set([postId, ...c.postIds])) }
       : c
   )
-  try {
-    localStorage.setItem(collectionsStorageKey(scopeId), JSON.stringify(next))
-  } catch {
-    /* */
-  }
-  return next
+  return { collections: next, persisted: persistCollections(next, scopeId) }
 }
 
+export function savePostToCollection(collectionId: string, postId: string, scopeId?: string): SavedCollection[] {
+  return savePostToCollectionWithStatus(collectionId, postId, scopeId).collections
+}
 
-export function createCollection(name: string, scopeId?: string): SavedCollection {
+export function createCollectionWithStatus(
+  name: string,
+  scopeId?: string,
+): { collection: SavedCollection; persisted: boolean } {
   const trimmed = String(name || "").trim().slice(0, 40)
   const cols = loadCollections(scopeId)
   if (!trimmed) {
-    return cols[0] || { id: "col_0", name: "Later", postIds: [], createdAt: Date.now() }
+    return { collection: cols[0] || { id: "col_0", name: "Later", postIds: [], createdAt: Date.now() }, persisted: false }
   }
   const existing = cols.find((c) => c.name.toLowerCase() === trimmed.toLowerCase())
-  if (existing) return existing
+  if (existing) return { collection: existing, persisted: true }
   const col: SavedCollection = {
     id: `col_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
     name: trimmed,
@@ -126,12 +141,11 @@ export function createCollection(name: string, scopeId?: string): SavedCollectio
     createdAt: Date.now(),
   }
   const next = [col, ...cols]
-  try {
-    localStorage.setItem(collectionsStorageKey(scopeId), JSON.stringify(next))
-  } catch {
-    /* */
-  }
-  return col
+  return { collection: col, persisted: persistCollections(next, scopeId) }
+}
+
+export function createCollection(name: string, scopeId?: string): SavedCollection {
+  return createCollectionWithStatus(name, scopeId).collection
 }
 
 export function removePostFromCollections(postId: string, scopeId?: string): SavedCollection[] {

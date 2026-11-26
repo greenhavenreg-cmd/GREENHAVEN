@@ -1,0 +1,31 @@
+#!/usr/bin/env node
+/** RUN429: durable community invitation persistence and authorization contract. */
+import { readFileSync } from "node:fs"
+const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8")
+const sql = read("supabase/migrations/20261126090001_run429_durable_community_invitations.sql")
+const listApi = read("app/api/communities/invitations/route.ts")
+const respondApi = read("app/api/communities/invitations/[inviteId]/route.ts")
+const createApi = read("app/api/communities/[id]/invitations/route.ts")
+const communityUi = read("components/ghc/communities-screen.tsx")
+const homeUi = read("components/ghc/home-command-centre.tsx")
+const context = read("contexts/ghc-context.tsx")
+let passed = 0, failed = 0
+const check = (name, ok) => { if (ok) { passed++; console.log(`PASS ${name}`) } else { failed++; console.error(`FAIL ${name}`) } }
+check("Migration adds one canonical invitation table linked to gh_communities", /CREATE TABLE IF NOT EXISTS public\.gh_community_invitations/.test(sql) && /REFERENCES public\.gh_communities\(id\) ON DELETE CASCADE/.test(sql))
+check("Pending invitation uniqueness is scoped to community and invitee", /uq_gh_community_invites_pending_pair[\s\S]*?WHERE status = 'pending'/.test(sql))
+check("Invitation storage is RLS-enabled, deny-client and not directly granted", /ENABLE ROW LEVEL SECURITY/.test(sql) && /gh_community_invitations_no_client[\s\S]*?USING \(false\) WITH CHECK \(false\)/.test(sql) && /REVOKE ALL ON TABLE public\.gh_community_invitations FROM PUBLIC, anon, authenticated, service_role/.test(sql))
+check("Only active owner, admin or moderator can create invitations", /COALESCE\(v_role, ''\) NOT IN \('owner', 'admin', 'moderator'\)/.test(sql))
+check("Invitation creation rejects self-invites, unknown targets and reciprocal blocks", /trim\(p_actor_id\) = trim\(p_invitee_id\)/.test(sql) && /gh_user_profiles p WHERE p\.gh_user_id = trim\(p_invitee_id\)/.test(sql) && /b\.blocker_id = trim\(p_actor_id\)[\s\S]*?b\.blocker_id = trim\(p_invitee_id\)/.test(sql))
+check("Banned, already-active and pending-request targets are rejected", /v_member_status = 'banned'[\s\S]*?v_member_status = 'active'[\s\S]*?v_member_status = 'pending'/.test(sql))
+check("Creation reuses active pending invites and expires stale invites", /v_invite\.expires_at > now\(\)[\s\S]*?status = 'expired'/.test(sql))
+check("Inbox listing is invitee-scoped and excludes expired or deleted communities", /i\.invitee_user_id = trim\(p_user_id\)[\s\S]*?i\.status = 'pending' AND i\.expires_at > now\(\)[\s\S]*?c\.deleted_at IS NULL/.test(sql))
+check("Accept and decline are recipient-bound and expiry-checked", /invitee_user_id = trim\(p_actor_id\)[\s\S]*?v_invite\.expires_at <= now\(\)[\s\S]*?status = 'declined'/.test(sql))
+check("Acceptance creates active membership and reconciles member count", /INSERT INTO public\.gh_community_members[\s\S]*?status = 'active'[\s\S]*?SET member_count = \([\s\S]*?status = 'active'/.test(sql))
+check("Community acceptance never implicitly grants realtime Chat membership", /Intentionally no gh_conversation_members write/.test(sql) && !/INSERT INTO public\.gh_conversation_members/.test(sql))
+check("Invitation create and response write canonical, deduplicated notification inbox records", /gh_notification_inbox_create/.test(sql) && /community_invite:/.test(sql) && /community_invite_accepted:/.test(sql))
+check("All invitation RPCs are service-role-only", (sql.match(/REVOKE ALL ON FUNCTION public\.gh_community_invitation_/g) || []).length === 3 && (sql.match(/GRANT EXECUTE ON FUNCTION public\.gh_community_invitation_/g) || []).length === 3)
+check("API derives actors from authenticated sessions and applies abuse limits", /resolveAuthenticatedUser/.test(listApi) && /resolveAuthenticatedUser/.test(respondApi) && /resolveAuthenticatedUser/.test(createApi) && /enforceUserMutationRateLimit/.test(respondApi) && /enforceUserMutationRateLimit/.test(createApi))
+check("Community and Home invitation views load the durable inbox and fail visibly", /api\/communities\/invitations/.test(communityUi) && /invitationsUnavailable/.test(communityUi) && /api\/communities\/invitations/.test(homeUi) && /invitesUnavailable/.test(homeUi))
+check("Context invite, accept and decline actions use durable server APIs", /api\/communities\/\$\{encodeURIComponent\(communityId\)\}\/invitations/.test(context) && /api\/communities\/invitations\/\$\{encodeURIComponent\(invitationId\)\}/.test(context))
+console.log(`${passed}/${passed + failed} passed`)
+process.exit(failed ? 1 : 0)

@@ -18,7 +18,7 @@ import { EmptyState } from "./empty-state"
 import { Search, SlidersHorizontal, X } from "lucide-react"
 import {
   resolveUserIntents,
-  saveConnectionIntents,
+  saveConnectionIntentsWithStatus,
   type ConnectionIntentId,
 } from "@/lib/connection-intents"
 import { IdentityService } from "@/lib/identity/identity-service"
@@ -89,6 +89,8 @@ export function DiscoveryGridScreen() {
     startConversation?: (userId: string, userName?: string, userPhoto?: string) => Promise<string | null>
     loading?: boolean
     error?: string | null
+    updateProfile?: (updates: { connectionIntents: string[] }) => Promise<boolean>
+    addToast?: (message: string, type?: "success" | "error" | "info") => void
   }
   const meId = IdentityService.getCurrentUserId()
   const profileIntents = resolveUserIntents(meId, ghc.profile as any)
@@ -111,15 +113,27 @@ export function DiscoveryGridScreen() {
   const [category, setCategory] = useState<DiscoveryCategory>("people")
   const [useModernCard, setUseModernCard] = useState(true)
   const onIntentsChange = useCallback(
-    (ids: ConnectionIntentId[]) => {
-      setSelectedIntents(ids)
-      try {
-        saveConnectionIntents(meId, ids)
-      } catch {
-        /* */
+    async (ids: ConnectionIntentId[]) => {
+      const previous = selectedIntents
+      const normalized = Array.from(new Set(ids)).slice(0, 11)
+      setSelectedIntents(normalized)
+      if (!ghc.updateProfile) {
+        setSelectedIntents(previous)
+        ghc.addToast?.("Connection preferences cannot be saved right now", "error")
+        return
       }
+      const saved = await ghc.updateProfile({ connectionIntents: normalized })
+      if (!saved) {
+        // updateProfile may have queued the account change for reconnect. Keep the
+        // current selection visible, but clearly distinguish it from server-confirmed state.
+        ghc.addToast?.("Connection preferences are not yet confirmed by the server", "info")
+        return
+      }
+      // Local mirror is a convenience cache only; the profile service is authoritative.
+      saveConnectionIntentsWithStatus(meId, normalized)
+      ghc.addToast?.("Discovery preferences updated", "success")
     },
-    [meId],
+    [ghc.updateProfile, ghc.addToast, meId, selectedIntents],
   )
   const [query, setQuery] = useState("")
   const [pickerTarget, setPickerTarget] = useState<{ id: string; name?: string } | null>(null)

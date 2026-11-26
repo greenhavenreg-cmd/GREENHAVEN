@@ -7,11 +7,11 @@ import { DurableImage } from "./durable-image"
  * Production never injects demo people/communities into these cards.
  */
 
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useGHCProfile, useGHCMessaging, useGHCFeed } from "@/contexts/ghc-context"
 import { listMyCommunitiesForHome } from "@/lib/domains/adapters/my-communities-home"
 import { Calendar } from "lucide-react"
-import { listInvitationsForViewer } from "@/lib/domains/adapters/community-invites-adapter"
+import type { CommunityInvitationView } from "@/lib/domains/adapters/community-invites-adapter"
 import { buildHomeCommunityPulse } from "@/lib/domains/adapters/home-community-pulse"
 import { IdentityService } from "@/lib/identity/identity-service"
 import { useGHC } from "@/contexts/ghc-context"
@@ -117,9 +117,46 @@ export function HomeCommandCentre({
     blockedUserIds,
     limit: 6,
   })
-  const invites = listInvitationsForViewer(conversations, meId, {
-    blockedUserIds,
-  }).filter((i: { status: string }) => i.status === "invited")
+  const [invites, setInvites] = useState<CommunityInvitationView[]>([])
+  const [invitesUnavailable, setInvitesUnavailable] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    if (!meId) { setInvites([]); setInvitesUnavailable(false); return }
+    const load = async () => {
+      try {
+        const response = await fetch("/api/communities/invitations", { credentials: "include", cache: "no-store" })
+        const payload = await response.json().catch(() => null)
+        if (!response.ok || payload?.ok !== true || payload?.durable !== true || !Array.isArray(payload.invitations)) {
+          throw new Error("INVITATIONS_UNAVAILABLE")
+        }
+        const rows: CommunityInvitationView[] = payload.invitations.flatMap((invite: any) => {
+          if (typeof invite?.communityId !== "string" || typeof invite?.id !== "string") return []
+          return [{
+            communityId: invite.communityId,
+            invitationId: invite.id,
+            communityName: String(invite.communityName || "Community"),
+            purpose: String(invite.purpose || invite.description || ""),
+            coverImage: typeof invite.coverImage === "string" ? invite.coverImage : undefined,
+            inviterId: typeof invite.invitedBy === "string" ? invite.invitedBy : undefined,
+            status: "invited" as const,
+            privacy: typeof invite.privacy === "string" ? invite.privacy : undefined,
+          }]
+        })
+        if (!cancelled) { setInvites(rows); setInvitesUnavailable(false) }
+      } catch {
+        if (!cancelled) { setInvites([]); setInvitesUnavailable(true) }
+      }
+    }
+    void load()
+    const onRefresh = () => void load()
+    window.addEventListener("ghc:community-refresh", onRefresh)
+    window.addEventListener("focus", onRefresh)
+    return () => {
+      cancelled = true
+      window.removeEventListener("ghc:community-refresh", onRefresh)
+      window.removeEventListener("focus", onRefresh)
+    }
+  }, [meId])
   const communityPulse = buildHomeCommunityPulse({
     viewerId: meId,
     conversations,
@@ -435,6 +472,11 @@ export function HomeCommandCentre({
         }}
       />
 
+      {invitesUnavailable ? (
+        <p className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground" role="status">
+          Community invitations are temporarily unavailable. Your inbox has not been treated as empty.
+        </p>
+      ) : null}
       {invites.length > 0 ? (
         <div className="space-y-2" aria-label={`${invites.length} community invitations`}>
           {invites.slice(0, 3).map((invite) => (

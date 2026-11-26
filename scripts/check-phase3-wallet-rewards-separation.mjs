@@ -26,7 +26,7 @@ ok("send educate points to Rewards for matured claims", wallet.includes("claim m
 const rewards = read("components/ghc/rewards-centre-screen.tsx")
 ok("registration bonus on rewards", rewards.includes("RegistrationBonusCard"))
 ok("withdraw path navigates to wallet", rewards.includes("Open Wallet · Withdraw Pi"))
-ok("claims stay on rewards copy", rewards.includes("Claims stay here") || rewards.includes("claimed here"))
+ok("claims stay on rewards copy", rewards.includes("/api/economy/rewards/claim") && rewards.includes("Claim to available GHC") && rewards.includes("Earn & claim"))
 
 const membership = read("components/ghc/premium-membership-screen.tsx")
 ok("membership screen still exists", membership.length > 500)

@@ -27,7 +27,7 @@ const checks = [
   ['Membership management exposes the server-confirmed membership start date', screen.includes('authoritativeStatus?.startedAt') && screen.includes('Member since')],
   ['Plan comparison table has an accessible descriptive caption', screen.includes('Comparison of Free, VIP and VVIP membership benefits and selected-term prices')],
   ['Complimentary paid access is not mislabeled as standard Free access', screen.includes('Complimentary membership · no scheduled expiry')],
-  ['Manual refresh reports the actual result rather than stale React state', screen.includes('refreshed ? "Status refreshed" : "Membership status unavailable"')],
+  ['Manual refresh reports fresh, degraded and unavailable outcomes distinctly', screen.includes('refreshed = next !== null') && screen.includes('degraded = result.degraded') && /degraded\s*\?\s*"Showing last confirmed status"\s*:\s*"Status refreshed"/.test(screen) && screen.includes('Membership status unavailable')],
   ['Prepaid non-recurring renewal policy remains unchanged server-side', activate.includes('alreadyActive') && activate.includes('MEMBERSHIP_STORE_UNAVAILABLE') && pricing.includes('bonusMonths: 1')],
   ['Purchase and entitlement grants remain server-authoritative', activate.includes('resolveAuthenticatedUser') && activate.includes('tryGrantMembershipFromCompletedIntent') && activate.includes('ghc_purchase_membership')],
   ['Comparison categories can be filtered accessibly', screen.includes('compareCategories') && screen.includes('aria-pressed={compareCategory === category}') && screen.includes('visibleCompareRows')],

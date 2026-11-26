@@ -1,0 +1,144 @@
+# GreenHaven — current source of truth
+
+**Accepted source archive:** `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`  
+**Working package candidate:** `gh-connect@0.338.154` (RUN442 Testnet Migration Reconciliation & Controlled Application)  
+**Package identity:** `gh-connect@0.338.154`  
+**Working candidate archive:** `GREENHAVEN-0.338.154-RUN442-TESTNET-MIGRATION-RECONCILIATION-2026-11-26.zip`  
+**Parent baseline:** `gh-connect@0.338.139` (RUN426 Phase 0)  
+**Date:** 26 November 2026
+**RUN442 update:** Applied three individually preflighted additive migrations to Testnet: RUN384 research FK indexes (17/17 postflight), RUN384 least-privilege server REST grants (13/13), and RUN390 server read grants. Generated history versions are `20261126153605`, `20261126153609`, and `20261126153614`; original source versions remain drifted. Four migrations remain held for disposable PostgreSQL 17/security/financial/concurrency validation. No financial data or provider state changed. RUN441 identity/session/profile hardening remains in the candidate. Phase 3 operational blockers remain open.
+**RUN437 update:** Adds read-only SQL diagnostics for migration effects, service-role/client ACLs, expected RPCs, invitation-table posture and migration-history anomalies. RUN437 source contract passes 8/8. The SQL was not run against Testnet in this increment; operational database tests remain blocked.  
+**Acceptance status:** 0.338.154 is not yet accepted, pushed or deployed.  
+**Release status:** **NOT APPROVED** for Mainnet or production financial release.
+
+## Authority and preservation
+
+1. The user's 26 November 2026 Phase 1–6 integrated archive is the authoritative baseline.
+2. The former Run 423 / Run 411 archive is historical evidence only.
+3. The RUN426 Phase 0 candidate (incorporating RUN424/RUN425) is a controlled derivative of the authoritative baseline. It preserves the application architecture, records recovered repository infrastructure and historical evidence, and includes the targeted fixes listed in `docs/ENGINEERING-AUDIT-2026-11-26.md`.
+4. Do not bulk-merge the former project's nested `run413_work/` tree. Historical documents are marked with `.historical-notice.md` sidecars or stored under `docs/archive/`.
+5. RUN429 adds one source migration, classified REVIEW_REQUIRED. It remains unapplied; the RUN441 lock-order correction is still held pending PostgreSQL rehearsal.
+
+## Product experience standard
+
+GreenHaven is a finished consumer product, not a developer demo. Prefer concise labels and familiar interaction patterns. Remove long feature explanations, redundant onboarding copy, implementation notes and internal diagnostics from customer-facing screens. Keep short, contextual explanations only where needed for payments, security, consent, eligibility, privacy, financial settlement or error recovery. Engineering detail belongs in repository documentation.
+
+## Connected operational environment
+
+- **GitHub:** `greenhavenreg-cmd/GREENHAVEN`, branch `testnet`.
+- **Vercel:** project `greenhaven`, team `greenhavenreg-5659`, Preview environment.
+- **Supabase:** project `jhlsjnmfpakvibuuoygx`, Testnet.
+- **Pi:** Testnet/Sandbox only. Mainnet activation is outside scope.
+
+## Current operational reconciliation — 26 November 2026
+
+### GitHub and Vercel
+
+The connected `testnet` branch is at `bc42129e7ebf5d5259f9846a79118a0c855ed9a6`, package `0.338.137`. The latest inspected Vercel Preview deployment is `READY`, but it was built from that same older commit; its Vercel status check is successful and no GitHub Actions workflow runs were returned for that commit. Seven integrated application components do not match the current GitHub branch: `pi-cashback-summary.tsx`, `premium-membership-screen.tsx`, `rewards-centre-screen.tsx`, `skeleton-loaders.tsx`, `unified-earnings-dashboard.tsx`, `wallet-screen.tsx`, and `withdraw-ghc-panel.tsx`. The RUN426 Phase 0 candidate (incorporating RUN424/RUN425) has not been pushed and no new Vercel deployment has been made.
+
+The following repository-level files were restored from the former archive and verified byte-for-byte against the connected GitHub branch using their Git blob SHAs: `.gitignore`, `.github/dependabot.yml`, `.github/workflows/ci.yml`, `.github/workflows/dependency-security.yml`, and `scripts/check-dependency-lock-integrity.mjs`.
+
+### Supabase migration reconciliation
+
+The active source inventory contains **246 SQL migration files**. After RUN442, Supabase Testnet reports **243 migration-history rows**. The source/history reconciliation is:
+
+- **234** source migrations match a remote history row by exact version and normalized name.
+- **Four** source migrations have no corresponding Testnet migration-history entry and remain held: RUN388 (`20261124150000`), RUN396 (`20261125120000`), RUN405 (`20261125150000`) and RUN429 (`20261126090001`).
+- **Eight** logical migrations have source/history version drift: RUN383 identity privacy grants; RUN407 earnings-ledger privileges; RUN397 registration bonus; RUN397 referral quality caps; RUN406 server-read privilege reconciliation; RUN384 research FK indexes; RUN384 server REST grants; and RUN390 Marketplace/Membership/Feed read grants.
+- The three RUN442 migrations were applied through the Supabase migration tool and recorded under generated history versions `20261126153605`, `20261126153609`, and `20261126153614`, not their original source timestamps. Their SQL effects are postflight-verified, but the original source timestamps remain unrecorded.
+- The remote history still contains two versions for the same RUN406 migration name (`20261125075911` and `20261125075936`). This is a duplicate-name history condition, not a duplicate version number.
+
+Do not run `supabase db push`, replay, repair, squash or re-version these migrations automatically. The Supabase tool generated new history IDs for RUN442, so source/history synchronization must be explicitly reconciled before a CLI push. Do not replay the three applied migrations by assumption. The four remaining source migrations are held for disposable PostgreSQL 17 and target-specific validation. Mainnet was not accessed.
+
+### Supabase security and performance observations
+
+Read-only catalog checks found 37 public tables with RLS enabled and no policies; these are intentional server-only deny-client tables, so do not add generic policies. The RUN442 security postflight retained client-deny ACLs. The Performance Advisor now reports 200 INFO unused-index candidates; do not remove indexes without workload evidence. The 17 RUN384 foreign-key indexes have been applied and all 17 were verified valid. Supabase Health Advisor returned no findings.
+
+## Verification and release boundary
+
+- RUN441 focused identity/session/profile and Community/Messenger contracts remain passing; the last full static run was an incomplete timed run and is not claimed as a full-suite pass.
+- Release hygiene: **PASS, 17/17**.
+- Project truth: **PASS, 11/11**.
+- Dependency-lock integrity and repository consistency checks: **PASS**.
+- Prebuild dry-run: **464 checks discovered**; execution is blocked by the Node 22.16.0 runtime guard.
+- RUN434 authority contract: **17/17 PASS**; operator-key runtime: **6/6 PASS**; RUN435 identity input classification: **16/16 PASS**.
+- Supported Node runtime: **BLOCKED locally**. This workspace has Node `v22.16.0`; the project pins Node `24.15.0`.
+- Typecheck, lint, dependency audit refresh and production build: **NOT RUN** in this environment because the supported Node runtime/dependency installation was unavailable.
+- Live Pi Browser authentication and complete Testnet buyer/seller, Wallet, Rewards, Membership and withdrawal acceptance: **NOT YET VERIFIED**.
+
+A previous dependency scan reported 22 known findings; a fresh audit under Node 24.15.0 is still required before release. A passing source-only suite does not certify a build, live service behavior or production readiness.
+
+## Release policy
+
+Keep the project Testnet-only. Production and Mainnet remain **NOT APPROVED** until the R2 source is synchronized to a reviewable GitHub Testnet branch, the supported-runtime CI/build and current dependency-security gates pass, migration history is reconciled without replay, and identity, Marketplace, Wallet, Rewards, Membership and Pi Testnet user journeys pass functional acceptance.
+
+
+## RUN424 — wallet and session integrity
+
+The current 0.338.139 candidate retains the RUN424 wallet quote correction, strict wallet snapshot field validation, matching partitioned-cookie clearing attributes, and the corresponding regression gate. See `docs/RUN424-IDENTITY-FINANCIAL-INTEGRITY-2026-11-26.md`.
+
+
+## RUN425 — Pi profile synchronization repair
+
+Live Vercel runtime errors exposed repeated HTTP 409 profile-store writes on `/api/auth/pi`. The source used a PostgREST `on_conflict` target without `Prefer: resolution=merge-duplicates`. RUN425 adds the required upsert preference, preserves `created_at`, and fails closed if the production profile read is unavailable. This is a profile presentation sync repair, not a fix or proof of Pi Platform token authorization. The Pi auth route continues to treat profile presentation sync as recoverable.
+
+The Preview environment metadata also flags `GHC_OPERATOR_RECONCILE_KEY` as `readable-secret`; its value was not decrypted or changed. Rotate it and store it with Sensitive visibility before operator reconciliation use. Testnet flags remain fenced and no Mainnet action occurred.
+
+
+## RUN426 — Phase 0 social experience foundation
+
+The current 0.338.139 source candidate adds the external research record, source architecture inventory, cross-domain Community/Messages/Discovery design decisions, accessibility and performance targets, teen-safe discovery constraint, release acceptance matrix, and a static regression gate. It is a source-only foundation; no user-facing feature redesign, Supabase migration, live data mutation, GitHub push or Vercel deployment has occurred. See `docs/RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.md`.
+
+
+## RUN427–RUN429 — Phase 1 Social & Connections implementation candidate
+
+RUN427 adds the role-derived Managed community directory. RUN428 adds the Resources workspace and cross-domain Social & Connections source checks. RUN429 adds a durable community invitation table/RPC migration, authenticated create/list/respond APIs, inbox integration in Communities and Home, and notification projection. Invitation acceptance updates canonical community membership but does not implicitly grant realtime Chat membership. RUN429's migration is classified REVIEW_REQUIRED and has not been applied because disposable-PostgreSQL validation and exact target-history reconciliation remain outstanding. Targeted checks pass RUN426 15/15, RUN427 11/11, RUN428 21/21 and RUN429 16/16. Full `npm run verify:static` passes 63/63; prebuild dry-run discovers 451 checks, but execution requires Node.js 24.15.0. These remain source-level checks, not live acceptance. Node 24.15.0 dependency-backed typecheck/lint/build and two-account/multidevice E2E acceptance remain outstanding. The 0.338.147 RUN434 archive is a review candidate only; retain 0.338.139 as the accepted source archive until explicit user acceptance.
+
+
+## RUN430 — Phase 2 Social Engagement hardening
+
+RUN430 improves saved-collection persistence feedback. Device-local collection writes now return an explicit persistence result; the collection picker does not claim success or close when browser storage rejects the write, and it announces the failure accessibly. The durable account bookmark remains a separate server-authoritative operation. A new 16-check cross-feature contract covers comments, reactions, saves, shares, stories and notification targets. Existing focused Phase 2 suites were rerun and passed. This increment introduces no SQL migration and changes no live data. See `docs/RUN430-PHASE2-SOCIAL-ENGAGEMENT-2026-11-26.md` and `docs/archive/upgrade-worklogs/UPGRADE-WORKLOG-0.338.143.md`.
+
+
+## RUN431 — Phase 2 Discovery preferences integration
+
+RUN431 closes a cross-device persistence gap in Discover connection intentions. The Discovery context now exposes the canonical profile update action and shared toast action; changing intent preferences writes through the authenticated profile service, whose server store already supports `connection_intents`. The local intent store is retained only as a compatibility/convenience mirror and now has an explicit persistence result. Discover does not report a server-confirmed save unless `updateProfile` confirms it. This increment adds a 9-check source contract and no SQL migration. See `docs/RUN431-PHASE2-DISCOVERY-PREFERENCES-2026-11-26.md`.
+
+
+## RUN432 — Phase 2 Community creation draft recovery
+
+RUN432 makes the four-step Community creation flow resumable across modal close/reopen and page reload. Drafts are account-scoped, bounded, expire after 30 days, preserve the stable create idempotency identity, and exclude transient `blob:`/`data:` cover previews. Payment confirmation is never restored from local storage; the server must confirm it again. Failed creation retains the draft, while successful durable creation clears it. Added 10 source-contract checks and 15 runtime helper assertions. No migration or live data change.
+
+
+## RUN433 — Phase 2 Integrated Social Transformation
+
+RUN433 consolidates the five-stage Community, Messaging, Discovery and integration audit. The existing architecture already contains the canonical Community directory/workspace, durable invitations, Board pagination, events/resources/governance, authenticated messaging inbox/requests/details/search/media/voice/group flows, server-filtered Discovery, relationship lifecycle and typed notification navigation. RUN431 and RUN432 closed the identified cross-device preference persistence and resumable Community creation gaps. Live calling remains deliberately disabled until production policy, TURN and signaling are configured. A 22-check cross-stage contract now guards these boundaries. This is source-level acceptance only; two-account/multidevice browser acceptance, RUN429 SQL validation and Node 24.15.x build gates remain open.
+
+
+## RUN434 — Phase 3 Architecture, Identity & Durable Operation Boundaries
+
+RUN434 rebuilds the route/writer inventory against 284 current API handlers, consolidates the duplicated GHC spend transport, isolates the operational reconciliation key from the A2U worker key, and removes caller-controlled actor/approver labels from three operator financial workflows. Focused source checks pass 17/17; operator-key runtime checks pass 6/6. The generic transactional outbox remains proposal-only pending same-transaction owner-RPC integration and retry/dead-letter/consumer-deduplication rehearsal. Testnet read-only catalog checks confirm 322 public SECURITY DEFINER functions with no anon/authenticated EXECUTE privileges, and 37 server-only RLS/no-policy tables with no anon/authenticated DML grants. No SQL migration or live data mutation was made. The 0.338.139 archive remains the last user-designated accepted baseline; 0.338.147, 0.338.151 and 0.338.152 are unaccepted source candidates. Node 24.15.x build gates, disposable PostgreSQL, Testnet migration reconciliation, multi-account/concurrency tests and Mainnet evidence remain outstanding. Production remains NOT APPROVED.
+
+
+## RUN435 — Phase 3 identity input classification (26 November 2026)
+
+RUN435 manually classifies all eight routes flagged by the RUN434 body-identity inventory. Client-supplied actor/owner aliases are ignored or stripped; authenticated `auth.userId` is the authoritative actor/owner; legitimate target/counterparty IDs remain separately resolved or validated. A 16-assertion source regression gate is registered in `verify:static` and `prebuild:checks`. This is source-level evidence only and does not establish all-route AST proof or live cross-account authorization. The session-cap race remains an acceptance blocker until the held `gh_session_issue_with_cap` proposal passes disposable PostgreSQL rehearsal and migration-history reconciliation. Supported Node 24.15.x build gates, DB concurrency/retry tests, Testnet migration reconciliation, multi-account/multidevice acceptance and separate Mainnet evidence remain outstanding. No migration/live data mutation/push/deploy/payment/Mainnet operation occurred. Production remains NOT APPROVED. See `docs/RUN435-PHASE3-IDENTITY-INPUT-CLASSIFICATION-2026-11-26.md`.
+
+RUN435 verification update: full `npm run verify:static` passes with 5,330 PASS lines and zero FAIL lines; prebuild dry-run discovers 460 checks. Release hygiene passes 17/17, project truth 11/11, and migration manifest synchronization passes 246/246. Actual prebuild remains blocked by Node.js 22.16.0 versus required 24.15.0. See `docs/UPGRADE-WORKLOG-0.338.152.md`.
+
+
+RUN439 Phase 4 kickoff: added a runtime principal-boundary regression for a server-verified canonical GreenHaven account remapping under the same Pi provider subject. Existing Phase 4 identity/authentication (16/16), identity integration (17/17), coordinated identity/community/messaging (32/32), and profile identity snapshot (8/8) source gates pass. Phase 4 source implementation is now proceeding in parallel at the user’s explicit direction. Phase 3 operational acceptance remains blocked; this does not imply Phase 3 closure, Testnet migration approval, deployment or Mainnet authorization. See `docs/UPGRADE-WORKLOG-0.338.151.md`.
+
+
+## RUN440 — Phase 4 session rotation concurrency hardening
+
+Session-token rotation now updates the durable session row only when the stored token hash still equals the exact hash presented by the caller and the row remains unrevoked. The update requests a representation and succeeds only when exactly one matching row was changed. This compare-and-swap prevents two concurrent step-up requests from both reporting a successful rotation, and prevents stale rotation from overwriting a concurrent revocation. The in-memory fallback rechecks its token index after asynchronous validation. The RUN440 contract passes 12/12; runtime concurrency/outage regression passes 7 assertions. This remains source-level verification; a real PostgreSQL multi-request concurrency rehearsal is still required. No migration or live database mutation was made.
+
+
+## RUN441 — Phase 4 Identity, Community & Messenger concurrency hardening
+
+RUN441 adds 34 runtime assertions covering same-provider/different-canonical-account remapping, independent sessions across devices, cross-account revocation denial, session revocation, step-up account/session binding and revocation, and overlapping public-profile hydration requests with private-field exclusion and non-mutating results. The RUN441 source contract passes 21/21.
+
+SQL review identified two transaction hazards and prepared held corrections without editing the historical RUN429 migration: (1) Community invitation creation locks Community then invitation, while the original response function inverted that order; `supabase/proposals/20261126_run441_community_invitation_lock_order_correction.sql` now follows Community → invitation order. (2) Messenger member-count recalculation now locks affected conversation rows in deterministic order before counting. The full disposable PostgreSQL 17 two-connection rehearsal matrix is in `docs/RUN441-PHASE4-COMMUNITY-MESSENGER-TRANSACTION-REHEARSAL.md`. No `psql`, PostgreSQL server binary or Docker runtime was available, so the database rehearsal was not executed. Both corrections remain held proposals; RUN429 remains REVIEW_REQUIRED and no migration was applied.
+
+Historical RUN441 point-in-time status (before RUN442): source candidate `gh-connect@0.338.153`, not accepted, pushed or deployed. RUN442 subsequently applied three additive Testnet migrations as recorded above. The user-designated accepted archive remains `0.338.139`. Phase 3 operational acceptance remains blocked. Node 24.15.x dependency-backed typecheck/lint/build and live two-account/multidevice acceptance remain outstanding. No financial/provider operation, GitHub push or Vercel deployment occurred. Production and Mainnet remain NOT APPROVED.

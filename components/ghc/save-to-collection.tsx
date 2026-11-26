@@ -8,9 +8,9 @@
 import { useEffect, useState } from "react"
 import { Bookmark, Plus, X } from "lucide-react"
 import {
-  createCollection,
+  createCollectionWithStatus,
   loadCollections,
-  savePostToCollection,
+  savePostToCollectionWithStatus,
   type SavedCollection,
 } from "@/lib/feed-profile-experience"
 
@@ -30,19 +30,27 @@ export function SaveToCollectionSheet({
   const [cols, setCols] = useState<SavedCollection[]>([])
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState("")
+  const [storageError, setStorageError] = useState<string | null>(null)
 
   useEffect(() => {
     if (open) {
       setCols(loadCollections(scopeId))
       setCreating(false)
       setNewName("")
+      setStorageError(null)
     }
   }, [open, scopeId])
 
   if (!open || !postId) return null
 
   const pick = (c: SavedCollection) => {
-    savePostToCollection(c.id, postId, scopeId)
+    const result = savePostToCollectionWithStatus(c.id, postId, scopeId)
+    setCols(result.collections)
+    if (!result.persisted) {
+      setStorageError("Your bookmark is saved to your account, but this device could not save the collection. Check browser storage and try again.")
+      return
+    }
+    setStorageError(null)
     onSaved?.(c.name)
     onClose()
   }
@@ -50,10 +58,19 @@ export function SaveToCollectionSheet({
   const createAndSave = () => {
     const name = newName.trim()
     if (!name) return
-    const col = createCollection(name, scopeId)
-    savePostToCollection(col.id, postId, scopeId)
-    setCols(loadCollections(scopeId))
-    onSaved?.(col.name)
+    const created = createCollectionWithStatus(name, scopeId)
+    if (!created.persisted) {
+      setStorageError("Collections could not be saved on this device. Check browser storage and try again.")
+      return
+    }
+    const saved = savePostToCollectionWithStatus(created.collection.id, postId, scopeId)
+    setCols(saved.collections)
+    if (!saved.persisted) {
+      setStorageError("The collection was created, but this bookmark could not be added to it. Check browser storage and try again.")
+      return
+    }
+    setStorageError(null)
+    onSaved?.(created.collection.name)
     onClose()
   }
 
@@ -77,6 +94,7 @@ export function SaveToCollectionSheet({
         <p className="mb-2 text-[11px] text-muted-foreground">
           Collections are stored on this device and separated by account. The bookmark itself is saved to your account separately.
         </p>
+        {storageError ? <p role="alert" className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">{storageError}</p> : null}
         <div role="list" aria-label="Saved collections" className="max-h-56 space-y-1 overflow-y-auto">
           {cols.map((c) => (
             <button

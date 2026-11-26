@@ -68,7 +68,7 @@ const proposalAccidentallyExecutable = proposalOnly.filter(n => tables.has(n))
 
 if (files.length < 150) throw new Error(`Expected at least 150 clean migrations, found ${files.length}`)
 // RUN384 restores the two already-live direct-call tables to canonical migration source.
-if (tables.size !== 172) throw new Error(`Expected 172 executable GreenHaven tables in source, found ${tables.size}`)
+if (tables.size !== 173) throw new Error(`Expected 173 executable GreenHaven tables in source, found ${tables.size}`)
 if (missing.length) throw new Error(`Missing required executable GreenHaven tables: ${missing.join(', ')}`)
 if (proposalAccidentallyExecutable.length) throw new Error(`Proposal-only tables became executable: ${proposalAccidentallyExecutable.join(', ')}`)
 

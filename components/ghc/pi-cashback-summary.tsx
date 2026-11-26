@@ -134,7 +134,7 @@ export function PiCashbackSummary() {
               <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Refresh
             </button>
           </div>
-          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">0.5% of your eligible Pi spend, calculated at the end of each calendar quarter (UTC). Claim after the quarter is finalized.</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">0.5% of eligible Pi spend · quarterly</p>
         </div>
       </div>
 
@@ -153,14 +153,14 @@ export function PiCashbackSummary() {
         <div className="mt-3 space-y-2">
           <button type="button" onClick={() => void claimCashback()} disabled={claiming || loading} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-xs font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">
             {claiming ? <RefreshCw size={14} className="animate-spin" aria-hidden /> : <ShieldCheck size={14} aria-hidden />}
-            {claiming ? "Verifying Pi Testnet transfer…" : "Withdraw finalized cashback to Pi wallet"}
+            {claiming ? "Withdrawing…" : "Withdraw cashback"}
           </button>
-          <p className="text-[10px] leading-relaxed text-muted-foreground">Testnet only. A payout is shown as paid only after the Pi provider confirms the matching recipient, amount and verified transaction.</p>
+          <p className="text-[10px] text-muted-foreground">Testnet · paid after provider confirmation</p>
         </div>
       ) : (
         <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200/70 bg-amber-50/80 p-3 dark:border-amber-900/50 dark:bg-amber-950/30">
           <ShieldCheck size={14} className="mt-0.5 shrink-0 text-amber-800 dark:text-amber-200" aria-hidden />
-          <p className="text-[10px] leading-relaxed text-amber-950 dark:text-amber-100">{payload?.withdrawalEnabled ? "No finalized cashback is currently available to withdraw." : "Pi withdrawals remain disabled until the Testnet A2U payout migration, server credentials, wallet funding and end-to-end verification are complete. Mainnet payouts are not enabled by this release."}</p>
+          <p className="text-[10px] text-amber-950 dark:text-amber-100">{payload?.withdrawalEnabled ? "No cashback ready to withdraw." : "Cashback payouts are closed on this deployment."}</p>
         </div>
       )}
       {claimMessage ? <p role="status" aria-live="polite" className="mt-2 break-words rounded-lg border border-border/60 bg-background/70 p-2 text-[10px] leading-relaxed text-foreground">{claimMessage}</p> : null}

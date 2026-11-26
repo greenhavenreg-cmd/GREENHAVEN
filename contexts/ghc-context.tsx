@@ -426,6 +426,8 @@ export const GHCDiscoveryContext = createContext<{
   startConversation: GHCContextType["startConversation"]
   acceptMatch: GHCContextType["acceptMatch"]
   rejectMatch: GHCContextType["rejectMatch"]
+  updateProfile: GHCContextType["updateProfile"]
+  addToast: (message: string, type: "success" | "error" | "info") => void
   profile: Profile
 } | null>(null)
 
@@ -6561,84 +6563,93 @@ const dismissMatchCelebration = useCallback(() => {
     [addToast, domains]
   )
 
+  const findDurableCommunityInvitationId = useCallback(async (communityId: string): Promise<string | null> => {
+    const response = await fetch("/api/communities/invitations", { credentials: "include", cache: "no-store" })
+    const payload = await response.json().catch(() => null)
+    if (!response.ok || payload?.ok !== true || payload?.durable !== true || !Array.isArray(payload.invitations)) return null
+    const match = payload.invitations.find((invite: any) => invite?.communityId === communityId && typeof invite?.id === "string")
+    return match?.id || null
+  }, [])
+
   const acceptCommunityInvitation = useCallback(
     async (communityId: string): Promise<boolean> => {
       try {
-        const result = await domains.community.acceptInvitation(communityId)
-        if (!result.ok) {
-          addToast(result.error || "Invitation unavailable", "error")
+        const invitationId = await findDurableCommunityInvitationId(communityId)
+        if (!invitationId) {
+          addToast("Invitation unavailable or expired", "error")
           return false
         }
-        setState((s) => {
-          const memberId = IdentityService.getCurrentUserId() || "current-user"
-          return {
-            ...s,
-            conversations: s.conversations.map((c) => {
-              if (c.id !== communityId) return c
-              const groupRoles: NonNullable<Conversation["groupRoles"]> = {
-                ...(c.groupRoles || {}),
-                [memberId]: "member",
-              }
-              return {
-                ...c,
-                members: result.data.members,
-                invitedMembers: (c.invitedMembers || []).filter((id: string) => id !== memberId),
-                groupRoles,
-              }
-            }),
-          }
+        const response = await fetch(`/api/communities/invitations/${encodeURIComponent(invitationId)}`, {
+          method: "PATCH", credentials: "include", cache: "no-store",
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accept: true }),
         })
+        const payload = await response.json().catch(() => null)
+        if (!response.ok || payload?.ok !== true || payload?.durable !== true || payload?.accepted !== true) {
+          addToast(payload?.error || "Invitation unavailable", "error")
+          return false
+        }
+        const memberId = IdentityService.getCurrentUserId() || "current-user"
+        setState((s) => ({
+          ...s,
+          conversations: s.conversations.map((c) => c.id !== communityId ? c : ({
+            ...c,
+            members: Array.from(new Set([...(c.members || []), memberId])),
+            invitedMembers: (c.invitedMembers || []).filter((id: string) => id !== memberId),
+            groupRoles: { ...(c.groupRoles || {}), [memberId]: "member" },
+          })),
+        }))
         try {
-          const communityName =
-            (state.conversations.find((c) => c.id === communityId))?.groupName || "community"
+          const communityName = state.conversations.find((c) => c.id === communityId)?.groupName || "community"
           emitCommunityNotification({
-            subtype: "invitation_accepted",
-            communityId,
-            communityName,
-            userId: IdentityService.getCurrentUserId() || undefined,
-            actorName: state.profile.displayName || "Member",
-            referenceId: `invitation_accepted:${communityId}:${IdentityService.getCurrentUserId()}`,
+            subtype: "invitation_accepted", communityId, communityName,
+            userId: memberId, actorName: state.profile.displayName || "Member",
+            referenceId: `invitation_accepted:${communityId}:${memberId}`,
           })
-        } catch { /* */ }
+        } catch { /* notifications are secondary to the durable membership mutation */ }
         addToast("Joined community", "success")
+        window.dispatchEvent(new CustomEvent("ghc:community-refresh", { detail: { communityId } }))
         return true
-      } catch (err) {
+      } catch {
         addToast("Could not accept invitation", "error")
         return false
       }
     },
-    [addToast, domains, state.conversations, state.profile.displayName]
+    [addToast, findDurableCommunityInvitationId, state.conversations, state.profile.displayName]
   )
 
   const declineCommunityInvitation = useCallback(
     async (communityId: string): Promise<boolean> => {
       try {
-        const result = await domains.community.declineInvitation(communityId)
-        if (!result.ok) {
-          addToast(result.error || "Invitation unavailable", "error")
+        const invitationId = await findDurableCommunityInvitationId(communityId)
+        if (!invitationId) {
+          addToast("Invitation unavailable or expired", "error")
           return false
         }
+        const response = await fetch(`/api/communities/invitations/${encodeURIComponent(invitationId)}`, {
+          method: "PATCH", credentials: "include", cache: "no-store",
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accept: false }),
+        })
+        const payload = await response.json().catch(() => null)
+        if (!response.ok || payload?.ok !== true || payload?.durable !== true || payload?.accepted !== false) {
+          addToast(payload?.error || "Invitation unavailable", "error")
+          return false
+        }
+        const memberId = IdentityService.getCurrentUserId() || "current-user"
         setState((s) => ({
           ...s,
-          conversations: s.conversations.map((c) =>
-            c.id === communityId
-              ? {
-                  ...c,
-                  invitedMembers: (c.invitedMembers || []).filter(
-                    (id: string) => id !== (IdentityService.getCurrentUserId() || "current-user")
-                  ),
-                }
-              : c
-          ),
+          conversations: s.conversations.map((c) => c.id === communityId
+            ? { ...c, invitedMembers: (c.invitedMembers || []).filter((id: string) => id !== memberId) }
+            : c),
         }))
         addToast("Invitation declined", "info")
+        window.dispatchEvent(new CustomEvent("ghc:community-refresh", { detail: { communityId } }))
         return true
       } catch {
         addToast("Could not decline invitation", "error")
         return false
       }
     },
-    [addToast, domains]
+    [addToast, findDurableCommunityInvitationId]
   )
 
 
@@ -6778,9 +6789,13 @@ const dismissMatchCelebration = useCallback(() => {
           addToast("Invalid invite target", "error")
           return false
         }
-        const result = await domains.community.inviteMember(communityId, userId)
-        if (!result.ok) {
-          addToast(result.error || "Could not invite", "error")
+        const response = await fetch(`/api/communities/${encodeURIComponent(communityId)}/invitations`, {
+          method: "POST", credentials: "include", cache: "no-store",
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }),
+        })
+        const payload = await response.json().catch(() => null)
+        if (!response.ok || payload?.ok !== true || payload?.durable !== true) {
+          addToast(payload?.error || "Could not send invitation", "error")
           return false
         }
         const communityName =
@@ -6791,9 +6806,7 @@ const dismissMatchCelebration = useCallback(() => {
             c.id === communityId
               ? {
                   ...c,
-                  invitedMembers: result.data.invitedMembers || [
-                    ...new Set([...(c.invitedMembers || []), userId]),
-                  ],
+                  invitedMembers: [...new Set([...(c.invitedMembers || []), userId])],
                 }
               : c
           ),
@@ -6815,7 +6828,7 @@ const dismissMatchCelebration = useCallback(() => {
         return false
       }
     },
-    [addToast, domains, state.conversations, state.profile.displayName]
+    [addToast, state.conversations, state.profile.displayName]
   )
 
   const requestJoinCommunity = useCallback(
@@ -8269,6 +8282,8 @@ const dismissMatchCelebration = useCallback(() => {
       startConversation,
       acceptMatch,
       rejectMatch,
+      updateProfile,
+      addToast,
       profile: state.profile,
     }),
     [
@@ -8285,6 +8300,8 @@ const dismissMatchCelebration = useCallback(() => {
       startConversation,
       acceptMatch,
       rejectMatch,
+      updateProfile,
+      addToast,
     ],
   )
 

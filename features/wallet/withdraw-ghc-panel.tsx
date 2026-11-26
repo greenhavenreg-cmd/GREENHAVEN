@@ -14,6 +14,7 @@ import {
   parseGhcInput,
   withdrawalStatusLabel,
 } from "@/lib/wallet/ghc-amount"
+import { SettlementPanelSkeleton } from "@/components/ghc/skeleton-loaders"
 
 function newWithdrawalIdempotencyKey(): string {
   try {
@@ -68,6 +69,11 @@ export function WithdrawGhcPanel() {
   /** Stable across retries of the same submit; rotated only after success */
   const idempotencyKeyRef = useRef(newWithdrawalIdempotencyKey())
 
+  const lastQuoteRef = useRef<Quote | null>(null)
+  const lastItemsRef = useRef<WdRequest[]>([])
+  const [stale, setStale] = useState(false)
+  const [gateReason, setGateReason] = useState<string | null>(null)
+
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -82,15 +88,47 @@ export function WithdrawGhcPanel() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || data.ok === false) {
-        setError(data.message || data.error || "Could not load withdrawal info")
-        setQuote(null)
-        setItems([])
+        const code = String(data.error || "")
+        const msg = String(data.message || data.error || "Could not load withdrawal info")
+        // Soft-degrade: keep last successful quote so the panel does not go blank.
+        if (lastQuoteRef.current) {
+          setQuote(lastQuoteRef.current)
+          setItems(lastItemsRef.current)
+          setStale(true)
+          setError(msg)
+        } else {
+          setQuote(null)
+          setItems([])
+          setStale(false)
+          setError(msg)
+        }
+        // Operator / testnet gates — surface clearly, not as a generic network failure.
+        if (
+          code.includes("DISABLED") ||
+          code.includes("NOT_ENABLED") ||
+          /disabled|not enabled|not available|feature flag/i.test(msg)
+        ) {
+          setGateReason(msg)
+        }
         return
       }
-      setQuote(data.quote || null)
-      setItems(Array.isArray(data.withdrawals) ? data.withdrawals : [])
+      const nextQuote = (data.quote || null) as Quote | null
+      const nextItems = Array.isArray(data.withdrawals) ? (data.withdrawals as WdRequest[]) : []
+      lastQuoteRef.current = nextQuote
+      lastItemsRef.current = nextItems
+      setQuote(nextQuote)
+      setItems(nextItems)
+      setStale(false)
+      setGateReason(null)
     } catch {
-      setError("Network error")
+      if (lastQuoteRef.current) {
+        setQuote(lastQuoteRef.current)
+        setItems(lastItemsRef.current)
+        setStale(true)
+        setError("Could not refresh settlement info. Showing last loaded quote.")
+      } else {
+        setError("Network error — check your connection and retry.")
+      }
     } finally {
       setLoading(false)
     }
@@ -177,10 +215,10 @@ export function WithdrawGhcPanel() {
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">Withdraw GHC</h3>
+          <h3 className="text-sm font-black tracking-tight text-foreground">GHC → Pi settlement</h3>
           <p className="mt-0.5 text-[11px] text-muted-foreground leading-snug">
-            Request Pi settlement of eligible GHC. Not an instant transfer. Rate is{" "}
-            <strong className="text-foreground">{rate} GHC per 1 π</strong> (not 1:1).
+            Request operator-reviewed settlement of eligible GHC. Not an instant Pi send. Reference rate{" "}
+            <strong className="text-foreground">{rate} GHC = 1 π</strong> (never 1:1).
           </p>
         </div>
         <button
@@ -193,17 +231,33 @@ export function WithdrawGhcPanel() {
         </button>
       </div>
 
-      {loading ? (
-        <p className="text-[12px] text-muted-foreground">Loading…</p>
+            {gateReason ? (
+        <div className="rounded-xl border border-slate-300/80 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900/40" role="status">
+          <p className="text-[12px] font-bold text-foreground">GHC → Pi settlement is not open on this deployment</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+            Testnet / operator policy currently blocks settlement requests. Your GHC balance is unchanged. This is not a wallet error.
+          </p>
+          <p className="mt-1 text-[10px] text-muted-foreground">{gateReason}</p>
+        </div>
+      ) : null}
+
+      {stale && quote ? (
+        <div className="rounded-xl border border-amber-300/70 bg-amber-50/90 px-3 py-2 text-[11px] text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100" role="status">
+          Showing last confirmed settlement quote — live refresh is temporarily limited.
+        </div>
+      ) : null}
+
+      {loading && !quote ? (
+        <SettlementPanelSkeleton />
       ) : quote ? (
         <div className="grid grid-cols-2 gap-2 text-[12px]">
-          <div className="rounded-xl bg-muted/40 px-2.5 py-2">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Withdrawable</p>
-            <p className="font-semibold tabular-nums">{quote.withdrawableGhc.toFixed(2)} GHC</p>
+          <div className="rounded-xl bg-emerald-50/80 px-2.5 py-2 dark:bg-emerald-950/30">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">Withdrawable</p>
+            <p className="mt-0.5 font-black tabular-nums text-foreground">{quote.withdrawableGhc.toFixed(2)} GHC</p>
           </div>
-          <div className="rounded-xl bg-muted/40 px-2.5 py-2">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">≈ Pi value</p>
-            <p className="font-semibold tabular-nums">{quote.piEquivalent.toFixed(4)} π</p>
+          <div className="rounded-xl bg-violet-50/80 px-2.5 py-2 dark:bg-violet-950/30">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-800 dark:text-violet-300">≈ Pi value</p>
+            <p className="mt-0.5 font-black tabular-nums text-foreground">{quote.piEquivalent.toFixed(4)} π</p>
           </div>
           <div className="rounded-xl bg-muted/40 px-2.5 py-2">
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Locked</p>
@@ -214,12 +268,20 @@ export function WithdrawGhcPanel() {
             <p className="font-semibold tabular-nums">{quote.minGhc.toFixed(0)} GHC</p>
           </div>
         </div>
+      ) : !loading && !gateReason ? (
+        <div className="rounded-xl border border-dashed border-border px-3 py-3 text-center">
+          <p className="text-[12px] font-semibold text-foreground">Settlement quote unavailable</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Tap Refresh to load the server-confirmed rate and limits. No request was submitted.</p>
+        </div>
       ) : null}
 
       {quote && !quote.eligible ? (
-        <p className="text-[12px] text-amber-800 dark:text-amber-200/90 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-2">
-          Withdrawal unlocks at {quote.minGhc} GHC minimum ({minPi} π equivalent at {rate} GHC/π).
-        </p>
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5" role="status">
+          <p className="text-[12px] font-bold text-amber-900 dark:text-amber-100">Not eligible yet</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-amber-900/90 dark:text-amber-100/90">
+            Withdrawal unlocks at <strong>{quote.minGhc} GHC</strong> minimum ({minPi} π equivalent at {rate} GHC/π). Earn or receive more available GHC, then refresh.
+          </p>
+        </div>
       ) : null}
 
       {quote?.eligible ? (
@@ -291,15 +353,18 @@ export function WithdrawGhcPanel() {
         </div>
       ) : null}
 
-      {error ? (
-        <p className="text-[12px] text-red-600 dark:text-red-400" role="alert">
-          {error}
-        </p>
+      {error && !gateReason ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40" role="alert">
+          <p className="text-[12px] font-semibold text-red-800 dark:text-red-200">{error}</p>
+          <button type="button" onClick={() => void load()} className="mt-1 text-[11px] font-bold text-red-900 underline dark:text-red-100">
+            Retry
+          </button>
+        </div>
       ) : null}
       {success ? (
-        <p className="text-[12px] text-emerald-700 dark:text-emerald-300" role="status">
-          {success}
-        </p>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-900 dark:bg-emerald-950/40" role="status">
+          <p className="text-[12px] font-semibold text-emerald-800 dark:text-emerald-200">{success}</p>
+        </div>
       ) : null}
 
       {items.length > 0 ? (

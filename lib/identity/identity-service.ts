@@ -298,8 +298,8 @@ export const IdentityService = {
   },
 
   /**
-   * Soft merge from GH profile hydration — does NOT override a server-verified Pi uid
-   * or force needsOnboarding false/true (bridge owns that).
+   * Soft merge from GH profile hydration. Verified identities accept metadata only from
+   * their exact canonical profile row; stale account-switch responses are ignored.
    */
   setFromProfile(input: {
     userId?: string | null
@@ -307,8 +307,19 @@ export const IdentityService = {
     displayName?: string | null
   }) {
     const profileId = String(input.userId || "").trim()
-    const keepPi =
+    const isServerVerified =
       identity.verificationState === "server_verified" && Boolean(identity.piUserId)
+    // Profile hydration is asynchronous and can finish after logout/account switch.
+    // A verified principal accepts labels only from its exact canonical profile row;
+    // missing IDs and stale rows are ignored rather than relabeling the new account.
+    if (isServerVerified && (!profileId || profileId !== identity.userId)) {
+      return this.getIdentity()
+    }
+    // An unverified provider UID cannot bind profile metadata to a GH account.
+    if (identity.piUserId && !isServerVerified) {
+      return this.getIdentity()
+    }
+    const keepPi = isServerVerified
     const nextUserId = keepPi
       ? identity.userId
       : identity.piUserId

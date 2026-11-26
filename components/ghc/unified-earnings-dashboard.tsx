@@ -1,5 +1,7 @@
 "use client"
 
+import { PiEarningsSkeleton } from "@/components/ghc/skeleton-loaders"
+
 import { releaseReservedPi, emitWalletBalanceRefresh } from "@/lib/wallet/release-reserved-pi"
 
 /**
@@ -157,6 +159,62 @@ function statusTone(status?: string): string {
   }
 }
 
+
+/** Human labels for Pi earnings ledger entry types (operator + user facing). */
+function humanizeLedgerEntryType(raw?: string | null): string {
+  const key = String(raw || "").trim().toLowerCase()
+  const map: Record<string, string> = {
+    release_reserve: "Reserve released",
+    reserve: "Reserved for payout",
+    reserved: "Reserved for payout",
+    payout_reserve: "Reserved for payout",
+    payout_release: "Reserve released",
+    payout_paid: "Paid to Pi wallet",
+    paid: "Paid to Pi wallet",
+    credit: "Earnings credit",
+    debit: "Earnings debit",
+    fee: "Network / platform fee",
+    registration_bonus: "Registration reward",
+    registration_reward: "Registration reward",
+    adjustment: "Balance adjustment",
+    reversal: "Reversal",
+    hold: "Temporary hold",
+    release: "Hold released",
+  }
+  if (map[key]) return map[key]
+  if (!key) return "Ledger entry"
+  return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function humanizeLedgerStatus(raw?: string | null): string {
+  const key = String(raw || "").trim().toLowerCase()
+  const map: Record<string, string> = {
+    available: "Available",
+    pending: "Pending",
+    reserved: "Reserved",
+    processing: "Processing",
+    paid: "Paid",
+    released: "Released",
+    failed: "Failed",
+    reversed: "Reversed",
+    disputed: "Disputed",
+    uncertain: "Confirming",
+  }
+  if (map[key]) return map[key]
+  if (!key) return "—"
+  return key.replace(/_/g, " ")
+}
+
+function humanizeLedgerReason(raw?: string | null): string {
+  const text = String(raw || "").trim()
+  if (!text) return ""
+  // Avoid dumping raw snake_case operator codes at users.
+  if (/^[a-z0-9_]+$/i.test(text) && text.includes("_")) {
+    return text.replace(/_/g, " ")
+  }
+  return text
+}
+
 export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolean }) {
   // Wallet primary actions (Withdraw / Status / Linked) focus this surface as source of truth.
 
@@ -185,6 +243,10 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
   const quoteSequence = useRef(0)
   const refreshController = useRef<AbortController | null>(null)
   const refreshSequence = useRef(0)
+  /** Preserve last successful earnings snapshot across transient failures. */
+  const lastKnownSnapRef = useRef<Withdrawable | null>(null)
+  const lastKnownEntriesRef = useRef<LedgerEntry[]>([])
+  const [stale, setStale] = useState(false)
 
   const refresh = useCallback(async (externalSignal?: AbortSignal) => {
     const sequence = ++refreshSequence.current
@@ -253,10 +315,20 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
       }
 
       if (!wRes.ok || !wJson?.ok) {
-        setFailed(true)
-        setSnap(null)
+        // Soft degrade: keep last known balances rather than wiping the Pi rail.
+        if (lastKnownSnapRef.current) {
+          setSnap(lastKnownSnapRef.current)
+          setFailed(false)
+          setStale(true)
+        } else {
+          setFailed(true)
+          setSnap(null)
+          setStale(false)
+        }
       } else {
         setFailed(false)
+        setStale(false)
+        lastKnownSnapRef.current = wJson
         setSnap(wJson)
         const wa = wJson.walletAuthorization
         if (wa) {
@@ -267,7 +339,11 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
         }
       }
       if (sRes.ok && sJson?.ok && Array.isArray(sJson.entries)) {
+        lastKnownEntriesRef.current = sJson.entries
         setEntries(sJson.entries)
+      } else if (lastKnownEntriesRef.current.length > 0) {
+        // Keep previous ledger rows when the statement endpoint is temporarily down.
+        setEntries(lastKnownEntriesRef.current)
       } else {
         setEntries([])
       }
@@ -311,8 +387,16 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
       }
     } catch {
       if (!signal?.aborted) {
-        setFailed(true)
-        setSnap(null)
+        if (lastKnownSnapRef.current) {
+          setSnap(lastKnownSnapRef.current)
+          setEntries(lastKnownEntriesRef.current)
+          setFailed(false)
+          setStale(true)
+        } else {
+          setFailed(true)
+          setSnap(null)
+          setStale(false)
+        }
       }
     } finally {
       window.clearTimeout(timeout)
@@ -320,7 +404,8 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
       if (sequence === refreshSequence.current) {
         refreshController.current = null
         setLoading(false)
-        if (signal.aborted) setFailed(true)
+        if (signal.aborted && !lastKnownSnapRef.current) setFailed(true)
+        else if (signal.aborted && lastKnownSnapRef.current) setStale(true)
       }
     }
   }, [])
@@ -511,7 +596,11 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
     )
   }
 
-  if (failed || !snap) {
+  if (loading && !snap && !lastKnownSnapRef.current) {
+    return <PiEarningsSkeleton compact={compact} />
+  }
+
+    if ((failed || !snap) && !lastKnownSnapRef.current) {
     return (
       <section className="mx-3 mt-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
         <div className="flex items-start gap-2">
@@ -526,6 +615,7 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
               className="mt-3 inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-950 shadow-sm"
               onClick={() => {
                 setFailed(false)
+                setStale(false)
                 setLoading(true)
                 void refresh()
               }}
@@ -538,6 +628,14 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
     )
   }
 
+  // Prefer live snap; fall back to last known when refresh degraded.
+  const displaySnap = snap || lastKnownSnapRef.current
+  if (!displaySnap) {
+    return null
+  }
+
+  // Shadow state with the display snapshot so the rest of the render stays simple.
+  const snap = displaySnap
   const feePct = snap.feePercent ?? (snap.feeBps != null ? snap.feeBps / 100 : 3)
   const available = typeof snap.available === "number" ? snap.available : atomicToDisplay(snap.availableAtomic)
   const pending = typeof snap.pending === "number" ? snap.pending : atomicToDisplay(snap.pendingAtomic)
@@ -553,6 +651,27 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
       aria-label="Pi balance"
       data-pi-earnings-root
     >
+      {stale ? (
+        <div className="flex items-start gap-2 border-b border-amber-200/80 bg-amber-50/90 px-4 py-2.5 dark:border-amber-900 dark:bg-amber-950/40">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold text-amber-950 dark:text-amber-100">
+              Showing last confirmed Pi balances — live refresh is temporarily limited.
+            </p>
+            <button
+              type="button"
+              className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 underline dark:text-amber-100"
+              onClick={() => {
+                setStale(false)
+                setLoading(true)
+                void refresh()
+              }}
+            >
+              <RefreshCw className="h-3 w-3" /> Retry refresh
+            </button>
+          </div>
+        </div>
+      ) : null}
       <div className="flex items-center justify-between gap-2 border-b border-border/40 px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-600 text-sm font-bold text-white">
@@ -756,28 +875,38 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
 
       {entries.length > 0 ? (
         <div className="border-t border-border/40 px-4 py-3">
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Recent ledger</p>
+          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Recent ledger</p>
+          <p className="mb-2 text-[10px] leading-snug text-muted-foreground">
+            “Reserve released” means a temporary payout hold was returned to Available. It is not a new deposit.
+          </p>
           <ul className="space-y-2">
             {entries.slice(0, compact ? 3 : 6).map((e, idx) => (
               <li key={String(e.id || e.unique_ref || idx)} className="flex items-start justify-between gap-2 text-[12px]">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-foreground">{e.entry_type || e.source_kind || "entry"}</p>
+                  <p className="truncate font-medium text-foreground">{humanizeLedgerEntryType(e.entry_type || e.source_kind)}</p>
                   <p className="truncate text-[10px] text-muted-foreground" title={String(e.reason || e.unique_ref || "")}>
-                    {e.reason || e.unique_ref || ""}
-                    {e.unique_ref && e.reason ? ` · ${e.unique_ref}` : ""}
+                    {humanizeLedgerReason(e.reason) || e.unique_ref || "Server ledger entry"}
+                    {e.unique_ref && e.reason ? ` · ref ${String(e.unique_ref).slice(0, 12)}` : ""}
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="font-semibold tabular-nums text-foreground">
                     {e.amount_atomic != null ? atomicToDisplay(e.amount_atomic) : "—"}
                   </p>
-                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${statusTone(e.status)}`}>{e.status || "—"}</span>
+                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${statusTone(e.status)}`}>{humanizeLedgerStatus(e.status)}</span>
                 </div>
               </li>
             ))}
           </ul>
         </div>
-      ) : null}
+      ) : (
+        <div className="border-t border-border/40 px-4 py-3">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Recent ledger</p>
+          <p className="mt-2 rounded-xl border border-dashed border-border px-3 py-3 text-center text-[12px] leading-relaxed text-muted-foreground">
+            No recent Pi ledger movements yet. Registration rewards and payouts appear here after the server confirms them.
+          </p>
+        </div>
+      )}
     </section>
   )
 }

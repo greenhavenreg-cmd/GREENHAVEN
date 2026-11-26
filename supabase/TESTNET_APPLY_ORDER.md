@@ -1,9 +1,13 @@
 # GreenHaven Testnet migration review order
 
 **Generated from:** `supabase/migrations/*.sql` and the canonical classification policy in `scripts/generate-migration-inventory.mjs`.
-**Current source inventory:** 245 migrations.
+**Current source inventory:** 246 migrations.
 
-> **This is a review order, not permission to apply.** It does not prove remote migration history, database compatibility, or Testnet/Mainnet readiness. See docs/RUN384-FULL-PROJECT-AUDIT-2026-11-24.md for the current live target reconciliation; RUN278 and 2026-11-10 records are historical snapshots. Never run `supabase db push` while any pending migration is held for review, approval, validation, or marked proposal. Supabase CLI does not enforce these classifications.
+> **This is a review order, not permission to apply.** It does not prove remote migration history, database compatibility, or Testnet/Mainnet readiness. Never run `supabase db push` while any pending migration is held for review, approval, validation, or marked proposal. Supabase CLI does not enforce these classifications.
+
+## Current Testnet application overlay — RUN442 (26 November 2026)
+
+Target: `jhlsjnmfpakvibuuoygx`, PostgreSQL 17.12. Three migrations have been applied and postflight-verified under generated history versions: RUN384 FK indexes `20261126153605` (17/17), RUN384 service REST grants `20261126153609` (13/13), and RUN390 read grants `20261126153614`. Their original source versions remain unrecorded; do not replay them or run CLI push until history reconciliation. Four migrations remain held: RUN388 quota RPC, RUN396 payout history RPC, RUN405 registration backfill replacement, and RUN429 Community invitations. RUN429 requires the RUN441 lock-order correction to be incorporated and rehearsed. The eight version-drifted migrations and duplicate RUN406 history record remain unrepaired. See `docs/RUN442-TESTNET-MIGRATION-APPLICATION-REPORT-2026-11-26.md`. Mainnet was not accessed.
 
 ## Required operator procedure
 
@@ -255,9 +259,9 @@ The rows are sorted by the canonical migration identifier for review. Dependenci
 | 233 | `20261122133100_gh_call_sessions_conversation_fk_index.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
 | 234 | `20261123145603_gh_identity_session_service_role_grants.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
 | 235 | `20261124095500_run383_identity_privacy_service_role_grants.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
-| 236 | `20261124110000_run384_research_foreign_key_indexes.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
-| 237 | `20261124120000_run384_server_rest_table_grants.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
-| 238 | `20261124143000_run390_marketplace_membership_feed_read_grants.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 236 | `20261124110000_run384_research_foreign_key_indexes.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 237 | `20261124120000_run384_server_rest_table_grants.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 238 | `20261124143000_run390_marketplace_membership_feed_read_grants.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
 | 239 | `20261124150000_run388_research_atomic_schedule_quota.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
 | 240 | `20261125090000_run407_service_role_earnings_ledger_privileges.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
 | 241 | `20261125120000_run396_pi_payout_history_rpc.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
@@ -265,6 +269,7 @@ The rows are sorted by the canonical migration identifier for review. Dependenci
 | 243 | `20261125140000_run397_referral_quality_caps_and_summary.sql` | REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
 | 244 | `20261125150000_run405_registration_backfill_account_discovery.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
 | 245 | `20261125160000_run406_server_read_privilege_reconciliation.sql` | REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
+| 246 | `20261126090001_run429_durable_community_invitations.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
 
 ## Classification meanings
 

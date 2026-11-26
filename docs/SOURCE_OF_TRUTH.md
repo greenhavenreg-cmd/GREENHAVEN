@@ -1,3 +1,13 @@
+**Current source version:** `0.338.154`
+**Current package identity:** `gh-connect@0.338.152`
+**Coordinated programme:** `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`
+
+> **Current authority notice (26 November 2026):** This document is historical context. The working package candidate is `gh-connect@0.338.154` (RUN442 Testnet Migration Reconciliation & Controlled Application), documented in `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md`. The last user-designated accepted archive remains 0.338.139; 0.338.154 is not yet accepted, pushed or deployed.
+> **Current package identity:** `gh-connect@0.338.147` (RUN434 Phase 3 Architecture, Identity & Durable Operation Boundaries); all older version statements below are historical records.
+> **Current source version:** `0.338.147`
+**Current source version:** `0.338.147`
+
+
 # GreenHaven source authority — 0.338.137 Run 414 Release Metadata Synchronization (2026-11-25)
 
 **Current source version:** `0.338.137`
@@ -28,7 +38,7 @@ Referral rewards are 5% of a verified qualifying membership charge, capped at 25
 
 Run 414 synchronizes the current version references in README.md, docs/PROJECT_TRUTH.md, VERIFIED_MANIFEST.txt, and this source-of-truth record with the package/lockfile release identity `gh-connect@0.338.137`. This addresses the four stale metadata failures in `scripts/check-run300-release-integrity.mjs` without changing or weakening the gate. Historical records remain historical. No dependency, application behavior, migration, environment setting, financial flag, database, GitHub, or Vercel state was changed. Targeted Run #300 and Phase 4 release identity checks must pass before the full prebuild/build can be considered clear.
 
-The records below retain prior implementation history. Their original version/archive references are historical and do not override the current 0.338.137 source pointer.
+The records below retain prior implementation history. Their original version/archive references are historical and do not override the current 0.338.139 RUN426 Phase 0 source pointer.
 
 ## RUN390 — Membership, Feed Privacy and Marketplace read-path repair
 
@@ -308,3 +318,41 @@ The RUN377 audit found that the currently connected Supabase project has both id
 
 
 Run 408 integrated the Run 407 audit report and the narrowly scoped earnings-ledger service-role privilege migration into source. The Run 407 migration was already applied and verified on Testnet; this source integration is not permission to replay it. See `docs/UPGRADE-WORKLOG-0.338.133.md`. The profile/identity runtime failures, migration-history drift, broad server-role privilege inventory, and full build/browser acceptance remain unresolved release blockers.
+
+
+RUN426 Phase 0 establishes the research-backed Community, Messages and Discovery foundation in `docs/RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.md`. Package, lockfile, README, PROJECT_TRUTH, VERIFIED_MANIFEST and app release identity are synchronized to 0.338.139. No database migration, live data mutation, GitHub push or Vercel deployment occurred.
+
+
+## RUN430 — Phase 2 Social Engagement hardening (2026-11-26)
+
+Current working candidate: `gh-connect@0.338.147`. RUN430 makes saved-collection local persistence failures explicit and adds a 16-check cross-feature social engagement contract. The account bookmark remains server-authoritative; user collections remain device-local. No migration or live database change was made. See `docs/RUN430-PHASE2-SOCIAL-ENGAGEMENT-2026-11-26.md`. The accepted archive remains 0.338.139 until explicit user acceptance and outstanding operational gates are complete.
+
+
+## RUN431 — Phase 2 Discovery preferences integration (2026-11-26)
+
+Current working candidate: `gh-connect@0.338.147`. Discover intent changes now use the existing authenticated profile update path rather than treating local browser storage as the authority. The local cache remains a convenience mirror. RUN431 adds a 9-check source contract and no SQL migration. See `docs/RUN431-PHASE2-DISCOVERY-PREFERENCES-2026-11-26.md`.
+
+
+## RUN432 — Phase 2 Community creation draft recovery (2026-11-26)
+
+Current candidate `gh-connect@0.338.147` adds account-scoped resumable Community creation drafts with bounded storage, durable-media-only cover references, stable idempotency identity and no client-trusted payment confirmation. Failed creation preserves the draft; successful creation clears it. See `docs/RUN432-PHASE2-COMMUNITY-CREATE-DRAFT-2026-11-26.md`.
+
+
+## RUN433 — Phase 2 Integrated Social Transformation (2026-11-26)
+
+Candidate `gh-connect@0.338.147` includes the integrated five-stage source audit and 22-check cross-stage contract for Community, Messaging, Discovery and notification integration. The source architecture retains one canonical backend per domain; no parallel subsystem was added. Calling remains fail-closed. See `docs/RUN433-PHASE2-INTEGRATED-SOCIAL-TRANSFORMATION-2026-11-26.md`.
+
+
+## RUN434 — Phase 3 Architecture, Identity & Durable Operation Boundaries (2026-11-26)
+
+The current working candidate is `gh-connect@0.338.147`, derived from RUN433 / 0.338.146. RUN434 regenerates the API route/writer inventory across 284 handlers, consolidates duplicate GHC spend transport, removes the A2U executor-key fallback from operational financial routes, and makes operator audit actor labels server-owned. Focused source checks pass 17/17 and operator-key runtime checks pass 6/6. The existing generic transactional outbox remains proposal-only; no new table or migration was introduced without same-transaction owner-RPC integration and consumer-failure proof. Testnet catalog evidence was read-only. No database mutation, migration apply, push, deploy or payment operation occurred. Full Node 24.15.x build, PostgreSQL rehearsal, Testnet migration reconciliation, multi-account/concurrency acceptance and separate Mainnet evidence remain open. Production remains NOT APPROVED. See `docs/RUN434-PHASE3-AUTHORITY-AUDIT-2026-11-26.md`.
+
+
+## RUN435 — Phase 3 identity input classification (26 November 2026)
+
+Working candidate `gh-connect@0.338.151` adds a manual classification of all eight routes flagged by RUN434 for caller-supplied identity fields, plus a 16-assertion source gate registered in static verification and prebuild checks. Session-derived actor/owner identity remains authoritative; caller aliases are ignored/stripped; target IDs are separately validated. External PostgreSQL, Testnet migration reconciliation, Node 24.15.x build, two-account/multidevice and Mainnet evidence remain outstanding. No migration/live data mutation/push/deploy/payment/Mainnet action occurred. Production remains NOT APPROVED.
+
+
+## RUN440 current source overlay
+
+The working candidate is `gh-connect@0.338.152` / RUN440. Durable session token rotation uses compare-and-swap against the old token hash and an unrevoked-row predicate; a successful response requires exactly one changed row. This closes the stale concurrent-rotation success race and prevents a rotation update from winning over a prior revocation. The memory-only fallback rechecks the current token index before replacing it. Focused source contract: 12/12; runtime concurrency/outage regression: 7 assertions. Live PostgreSQL concurrency rehearsal, supported Node 24.15.x build, Phase 3 operational acceptance and Testnet multi-account/device verification remain outstanding. The accepted baseline remains 0.338.139; RUN440 is an unaccepted review candidate.

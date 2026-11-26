@@ -1,0 +1,1 @@
+Recovered from the former GreenHaven archive on 2026-11-26 to preserve historical engineering evidence and allow the legacy regression suite to run. This file is not current project authority. Consult docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md before acting on historical instructions or migration statuses.

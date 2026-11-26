@@ -1,0 +1,1 @@
+Historical engineering record recovered from the former GreenHaven archive on 2026-11-26 for traceability and legacy regression coverage. It is not current project authority. Consult docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md before acting on old implementation notes or migration states.

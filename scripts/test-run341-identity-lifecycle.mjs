@@ -69,11 +69,28 @@ const betaVerified = IdentityService.setFromPi({
 assert.equal(betaVerified.userId, 'gh-user-beta')
 assert.equal(betaVerified.piUserId, 'pi-uid-beta')
 assert.equal(IdentityService.isProductionIdentity(), true)
+
+// If the provider subject remains the same but the durable GH mapping changes,
+// treat it as a principal-boundary change and do not carry the prior bearer or
+// display metadata into the newly mapped account.
+const rebound = IdentityService.setFromPi({
+  uid: 'pi-uid-beta', canonicalUserId: 'gh-user-beta-rebound',
+  verifiedByServer: true, needsOnboarding: true,
+})
+assert.equal(rebound.userId, 'gh-user-beta-rebound')
+assert.equal(rebound.piUserId, 'pi-uid-beta')
+assert.equal(rebound.accessToken, null)
+assert.equal(rebound.username, null)
+assert.equal(rebound.displayName, null)
+assert.equal(rebound.needsOnboarding, true)
+assert.equal(rebound.verificationState, 'server_verified')
+assert.notEqual(IdentityService.getAuthHeaders().Authorization, 'Bearer beta-secret-token')
+
 assert.equal(resolveCanonicalUserId({ canonicalUserId: 'gh-user', profileUserId: 'profile-user' }), 'gh-user')
 
 // Profile hydration cannot replace the established canonical account principal.
 const afterHydration = IdentityService.setFromProfile({ userId: 'different-profile-id', username: 'beta' })
-assert.equal(afterHydration.userId, 'gh-user-beta')
+assert.equal(afterHydration.userId, 'gh-user-beta-rebound')
 
 // Explicit local reset cannot retain the previously verified account or token.
 const local = IdentityService.setFromPi({ uid: null, username: 'preview' })

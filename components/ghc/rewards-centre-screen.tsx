@@ -38,6 +38,7 @@ import {
   DAILY_STREAK_GHC,
 } from "@/lib/domains/reward-level-domain"
 import { useGHC } from "@/contexts/ghc-context"
+import { useWalletRead } from "@/contexts/domains/wallet-read-provider"
 import { useRegionalContext } from "@/contexts/regional-context"
 import { getProductMessage } from "@/lib/i18n/product"
 import { useSectionRefresh } from "@/hooks/use-section-refresh"
@@ -48,6 +49,7 @@ import { FilterResultState } from "./filtering/filter-result-state"
 import { matchesFilterQuery } from "@/lib/filtering/filter-utils"
 import { matchesFilterDateRange } from "@/lib/filtering/filter-contract"
 import { RewardsJourneyHero } from "./rewards-journey-hero"
+import { RewardsBalanceSkeleton } from "./skeleton-loaders"
 import { PiCashbackSummary } from "./pi-cashback-summary"
 import { RegistrationBonusCard } from "./registration-bonus-card"
 import { SurfaceIntro } from "./ui/product-surface"
@@ -206,7 +208,6 @@ export function RewardsCentreScreen({
   const msg = useCallback((key: Parameters<typeof getProductMessage>[0]) => getProductMessage(key, regional.locale), [regional.locale])
   const [tab, setTab] = useState<Tab>("challenges")
   const [tick, setTick] = useState<number>(0)
-  const [showLearnMore, setShowLearnMore] = useState(false)
   const [claimedFlash, setClaimedFlash] = useState<string | null>(null)
   const [claimingId, setClaimingId] = useState<string | null>(null)
   const [serverRewardTransactions, setServerRewardTransactions] = useState<ServerRewardTransaction[] | null>(null)
@@ -237,6 +238,8 @@ export function RewardsCentreScreen({
   const [economyStatus, setEconomyStatus] = useState<"loading" | "refreshing" | "ready" | "unavailable">("loading")
   const economyOwnerRef = useRef<string | null>(null)
   const ghc = useGHC()
+  // Same authority as Wallet screen — keeps Available/Pending/Locked consistent across tabs.
+  const { snapshot: walletAuthority, refresh: refreshWalletAuthority } = useWalletRead()
   const profile = ghc.profile
   // Optional community lists may be present on the provider value without being
   // declared on GHCContextType; read them via a narrow intersection (no unknown[]).
@@ -304,7 +307,7 @@ export function RewardsCentreScreen({
             progress: { ...card.progress, status: "locked" as const, progress: 0 },
             status: "locked" as const,
             percent: 0,
-            nextStep: "This mission is not open yet because its durable server verification workflow is not available. It will unlock when the evidence checks are ready.",
+            nextStep: "Coming soon",
             recommended: false,
           }
         }
@@ -320,7 +323,7 @@ export function RewardsCentreScreen({
             progress,
             status: "completed" as const,
             percent: 100,
-            nextStep: "Server-verified achievement saved to your account.",
+            nextStep: "Completed",
             recommended: false,
           }
         }
@@ -329,7 +332,7 @@ export function RewardsCentreScreen({
             ...card,
             progress: { ...card.progress, status: "pending_validation" as const },
             status: "pending_validation" as const,
-            nextStep: "Your journey progress meets this milestone. Verify it against GreenHaven records to save the achievement.",
+            nextStep: "Ready to verify",
           }
         }
         return card
@@ -411,6 +414,61 @@ export function RewardsCentreScreen({
       controller.abort()
     }
   }, [tick, userId])
+
+  // Prefer /api/economy/wallet/summary (Wallet rail) over /api/social/economy/status
+  // so Rewards "at a glance" never disagrees with Wallet on Available / Pending / Locked.
+  const displayEconomy = useMemo(() => {
+    const authReady =
+      walletAuthority.status === "ready" || walletAuthority.status === "error"
+    const available =
+      authReady && walletAuthority.availableGhc != null
+        ? walletAuthority.availableGhc
+        : serverEconomy.balance
+    const pending =
+      authReady && walletAuthority.pendingGhc != null
+        ? walletAuthority.pendingGhc
+        : serverEconomy.pending
+    const locked =
+      authReady && walletAuthority.lockedGhc != null
+        ? walletAuthority.lockedGhc
+        : serverEconomy.locked
+    const source: "wallet" | "social" | "none" =
+      authReady && walletAuthority.availableGhc != null
+        ? "wallet"
+        : serverEconomy.balance != null
+          ? "social"
+          : "none"
+    const status: "loading" | "refreshing" | "ready" | "unavailable" | "stale" =
+      source === "wallet"
+        ? walletAuthority.status === "error"
+          ? "stale"
+          : "ready"
+        : economyStatus
+    return {
+      available,
+      pending,
+      locked,
+      curationBalance: serverEconomy.curationBalance,
+      canFundCuration: serverEconomy.canFundCuration,
+      source,
+      status,
+      stale: walletAuthority.status === "error" && walletAuthority.availableGhc != null,
+    }
+  }, [walletAuthority, serverEconomy, economyStatus])
+
+  // Keep wallet authority warm when Rewards is open / tick refreshes.
+  useEffect(() => {
+    void refreshWalletAuthority()
+    const onWallet = () => { void refreshWalletAuthority() }
+    window.addEventListener("ghc:wallet-refresh", onWallet)
+    window.addEventListener("ghc:wallet-synced", onWallet)
+    window.addEventListener("ghc:daily-reward-claimed", onWallet)
+    return () => {
+      window.removeEventListener("ghc:wallet-refresh", onWallet)
+      window.removeEventListener("ghc:wallet-synced", onWallet)
+      window.removeEventListener("ghc:daily-reward-claimed", onWallet)
+    }
+  }, [tick, refreshWalletAuthority])
 
   // Hydrate the authenticated GHC ledger for cross-device reward history.
   // The endpoint enforces same-user access and returns authoritative transactions;
@@ -522,7 +580,7 @@ export function RewardsCentreScreen({
         const rows: UnlockedAchievementRow[] = r.durable === true ? (r.achievements || []).map((a) => ({
           id: a.achievementId,
           title: a.achievementId.replace(/_/g, " "),
-          description: "Durably unlocked on this account",
+          description: "Unlocked",
           unlockedAt: a.unlockedAt,
         })) as UnlockedAchievementRow[] : []
         setServerAchievements(rows)
@@ -546,23 +604,23 @@ export function RewardsCentreScreen({
     const code = missionCodeForChallenge(challengeId)
     if (!code || verifyingMissionId) return
     setVerifyingMissionId(challengeId)
-    setStatusMsg("Verifying milestone against GreenHaven records…")
+    setStatusMsg("Verifying…")
     try {
       const result = await reportMissionProgress(code)
       if (!result.ok) {
-        setStatusMsg(result.message || "Verification is temporarily unavailable. No reward was issued.")
+        setStatusMsg(result.message || "Verification unavailable. Try again.")
         return
       }
       if (result.verified && result.completed) {
         setAchievementRefreshTick((value) => value + 1)
         setStatusMsg(result.alreadyCompleted
-          ? "This achievement is already unlocked on your account. Mission completion does not issue GHC."
-          : "Achievement verified and saved to your account. Mission completion does not issue GHC under the current policy.")
+          ? "Already unlocked."
+          : "Achievement saved.")
       } else {
-        setStatusMsg(result.message || "This milestone is not yet verified. Complete the action and try again.")
+        setStatusMsg(result.message || "Not verified yet. Keep going.")
       }
     } catch {
-      setStatusMsg("Verification is temporarily unavailable. No reward was issued.")
+      setStatusMsg("Verification unavailable. Try again.")
     } finally {
       setVerifyingMissionId(null)
     }
@@ -689,17 +747,6 @@ export function RewardsCentreScreen({
   }, [])
 
   useEffect(() => {
-    if (!showLearnMore) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setShowLearnMore(false)
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [showLearnMore])
-
-
-  
-  useEffect(() => {
     try {
       window.dispatchEvent(new CustomEvent("ghc:section-refresh", { detail: { section: "rewards", reason: "opened" } }))
     } catch { /* */ }
@@ -814,10 +861,13 @@ const claimPendingReward = useCallback(
       ) : null}
       {isOffline ? (
         <div
-          className="mx-3 mt-2 rounded-[1.25rem] border border-amber-200/80 bg-amber-50/90 px-3.5 py-2 text-[11px] leading-snug text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+          className="mx-3 mt-2 rounded-[1.25rem] border border-amber-300/80 bg-amber-50 px-3.5 py-2.5 shadow-sm dark:border-amber-900 dark:bg-amber-950/50"
           role="status"
         >
-          Offline — journey progress already on this device stays visible. Claims need a connection so the ledger can confirm.
+          <p className="text-[12px] font-bold text-amber-950 dark:text-amber-100">You are offline</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-amber-900/90 dark:text-amber-100/80">
+            Reconnect to claim or verify missions. Balances show the last confirmed snapshot.
+          </p>
         </div>
       ) : null}
 
@@ -831,13 +881,26 @@ const claimPendingReward = useCallback(
           onOpenWallet={onOpenWallet}
         />
 
+        {(displayEconomy.status === "loading" && displayEconomy.available == null) ? (
+          <RewardsBalanceSkeleton />
+        ) : (
         <section className="gh-rewards-balance-panel mx-3 mt-3 rounded-[1.25rem] border border-border/60 bg-card px-3.5 py-3 shadow-sm" aria-labelledby="rewards-balance-summary-title">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p id="rewards-balance-summary-title" className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">Rewards at a glance</p>
-              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Amounts below come from the server-confirmed wallet snapshot. Pending and locked rewards are not spendable.</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">Pending and locked are not spendable.</p>
               <p className="mt-1 text-[9px] font-semibold" role="status" aria-live="polite">
-                {economyStatus === "ready" ? <span className="text-emerald-700 dark:text-emerald-300">● Server snapshot confirmed</span> : economyStatus === "refreshing" ? <span className="text-muted-foreground">Refreshing confirmed snapshot…</span> : economyStatus === "loading" ? <span className="text-muted-foreground">Loading secure snapshot…</span> : <span className="text-amber-700 dark:text-amber-300">Snapshot unavailable · retry refresh</span>}
+                {displayEconomy.status === "ready" ? (
+                  <span className="text-emerald-700 dark:text-emerald-300">● Wallet-confirmed snapshot{displayEconomy.source === "wallet" ? "" : " (social fallback)"}</span>
+                ) : displayEconomy.status === "stale" ? (
+                  <span className="text-amber-700 dark:text-amber-300">● Showing last confirmed wallet balances</span>
+                ) : displayEconomy.status === "refreshing" ? (
+                  <span className="text-muted-foreground">Refreshing confirmed snapshot…</span>
+                ) : displayEconomy.status === "loading" ? (
+                  <span className="text-muted-foreground">Loading secure snapshot…</span>
+                ) : (
+                  <span className="text-amber-700 dark:text-amber-300">Snapshot unavailable · retry refresh</span>
+                )}
               </p>
             </div>
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" aria-hidden="true">
@@ -847,53 +910,49 @@ const claimPendingReward = useCallback(
           <div className="mt-3 grid grid-cols-3 gap-2">
             <div className="min-w-0 rounded-xl bg-emerald-50/80 px-2.5 py-2 dark:bg-emerald-950/30">
               <p className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-300">Available</p>
-              <p className="mt-1 truncate text-[13px] font-black tabular-nums text-foreground">{serverEconomy.balance == null ? "—" : formatGhc(serverEconomy.balance)}</p>
+              <p className="mt-1 truncate text-[13px] font-black tabular-nums text-foreground">{displayEconomy.available == null ? "—" : formatGhc(displayEconomy.available)}</p>
             </div>
             <div className="min-w-0 rounded-xl bg-amber-50/80 px-2.5 py-2 dark:bg-amber-950/25">
               <p className="text-[10px] font-semibold text-amber-800 dark:text-amber-300">Pending</p>
-              <p className="mt-1 truncate text-[13px] font-black tabular-nums text-foreground">{serverEconomy.pending == null ? "—" : formatGhc(serverEconomy.pending)}</p>
+              <p className="mt-1 truncate text-[13px] font-black tabular-nums text-foreground">{displayEconomy.pending == null ? "—" : formatGhc(displayEconomy.pending)}</p>
             </div>
             <div className="min-w-0 rounded-xl bg-violet-50/80 px-2.5 py-2 dark:bg-violet-950/25">
               <p className="text-[10px] font-semibold text-violet-800 dark:text-violet-300">Locked</p>
-              <p className="mt-1 truncate text-[13px] font-black tabular-nums text-foreground">{serverEconomy.locked == null ? "—" : formatGhc(serverEconomy.locked)}</p>
+              <p className="mt-1 truncate text-[13px] font-black tabular-nums text-foreground">{displayEconomy.locked == null ? "—" : formatGhc(displayEconomy.locked)}</p>
             </div>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2" aria-label="Reward claim stages">
             <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/60 px-2.5 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
               <p className="text-[9px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">Locally marked claim-ready</p>
               <p className="mt-0.5 text-sm font-black tabular-nums text-foreground">{snapshot.rewards.filter((row) => row.validationStatus === "eligible" || row.validationStatus === "approved").length}</p>
-              <p className="text-[9px] leading-relaxed text-muted-foreground">A server check must still accept the claim before any credit is confirmed.</p>
+              <p className="text-[9px] text-muted-foreground">Needs server claim</p>
             </div>
             <div className="rounded-xl border border-amber-200/70 bg-amber-50/60 px-2.5 py-2 dark:border-amber-900/60 dark:bg-amber-950/20">
               <p className="text-[9px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">Under review / maturity</p>
               <p className="mt-0.5 text-sm font-black tabular-nums text-foreground">{snapshot.rewards.filter((row) => row.validationStatus === "pending_validation").length}</p>
-              <p className="text-[9px] leading-relaxed text-muted-foreground">Not claimable until the server approves it.</p>
+              <p className="text-[9px] text-muted-foreground">In review</p>
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2.5">
-            <p className="text-[10px] text-muted-foreground">Claimable and review counts are local reward records; credited value is confirmed only by the server ledger.</p>
+            <p className="text-[10px] text-muted-foreground">Credits post after server confirmation.</p>
             <button type="button" onClick={() => setTab("history")} className="inline-flex min-h-9 items-center gap-1 rounded-full border border-border px-3 py-1.5 text-[11px] font-bold text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2">
               View reward history <ChevronRight size={13} aria-hidden="true" />
             </button>
           </div>
         </section>
+        )}
 
-        <section className="mx-3 mt-3 rounded-[1.25rem] border border-emerald-200/70 bg-emerald-50/70 px-3.5 py-3 dark:border-emerald-900 dark:bg-emerald-950/25" aria-label="Recommended next action">
+        <section className="mx-3 mt-3 rounded-[1.25rem] border border-emerald-200/70 bg-gradient-to-br from-emerald-50/90 to-card px-3.5 py-3.5 shadow-sm dark:border-emerald-900 dark:from-emerald-950/40 dark:to-card" aria-label="Recommended next action">
           <p className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800 dark:text-emerald-300">Best next action</p>
           <p className="mt-1 text-[13px] font-bold text-foreground">{recommended.length > 0 ? recommended[0].challenge.title : snapshot.pending.length > 0 ? "Review reward statuses" : "Keep building quality participation"}</p>
-          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{recommended.length > 0 ? "This mission is the next suggested step based on the progress signals currently available. Server verification is still required for a durable achievement." : snapshot.pending.length > 0 ? "Some reward records are claim-ready or still under review. Check each server-confirmed status before planning around a credit." : "There is no reward action you need to force. Useful posts, helpful comments and community participation build your journey naturally."}</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">{recommended.length > 0 ? "Suggested mission for you right now." : snapshot.pending.length > 0 ? "You have rewards waiting for review." : "Post, comment, and join communities to progress."}</p>
           <button type="button" onClick={() => recommended.length > 0 ? setTab("challenges") : snapshot.pending.length > 0 ? setTab("history") : setTab("opportunities")} className="mt-2.5 min-h-9 rounded-full bg-emerald-700 px-3.5 text-[11px] font-bold text-white">{recommended.length > 0 ? "View mission" : snapshot.pending.length > 0 ? "Review rewards" : "Explore opportunities"}</button>
         </section>
 
-        <div className="mx-3 mt-3 rounded-2xl border border-border/60 bg-card/80 px-3.5 py-3 text-[11px] leading-relaxed text-muted-foreground">
-          <p className="font-semibold text-foreground">Two different rewards</p>
-          <p className="mt-1"><span className="font-semibold text-emerald-800 dark:text-emerald-300">GHC daily</span> — in-app utility, claim once per Lagos day from the feed pill.</p>
-          <p className="mt-0.5"><span className="font-semibold text-sky-800 dark:text-sky-300">PI cashback</span> — 0.5% of eligible Pi spend, calculated quarterly (not the daily claim).</p>
-        </div>
         <SurfaceIntro
-          kicker="Earn & claim"
-          title="Claims stay in Rewards"
-          body="Daily claims and eligible reward requests are managed here. Verified mission milestones unlock achievements; Wallet shows balances and transaction history."
+          kicker="Rewards"
+          title="Earn & claim"
+          body="Daily claims, missions, and cashback."
           tone="emerald"
         />
         <RegistrationBonusCard compact />
@@ -901,9 +960,7 @@ const claimPendingReward = useCallback(
         <PiCashbackSummary />
         <div className="mx-3 mt-3 rounded-2xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
           <p className="text-[12px] font-bold text-foreground">Pi withdrawals</p>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-            Authorize payouts and withdraw available Pi from Wallet. Claims stay here; balances and History stay on Wallet.
-          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">Authorize and withdraw from Wallet.</p>
           <button
             type="button"
             onClick={() => {
@@ -958,9 +1015,8 @@ const claimPendingReward = useCallback(
                 />
               ))}
             </div>
-            <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
-              Counts days with verified quality contributions (posts, helpful comments, community
-              activity). Never likes, self-interaction, or spam.
+            <p className="mt-2 text-[10px] text-muted-foreground">
+              Quality posts & comments count · not likes
             </p>
           </div>
         </div>
@@ -968,8 +1024,7 @@ const claimPendingReward = useCallback(
         {((snapshot.wallet?.pending ?? 0) > 0 || snapshot.pending.length > 0) && (
           <div className="mx-3 mt-2 rounded-[1.25rem] border border-amber-200/80 bg-amber-50/80 px-3.5 py-2.5 dark:border-amber-900 dark:bg-amber-950/30">
             <p className="text-[11px] leading-snug text-amber-900 dark:text-amber-100">
-              Pending GHC is not spendable until the server confirms its maturity and claim state.
-              Daily Claim rewards have a 48-hour lock.
+              Pending GHC unlocks after confirmation · daily claims lock 48h.
             </p>
             {snapshot.pending.length > 0 ? (
               <button
@@ -1005,15 +1060,8 @@ const claimPendingReward = useCallback(
           </div>
         )}
 
-        <p className="mx-3 mt-2 text-[11px] leading-relaxed text-muted-foreground">
-          Daily Claim rewards mature after 48 hours. Verified mission milestones unlock durable achievements; mission completion does not issue GHC under the current economy policy.{" "}
-          <button
-            type="button"
-            className="font-semibold text-emerald-700 underline-offset-2 hover:underline"
-            onClick={() => setShowLearnMore((v) => !v)}
-          >
-            Learn more
-          </button>
+        <p className="mx-3 mt-2 text-[11px] text-muted-foreground">
+          Daily claims unlock after 48h · missions unlock achievements (no GHC).
         </p>
         {claimedFlash && onOpenWallet && (
           <div className="mx-4 mt-2 flex items-center justify-between gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-900 dark:bg-emerald-950/40">
@@ -1023,15 +1071,7 @@ const claimPendingReward = useCallback(
             </button>
           </div>
         )}
-        {showLearnMore && (
-          <p className="mx-3 mt-1 rounded-xl border border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
-            Rewards require server-verified, meaningful actions. Daily Claim rewards mature after
-            48 hours; pending funds cannot be spent or transferred. Mission milestones are verified
-            against durable GreenHaven records and unlock non-financial achievements. GHC activity
-            issuance remains disabled by the current policy. Ledger entries remain the authority
-            for credited value.
-          </p>
-        )}
+
 
         {/* Recommended for you */}
         {recommended.length > 0 && (
@@ -1121,7 +1161,7 @@ const claimPendingReward = useCallback(
 
             <div className="mb-3 rounded-[1.25rem] border border-sky-200/70 bg-sky-50/60 px-3.5 py-3 dark:border-sky-900/60 dark:bg-sky-950/20" aria-label="Mission reward policy">
               <p className="text-[11px] font-bold text-foreground">How mission rewards work</p>
-              <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">Missions track meaningful participation and can unlock durable achievements after server verification. Under the current economy policy, mission completion does not issue GHC or Pi. Daily GHC claims and Pi cashback follow their own separate, server-controlled journeys.</p>
+              <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">Missions unlock achievements, not GHC or Pi.</p>
             </div>
             <div className="mb-3 rounded-[1.25rem] border border-border/60 bg-card px-3.5 py-3.5 shadow-[var(--gh-card-shadow)]" aria-label="Engagement paths">
               <h2 className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
@@ -1198,16 +1238,12 @@ const claimPendingReward = useCallback(
 
           {tab === "challenges" && (
             <>
-              <p className="px-1 text-[11px] font-semibold text-muted-foreground">
-                Journey guidance, status and next step — server verification is required for durable achievement status
-              </p>
+              <p className="px-1 text-[11px] font-semibold text-muted-foreground">Progress is guidance until verified.</p>
               <div
                 className="rounded-[1.25rem] border border-amber-200/80 bg-amber-50/90 px-3.5 py-2.5 text-[11px] leading-snug text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
                 role="status"
               >
-                Milestones are verified against durable GreenHaven activity and unlock account-level
-                achievements. Mission completion does not issue GHC under the current economy policy.
-                Progress bars are guidance from available profile/community signals and this device's journey state; they are not proof of durable completion. Daily Claim remains the active server-backed GHC reward path.
+                Verified milestones unlock achievements, not GHC or Pi.
               </div>
               {snapshot.challenges.map((card) => (
                 <ChallengeCardView key={card.challenge.id} card={card} onVerifyMission={verifyMission} verifyingMissionId={verifyingMissionId} />
@@ -1267,16 +1303,16 @@ const claimPendingReward = useCallback(
                 <button type="button" onClick={() => serverHistoryStatus === "unavailable" ? setTick((value) => value + 1) : setServerHistoryPageCursor(serverHistoryNextCursor)} className="min-h-10 w-full rounded-xl border border-border bg-card px-3 text-[11px] font-bold text-foreground">{serverHistoryStatus === "unavailable" ? "Retry older ledger entries" : "Load older ledger entries"}</button>
               ) : null}
               {serverHistoryStatus === "ready" ? (
-                <p className="px-1 text-[10px] leading-relaxed text-muted-foreground">History is ordered newest first. Load older entries to continue through your server ledger.</p>
+                <p className="px-1 text-[10px] text-muted-foreground">Newest first.</p>
               ) : null}
               <p className="mb-1 flex items-start gap-1.5 px-1 text-[11px] text-muted-foreground">
                 <Info size={12} className="mt-0.5 shrink-0" />
-                Server ledger entries are authoritative; local reward records are shown below as supplemental activity. Local records are not proof of a credited balance.
+                Server ledger is authoritative.
               </p>
               {filteredLocalRewardRecords.length === 0 ? (
                 <Empty
                   title="No additional local reward records"
-                  body="Your server ledger is shown above when available. New validated reward activity will appear here after it is synchronized."
+                  body="Nothing extra yet."
                 />
               ) : (
                 filteredLocalRewardRecords.map((r) => {
@@ -1367,7 +1403,7 @@ const claimPendingReward = useCallback(
               {snapshot.achievements.length === 0 ? (
                 <Empty
                   title="No achievements unlocked"
-                  body="Profile Builder, Community Builder and others unlock through verified activity."
+                  body="Complete missions to unlock."
                 />
               ) : (
                 snapshot.achievements.map((a) => (
@@ -1479,9 +1515,9 @@ function ChallengeCardView({
               </div>
             </div>
 
-            <p className="mt-2 text-[11px] font-medium text-foreground/90">{nextStep}</p>
-            {!compact ? <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">This progress indicator helps guide your next action. Only a successful server verification creates a durable achievement record.</p> : null}
-            {!compact && missionCodeForChallenge(challenge.id) && status !== "completed" ? <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">Check eligibility against GreenHaven records. If verified, the non-financial achievement is saved automatically; this mission does not issue GHC or Pi.</p> : null}
+            {nextStep && nextStep !== "Completed" ? (
+              <p className="mt-2 text-[11px] text-muted-foreground">{nextStep}</p>
+            ) : null}
             {(status === "available" || status === "in_progress") && challenge.ctaHint && (
               <button
                 type="button"
@@ -1499,16 +1535,14 @@ function ChallengeCardView({
                 disabled={verifyingMissionId === challenge.id}
                 className="mt-2.5 inline-flex min-h-9 items-center gap-1 rounded-full border border-emerald-300/80 bg-emerald-50 px-3.5 py-1.5 text-[11px] font-bold text-emerald-900 shadow-sm disabled:opacity-60 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100"
               >
-                {verifyingMissionId === challenge.id ? "Checking GreenHaven…" : status === "pending_validation" ? "Verify achievement" : "Check eligibility"}
+                {verifyingMissionId === challenge.id ? "Verifying…" : status === "pending_validation" ? "Verify" : "Check"}
                 <ChevronRight size={12} aria-hidden />
               </button>
             )}
             {status === "completed" && missionCodeForChallenge(challenge.id) ? (
               <p className="mt-2 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">Server verified{progress.completedAt ? ` · ${formatWhen(progress.completedAt)}` : ""}</p>
             ) : null}
-            {(status === "pending_validation" || status === "completed") && !missionCodeForChallenge(challenge.id) && (
-              <p className="mt-2 text-[10px] text-muted-foreground">This milestone does not currently have a server verification workflow.</p>
-            )}
+
           </div>
         </div>
         <div className="shrink-0 text-right">
