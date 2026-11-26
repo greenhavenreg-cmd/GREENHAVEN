@@ -1,14 +1,14 @@
 # GreenHaven
 
-**Package:** `gh-connect@0.338.159`  
-**Current source version:** `0.338.159`  
-**Candidate:** RUN447 — Community Role Type Repair  
+**Package:** `gh-connect@0.338.160`  
+**Current source version:** `0.338.160`  
+**Candidate:** RUN448 — Discovery Toast and Operational Hash Repair  
 **Accepted source archive:** `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`  
-**Candidate archive:** `GREENHAVEN-0.338.159-RUN447-COMMUNITY-ROLE-TYPE-REPAIR-2026-11-26.zip`
+**Candidate archive:** `GREENHAVEN-0.338.160-RUN448-DISCOVERY-TOAST-AND-OPERATIONAL-HASH-REPAIR-2026-11-26.zip`
 
-## RUN447 — Community Role Type Repair
+## RUN448 — Discovery Toast and Operational Hash Repair
 
-The community directory now normalizes persisted membership roles to the canonical `CommunityRoleLabel` union before passing them to `GroupCard`. Legacy `mod` maps to `moderator`; unknown values use a safe joined-member/guest fallback; creator identity retains owner precedence. The Discovery preference callback now depends on its exact functions rather than the full context object. A focused regression gate is registered in static and prebuild checks. The supplied Vercel log showed RUN446 bundle compilation succeeding before this new TypeScript error; RUN447 still requires a fresh supported-runtime build.
+RUN448 removes the duplicate `addToast` property from the Discovery hook contract while retaining the success/error/info signature used by its call sites. It also imports `createHash` from `node:crypto` in the server-side marketplace operational RPC module without changing the SHA-256 fingerprint behavior. A focused regression gate is registered in static and prebuild checks. The supplied Vercel log reports these errors on RUN447; RUN448 still requires a fresh supported-runtime TypeScript check and production build.
 
 ## RUN446 — Marketplace spend signature repair
 

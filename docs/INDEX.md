@@ -1,3 +1,5 @@
+- [RUN448 Discovery toast and operational hash repair](RUN448-DISCOVERY-TOAST-AND-OPERATIONAL-HASH-REPAIR-2026-11-26.md) — resolves duplicate toast property and missing Node crypto import.
+- [RUN448 upgrade worklog](UPGRADE-WORKLOG-0.338.160.md) — implementation and verification boundary.
 
 # GreenHaven documentation index
 

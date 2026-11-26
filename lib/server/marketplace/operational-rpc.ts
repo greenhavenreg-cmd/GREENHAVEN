@@ -2,6 +2,7 @@
  * Phase 26 — service-role RPC client for operational financial workflows.
  * Never trusts client amounts as authority for balances; only records evidence-backed operations.
  */
+import { createHash } from "node:crypto"
 import { hasPrivilegedDatabase, readGhcServerEnv } from "@/lib/server/economy/env"
 import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 import { operatorKeyValueAuthorized } from "@/lib/server/security/operator-key"

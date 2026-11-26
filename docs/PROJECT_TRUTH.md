@@ -1,3 +1,12 @@
+# Current project truth — 0.338.160 RUN448 Discovery Toast and Operational Hash Repair candidate (2026-11-26)
+
+**Current package candidate:** `gh-connect@0.338.160`.
+**Current source version:** `0.338.160` (working candidate)
+**Package identity:** `gh-connect@0.338.160`
+**User-designated accepted baseline:** `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`.
+
+RUN448 removes the duplicate Discovery `addToast` type property and imports Node `createHash` in the marketplace operational RPC module. The focused RUN448 regression contract passes. A full TypeScript check and Next.js production build on Node.js 24.15.0 remain required; the supplied Vercel log documents RUN447 failures, not a successful RUN448 build. No remote push, deployment, database mutation or provider transaction occurred.
+
 RUN447 source change: community directory roles are normalized to the canonical GroupCard role union, with legacy alias and safe fallback handling; creator ownership remains first priority. The RUN447 focused contract is registered in static and prebuild checks. The supplied Vercel log reports this error on RUN446; RUN447 has not yet been built by Vercel.
 
 ## RUN447 Community role type repair

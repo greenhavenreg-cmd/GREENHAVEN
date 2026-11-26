@@ -84,7 +84,6 @@ export function DiscoveryGridScreen() {
     blockedUsers?: string[]
     swipe?: (id: string, dir: string) => Promise<void>
     blockUser?: (id: string) => void
-    addToast?: (m: string, t?: string) => void
     reportContent?: (kind: string, id: string, reason: string) => void
     startConversation?: (userId: string, userName?: string, userPhoto?: string) => Promise<string | null>
     loading?: boolean
