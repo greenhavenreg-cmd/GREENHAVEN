@@ -3,8 +3,12 @@
 
 ## Current authority
 
-- [RUN442 Testnet migration application report](RUN442-TESTNET-MIGRATION-APPLICATION-REPORT-2026-11-26.md) — three applied migrations, generated history mappings, four held migrations and postflight evidence.
-- [RUN442 upgrade worklog](UPGRADE-WORKLOG-0.338.154.md) — controlled Testnet migration execution and release boundary.
+- [RUN444 Testnet payment and withdrawal rails](RUN444-TESTNET-PAYMENT-WITHDRAWAL-RAILS-2026-11-26.md) — Testnet activation profile, Paystack test-key isolation, GHC withdrawal network fences and outstanding provider acceptance.
+- [RUN444 upgrade worklog](UPGRADE-WORKLOG-0.338.156.md) — implementation and verification boundaries.
+
+- [RUN443 Testnet migration application closeout](RUN443-TESTNET-MIGRATION-APPLICATION-REPORT-2026-11-26.md) — four previously held migrations applied, corrected RUN429 lock ordering, RPC ACL/catalog postflight and remaining transaction/history gates.
+- [RUN443 upgrade worklog](UPGRADE-WORKLOG-0.338.155.md) — controlled Testnet migration closeout and release boundary.
+- [RUN442 Testnet migration application report](RUN442-TESTNET-MIGRATION-APPLICATION-REPORT-2026-11-26.md) — historical first three migration applications.
 
 - [RUN441 Phase 4 transaction rehearsal plan](RUN441-PHASE4-COMMUNITY-MESSENGER-TRANSACTION-REHEARSAL.md) — held PostgreSQL 17 concurrency matrix and explicit unexecuted status.
 - [Current source of truth](CURRENT-SOURCE-OF-TRUTH-2026-11-26.md) — active archive, connected GitHub/Vercel/Supabase state, migration boundaries and release status.

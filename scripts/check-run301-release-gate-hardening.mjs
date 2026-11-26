@@ -21,7 +21,7 @@ const checks = [
   ['lockfile root version matches package', lock.packages?.['']?.version === version],
   ['README identifies current baseline', readme.includes(`Current source version:** \`${version}\``)],
   ['project truth identifies current baseline', truth.includes(`Current source version:** \`${version}\``)],
-  ['current build context identifies current baseline', acceptance.includes(`${version} Phase 9 Coordinated Acceptance`)],
+  ['current build context identifies current baseline and current migration closeout', acceptance.includes(`${version} Testnet migration closeout`) && acceptance.includes('RUN443')],
   ['current build context records the RUN385 upgrade', acceptance.includes('docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md')],
   ['source-of-truth identifies current baseline', phase12.includes(`Current source version:** \`${version}\``)],
   ['source-of-truth documents the current RUN385 increment', phase12.includes('docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md')],

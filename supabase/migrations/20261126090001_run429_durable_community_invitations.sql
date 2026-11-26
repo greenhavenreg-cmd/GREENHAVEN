@@ -2,6 +2,7 @@
 -- Additive only: reuses gh_communities / gh_community_members and deliberately
 -- does not grant realtime chat membership when a community invitation is accepted.
 -- Server API derives actor ids from the authenticated GH session; RPCs are service_role-only.
+-- RUN441 lock-order correction is incorporated in the response RPC: Community -> Invitation.
 
 CREATE TABLE IF NOT EXISTS public.gh_community_invitations (
   id text PRIMARY KEY CHECK (id ~ '^ginv_[a-f0-9]{32}$'),
@@ -142,6 +143,7 @@ BEGIN
 END;
 $$;
 
+-- RUN441 correction incorporated: acceptance locks Community before Invitation.
 CREATE OR REPLACE FUNCTION public.gh_community_invitation_respond(
   p_invitation_id text, p_actor_id text, p_accept boolean
 ) RETURNS jsonb
@@ -150,11 +152,30 @@ DECLARE
   v_invite public.gh_community_invitations%ROWTYPE;
   v_community public.gh_communities%ROWTYPE;
   v_member_status text;
+  v_community_found boolean := false;
 BEGIN
   IF NULLIF(trim(p_invitation_id), '') IS NULL
      OR NULLIF(trim(p_actor_id), '') IS NULL OR p_accept IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'error', 'INVALID');
   END IF;
+
+  -- Initial unlocked lookup obtains the Community key only. It is not used as
+  -- the authorization/final-state decision; the invitation is re-read FOR UPDATE.
+  SELECT * INTO v_invite
+  FROM public.gh_community_invitations
+  WHERE id = trim(p_invitation_id) AND invitee_user_id = trim(p_actor_id);
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'error', 'NOT_FOUND'); END IF;
+
+  -- Lock order is Community -> invitation, matching invitation creation.
+  -- Decline does not mutate Community membership and only needs the invitation lock.
+  IF p_accept THEN
+    SELECT * INTO v_community
+    FROM public.gh_communities
+    WHERE id = v_invite.community_id AND deleted_at IS NULL
+    FOR UPDATE;
+    v_community_found := FOUND;
+  END IF;
+
   SELECT * INTO v_invite
   FROM public.gh_community_invitations
   WHERE id = trim(p_invitation_id) AND invitee_user_id = trim(p_actor_id)
@@ -186,14 +207,11 @@ BEGIN
     RETURN jsonb_build_object('ok', true, 'durable', true, 'accepted', false, 'idempotent', false, 'communityId', v_invite.community_id);
   END IF;
 
-  SELECT * INTO v_community
-  FROM public.gh_communities
-  WHERE id = v_invite.community_id AND deleted_at IS NULL
-  FOR UPDATE;
-  IF NOT FOUND THEN
+  IF NOT v_community_found THEN
     UPDATE public.gh_community_invitations SET status = 'revoked', responded_at = now() WHERE id = v_invite.id;
     RETURN jsonb_build_object('ok', false, 'error', 'COMMUNITY_UNAVAILABLE');
   END IF;
+
   IF EXISTS (
     SELECT 1 FROM public.ghc_user_blocks b
     WHERE (b.blocker_id = trim(p_actor_id) AND b.blocked_id = v_invite.invited_by)
@@ -230,7 +248,7 @@ BEGIN
     jsonb_build_object('kind', 'community_invitation_accepted', 'communityId', v_community.id),
     NULL, NULL, 'community_invite_accepted:' || v_invite.id, now() + interval '30 days'
   );
-  -- Intentionally no gh_conversation_members write: Community membership and Chat access are separate grants.
+  -- Community membership never implicitly grants Messenger membership. Intentionally no gh_conversation_members write.
   RETURN jsonb_build_object('ok', true, 'durable', true, 'accepted', true, 'idempotent', false, 'communityId', v_community.id);
 END;
 $$;

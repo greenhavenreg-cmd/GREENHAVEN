@@ -5,9 +5,9 @@
 
 > **This is a review order, not permission to apply.** It does not prove remote migration history, database compatibility, or Testnet/Mainnet readiness. Never run `supabase db push` while any pending migration is held for review, approval, validation, or marked proposal. Supabase CLI does not enforce these classifications.
 
-## Current Testnet application overlay — RUN442 (26 November 2026)
+## Current Testnet application overlay — RUN443 (26 November 2026)
 
-Target: `jhlsjnmfpakvibuuoygx`, PostgreSQL 17.12. Three migrations have been applied and postflight-verified under generated history versions: RUN384 FK indexes `20261126153605` (17/17), RUN384 service REST grants `20261126153609` (13/13), and RUN390 read grants `20261126153614`. Their original source versions remain unrecorded; do not replay them or run CLI push until history reconciliation. Four migrations remain held: RUN388 quota RPC, RUN396 payout history RPC, RUN405 registration backfill replacement, and RUN429 Community invitations. RUN429 requires the RUN441 lock-order correction to be incorporated and rehearsed. The eight version-drifted migrations and duplicate RUN406 history record remain unrepaired. See `docs/RUN442-TESTNET-MIGRATION-APPLICATION-REPORT-2026-11-26.md`. Mainnet was not accessed.
+Target: `jhlsjnmfpakvibuuoygx`, PostgreSQL 17.12. Seven operations were applied across RUN442/RUN443. RUN442: RUN384 FK indexes `20261126153605` (17/17), RUN384 server REST grants `20261126153609` (13/13), RUN390 read grants `20261126153614`. RUN443: RUN388 quota RPC `20261126161545`, RUN396 payout history `20261126161553`, RUN405 account-discovery replacement `20261126161603`, RUN429 Community invitations with RUN441 lock-order correction `20261126161651`. Testnet history: 247 rows, 246 distinct names; duplicate RUN406 remains. Generated versions differ from source timestamps; do not replay, run db push, repair or hand-edit history until row-by-row reconciliation. RUN405 backfill was not invoked. RUN429 two-connection concurrency rehearsal remains outstanding. See `docs/RUN443-TESTNET-MIGRATION-APPLICATION-REPORT-2026-11-26.md`. Mainnet was not accessed.
 
 ## Required operator procedure
 
@@ -262,14 +262,14 @@ The rows are sorted by the canonical migration identifier for review. Dependenci
 | 236 | `20261124110000_run384_research_foreign_key_indexes.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
 | 237 | `20261124120000_run384_server_rest_table_grants.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
 | 238 | `20261124143000_run390_marketplace_membership_feed_read_grants.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
-| 239 | `20261124150000_run388_research_atomic_schedule_quota.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 239 | `20261124150000_run388_research_atomic_schedule_quota.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
 | 240 | `20261125090000_run407_service_role_earnings_ledger_privileges.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
-| 241 | `20261125120000_run396_pi_payout_history_rpc.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 241 | `20261125120000_run396_pi_payout_history_rpc.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
 | 242 | `20261125130000_run397_testnet_registration_bonus_100_pi.sql` | REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
 | 243 | `20261125140000_run397_referral_quality_caps_and_summary.sql` | REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
-| 244 | `20261125150000_run405_registration_backfill_account_discovery.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 244 | `20261125150000_run405_registration_backfill_account_discovery.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
 | 245 | `20261125160000_run406_server_read_privilege_reconciliation.sql` | REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
-| 246 | `20261126090001_run429_durable_community_invitations.sql` | REVIEW_REQUIRED | HOLD_VALIDATION |
+| 246 | `20261126090001_run429_durable_community_invitations.sql` | REVIEW_REQUIRED | APPLIED_TESTNET_ONLY_HOLD_OTHER_TARGETS |
 
 ## Classification meanings
 

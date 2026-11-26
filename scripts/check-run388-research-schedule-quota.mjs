@@ -22,7 +22,7 @@ const checks = [
   ['RPC maps quota and lifecycle failures to explicit HTTP outcomes', /code === "RESPONSE_LIMIT_REACHED"/.test(publicRoute) && /code === "RESEARCH_CLOSED"/.test(publicRoute)],
   ['study builder collects optional opening and closing times', /type="datetime-local"/.test(studio) && /studyStartsAt/.test(studio) && /studyEndsAt/.test(studio)],
   ['study builder collects optional response quota', /studyResponseLimit/.test(studio) && /Maximum responses/.test(studio)],
-  ['migration is held for review rather than marked applied', /20261124150000_run388_research_atomic_schedule_quota\.sql/.test(inventory) && /REVIEW_REQUIRED/.test(inventory)],
+  ['source classification remains REVIEW_REQUIRED for other targets', /20261124150000_run388_research_atomic_schedule_quota\.sql/.test(inventory) && /REVIEW_REQUIRED/.test(inventory)],
   ['RUN388 gate is wired once into static and prebuild checks', (pkg.scripts['verify:static'].match(/check-run388-research-schedule-quota\.mjs/g) || []).length === 1 && (pkg.scripts['prebuild:checks'].match(/check-run388-research-schedule-quota\.mjs/g) || []).length === 1],
 ]
 let failed = 0

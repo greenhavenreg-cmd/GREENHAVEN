@@ -18,7 +18,14 @@ export class PaystackError extends Error {
 
 export function paystackTransfersEnabled(): boolean {
   const key = String(process.env.PAYSTACK_SECRET_KEY || "").trim()
-  return process.env.PAYSTACK_TRANSFERS_ENABLED === "true" && (key.startsWith("sk_test_") || key.startsWith("sk_live_"))
+  if (process.env.PAYSTACK_TRANSFERS_ENABLED !== "true") return false
+  // Preview/Testnet can never send a live bank transfer, even if a live key is
+  // accidentally copied into the Preview environment. Test transfers require
+  // an explicit Testnet network and a Paystack test secret.
+  if (process.env.PI_NETWORK === "testnet") {
+    return process.env.VERCEL_ENV !== "production" && key.startsWith("sk_test_")
+  }
+  return key.startsWith("sk_test_") || (key.startsWith("sk_live_") && process.env.PAYSTACK_LIVE_TRANSFERS_APPROVED === "true")
 }
 
 export function paystackLiveTransfersApproved(): boolean {

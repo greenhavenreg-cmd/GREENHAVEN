@@ -2,7 +2,7 @@ GH-CONNECT VERIFIED SOURCE MANIFEST
 ==================================
 inventory_status=OK
 duplicate_version_prefixes=
-project_version=0.338.154
+project_version=0.338.156
 manifest_format_version=1
 canonical_migrations=246
 classification_required=125
@@ -260,11 +260,11 @@ ALL_MIGRATIONS_ORDERED_FOR_REVIEW:
 [REVIEW_REQUIRED] size=2440 path=supabase/migrations/20261124110000_run384_research_foreign_key_indexes.sql
 [REVIEW_REQUIRED] size=3206 path=supabase/migrations/20261124120000_run384_server_rest_table_grants.sql
 [REVIEW_REQUIRED] size=2062 path=supabase/migrations/20261124143000_run390_marketplace_membership_feed_read_grants.sql
-[REVIEW_REQUIRED] size=5194 path=supabase/migrations/20261124150000_run388_research_atomic_schedule_quota.sql
+[REVIEW_REQUIRED] size=5143 path=supabase/migrations/20261124150000_run388_research_atomic_schedule_quota.sql
 [REVIEW_REQUIRED] size=326 path=supabase/migrations/20261125090000_run407_service_role_earnings_ledger_privileges.sql
 [REVIEW_REQUIRED] size=2002 path=supabase/migrations/20261125120000_run396_pi_payout_history_rpc.sql
 [REQUIRED] size=9826 path=supabase/migrations/20261125130000_run397_testnet_registration_bonus_100_pi.sql
 [REQUIRED] size=5852 path=supabase/migrations/20261125140000_run397_referral_quality_caps_and_summary.sql
 [REVIEW_REQUIRED] size=3596 path=supabase/migrations/20261125150000_run405_registration_backfill_account_discovery.sql
 [REQUIRED] size=3820 path=supabase/migrations/20261125160000_run406_server_read_privilege_reconciliation.sql
-[REVIEW_REQUIRED] size=12647 path=supabase/migrations/20261126090001_run429_durable_community_invitations.sql
+[REVIEW_REQUIRED] size=13505 path=supabase/migrations/20261126090001_run429_durable_community_invitations.sql

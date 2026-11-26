@@ -1,11 +1,8 @@
-**Current source version:** `0.338.154`
-**Current package identity:** `gh-connect@0.338.152`
-**Coordinated programme:** `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`
+**Current source version:** `0.338.156`
+**Current package identity:** `gh-connect@0.338.156`
 
-> **Current authority notice (26 November 2026):** This document is historical context. The working package candidate is `gh-connect@0.338.154` (RUN442 Testnet Migration Reconciliation & Controlled Application), documented in `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md`. The last user-designated accepted archive remains 0.338.139; 0.338.154 is not yet accepted, pushed or deployed.
-> **Current package identity:** `gh-connect@0.338.147` (RUN434 Phase 3 Architecture, Identity & Durable Operation Boundaries); all older version statements below are historical records.
-> **Current source version:** `0.338.147`
-**Current source version:** `0.338.147`
+> **Current authority notice (26 November 2026):** This file retains historical architecture and release context. The working candidate is `gh-connect@0.338.156` (RUN444 Testnet Payment and Withdrawal Rails), documented in `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md`. The last user-designated accepted archive remains `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`; 0.338.156 is not accepted, pushed or deployed.
+
 
 
 # GreenHaven source authority — 0.338.137 Run 414 Release Metadata Synchronization (2026-11-25)

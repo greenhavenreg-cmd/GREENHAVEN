@@ -19,7 +19,7 @@ function authorized(request: Request): boolean {
 
 export async function POST(request: Request, context: { params: Promise<{ requestId: string }> }) {
   if (!authorized(request)) return reply({ ok: false, error: "FORBIDDEN" }, 403)
-  if (process.env.GHC_MARKETPLACE_GHC_PAYOUTS_ENABLED !== "true") return reply({ ok: false, error: "GHC_PAYOUT_RAIL_DISABLED" }, 503)
+  if (process.env.GHC_MARKETPLACE_GHC_PAYOUTS_ENABLED !== "true" || process.env.PI_NETWORK !== "testnet" || process.env.VERCEL_ENV === "production") return reply({ ok: false, error: "GHC_PAYOUT_RAIL_DISABLED" }, 503)
   const treasuryUserId = String(process.env.GHC_MARKETPLACE_PAYOUT_TREASURY_USER_ID || "").trim()
   if (!treasuryUserId) return reply({ ok: false, error: "GHC_PAYOUT_TREASURY_NOT_CONFIGURED" }, 503)
   const rl = await checkDurableRateLimit("ghc-seller-payout-settlement", 10, 60_000, { onUnavailable: "deny" })

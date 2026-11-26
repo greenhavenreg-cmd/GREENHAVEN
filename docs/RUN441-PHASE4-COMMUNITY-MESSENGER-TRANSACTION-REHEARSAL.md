@@ -1,24 +1,24 @@
 # RUN441 — Phase 4 Community & Messenger transaction rehearsal plan
 
-**Status:** Prepared; NOT EXECUTED.  
+**Status:** Prepared; NOT EXECUTED. RUN429 was applied to Testnet in RUN443 with its lock-order correction; the full transaction rehearsal remains outstanding.  
 **Target runtime:** Disposable PostgreSQL 17 instance only.  
 **Forbidden targets:** Connected GreenHaven Testnet, Mainnet, or any database containing user/financial data.  
-**Migration status:** RUN429 remains review-required. The Phase 4 identity/group/contact SQL and RUN441 correction are proposals, not approved migrations.
+**Migration status:** RUN429 is applied to Testnet under generated history version `20261126161651`, with the RUN441 Community-before-Invitation correction incorporated. The separate Phase 4 identity/group/contact SQL and Messenger member-count correction remain held proposals.
 
 ## Why this rehearsal is required
 
 Source inspection found two concurrency-sensitive database boundaries:
 
 1. The Phase 4 Messenger member-count trigger recalculated a count without first serializing concurrent membership changes. RUN441 changes the held proposal to lock affected conversation rows in deterministic order before recalculation.
-2. RUN429 Community invitation creation locks the Community row before the invitation row, while its original acceptance RPC locked the invitation before the Community row. That inversion can deadlock during concurrent invitation creation and acceptance. RUN441 adds a separate held `CREATE OR REPLACE FUNCTION` correction that follows Community → invitation lock order. The historical RUN429 migration itself is not edited.
+2. RUN429 Community invitation creation locks the Community row before the invitation row, while its original acceptance RPC locked the invitation before the Community row. That inversion can deadlock during concurrent invitation creation and acceptance. RUN441 supplied a `CREATE OR REPLACE FUNCTION` correction that follows Community → invitation lock order. RUN443 incorporated this correction into the canonical RUN429 source migration and applied the corrected function to Testnet.
 
-Neither source correction is database-verified until it is applied and exercised on an isolated PostgreSQL 17 clone with the exact required schema and dependencies.
+The RUN429 correction is installed on Testnet and catalog/smoke-verified; neither the RUN429 transaction races nor the Messenger member-count correction has passed an isolated PostgreSQL 17 two-connection rehearsal.
 
 ## Disposable database prerequisites
 
 - Create a disposable PostgreSQL 17 database/instance with no connection to production or Testnet credentials.
 - Reconstruct the exact required schema and extensions from a known-good migration snapshot; record the snapshot hash and PostgreSQL version.
-- Apply the RUN429 source migration and held Phase 4 proposal only inside this disposable instance, then apply the RUN441 Community lock-order correction proposal.
+- Apply the canonical RUN429 migration (which now includes the RUN441 Community lock-order correction) and the held Phase 4 proposal only inside this disposable instance.
 - Seed synthetic accounts, profiles, communities, direct conversations, memberships, block rows and notification prerequisites. Use no real user identifiers or wallet data.
 - Capture schema/catalog fingerprints before and after; run the test inside a rollback-capable harness and destroy the instance afterward.
 - Use two independent database connections for concurrency cases. Record transaction start/end, SQLSTATE, returned JSON and final row invariants.
@@ -77,8 +77,8 @@ Neither source correction is database-verified until it is applied and exercised
 
 ## Acceptance evidence required
 
-The rehearsal is accepted only when the disposable PostgreSQL 17 instance executes every case above, including true two-connection races, with final invariant queries and logs saved. A static source check, SQL parse, single-connection test, or Testnet catalog lookup is not a substitute. The migration remains held until the rehearsal passes, migration history is reconciled, and the user separately authorizes any Testnet application.
+The rehearsal is accepted only when the disposable PostgreSQL 17 instance executes every case above, including true two-connection races, with final invariant queries and logs saved. A static source check, SQL parse, single-connection test, or Testnet catalog lookup is not a substitute. The full Phase 4 proposal remains held until the rehearsal passes. RUN429 is already installed on Testnet, but its operational feature acceptance remains incomplete.
 
 ## Current execution limitation
 
-RUN441 workspace inspection found no `psql`, `postgres` server binary or Docker runtime. Therefore no PostgreSQL transaction was executed in this increment. The lock-order and member-count changes are held source proposals only. No migration was applied and no connected database was mutated.
+RUN443 connected Testnet inspection still found no local `psql`, `postgres` server binary or Docker runtime. The corrected RUN429 migration was applied to Testnet and only non-mutating smoke calls were executed; no two-connection transaction race was run. The Messenger member-count correction remains a held source proposal. No synthetic fixture, real invitation, membership, notification or Messenger membership was created.

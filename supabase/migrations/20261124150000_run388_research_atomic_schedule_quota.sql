@@ -16,7 +16,6 @@ SET search_path = pg_catalog, public
 AS $function$
 DECLARE
   v_project public.gh_research_projects%ROWTYPE;
-  v_existing public.gh_research_responses%ROWTYPE;
   v_response_id uuid;
   v_submitted_at timestamptz;
   v_now timestamptz := clock_timestamp();

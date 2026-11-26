@@ -19,7 +19,11 @@ export const WITHDRAWAL_MIN_PI = 100 as const
  * Missing environment configuration always fails closed.
  */
 export function areGhcPiWithdrawalsEnabled(): boolean {
-  return process.env.GHC_WITHDRAWALS_ENABLED === "true"
+  // External GHC→Pi settlement is available only on a non-Production Pi
+  // Testnet deployment. Mainnet activation requires a separate reviewed gate.
+  return process.env.GHC_WITHDRAWALS_ENABLED === "true" &&
+    process.env.PI_NETWORK === "testnet" &&
+    process.env.VERCEL_ENV !== "production"
 }
 
 export type WithdrawalStatus =

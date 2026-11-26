@@ -1,14 +1,15 @@
 # GreenHaven — current source of truth
 
 **Accepted source archive:** `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`  
-**Working package candidate:** `gh-connect@0.338.154` (RUN442 Testnet Migration Reconciliation & Controlled Application)  
-**Package identity:** `gh-connect@0.338.154`  
-**Working candidate archive:** `GREENHAVEN-0.338.154-RUN442-TESTNET-MIGRATION-RECONCILIATION-2026-11-26.zip`  
+**Working package candidate:** `gh-connect@0.338.156` (RUN444 Testnet Payment and Withdrawal Rails)  
+**Package identity:** `gh-connect@0.338.156`  
+**Working candidate archive:** `GREENHAVEN-0.338.156-RUN444-TESTNET-PAYMENT-WITHDRAWAL-RAILS-2026-11-26.zip`  
 **Parent baseline:** `gh-connect@0.338.139` (RUN426 Phase 0)  
 **Date:** 26 November 2026
-**RUN442 update:** Applied three individually preflighted additive migrations to Testnet: RUN384 research FK indexes (17/17 postflight), RUN384 least-privilege server REST grants (13/13), and RUN390 server read grants. Generated history versions are `20261126153605`, `20261126153609`, and `20261126153614`; original source versions remain drifted. Four migrations remain held for disposable PostgreSQL 17/security/financial/concurrency validation. No financial data or provider state changed. RUN441 identity/session/profile hardening remains in the candidate. Phase 3 operational blockers remain open.
+**RUN444 update:** Adds a dedicated Testnet payment/withdrawal activation profile for Pi A2U, Pi earnings withdrawals, GHC→Pi withdrawals, marketplace GHC seller payouts and Paystack test transfers. Paystack Testnet is restricted to `sk_test_` outside Vercel Production; GHC withdrawal and seller settlement are fenced to non-Production Testnet. Generic `.env.example` remains fail-closed and credentials remain blank. Focused RUN444 contract passes 9/9; full static verification passed 63/63 gates with 5,378 PASS lines and zero failures. Prebuild dry-run discovered 465 checks; actual prebuild requires Node 24.15.0. No provider transactions, remote environment changes, deployment, GitHub push or Mainnet activity occurred. See `docs/RUN444-TESTNET-PAYMENT-WITHDRAWAL-RAILS-2026-11-26.md`.
+**RUN443 update:** Applied the four migrations previously held by RUN442: RUN388 research quota RPC (`20261126161545`), RUN396 owner-scoped payout history (`20261126161553`), RUN405 bounded registration account-discovery replacement (`20261126161603`), and RUN429 durable Community invitations with RUN441 lock-order correction (`20261126161651`). Combined with three RUN442 applications, seven migration operations are installed on Testnet. Six RPCs have postgres ownership, SECURITY DEFINER, pinned search paths and service_role-only execute ACLs; RUN429 RLS/client-deny posture and indexes were verified. No backfill or financial operation was executed. Testnet history now has 247 rows, 246 distinct names and duplicate RUN406 history; generated source-version drift remains. Disposable PostgreSQL concurrency rehearsal, Node 24.15.0 build and two-account Testnet acceptance remain open.
 **RUN437 update:** Adds read-only SQL diagnostics for migration effects, service-role/client ACLs, expected RPCs, invitation-table posture and migration-history anomalies. RUN437 source contract passes 8/8. The SQL was not run against Testnet in this increment; operational database tests remain blocked.  
-**Acceptance status:** 0.338.154 is not yet accepted, pushed or deployed.  
+**Acceptance status:** 0.338.156 is not yet accepted, pushed or deployed.  
 **Release status:** **NOT APPROVED** for Mainnet or production financial release.
 
 ## Authority and preservation
@@ -17,7 +18,7 @@
 2. The former Run 423 / Run 411 archive is historical evidence only.
 3. The RUN426 Phase 0 candidate (incorporating RUN424/RUN425) is a controlled derivative of the authoritative baseline. It preserves the application architecture, records recovered repository infrastructure and historical evidence, and includes the targeted fixes listed in `docs/ENGINEERING-AUDIT-2026-11-26.md`.
 4. Do not bulk-merge the former project's nested `run413_work/` tree. Historical documents are marked with `.historical-notice.md` sidecars or stored under `docs/archive/`.
-5. RUN429 adds one source migration, classified REVIEW_REQUIRED. It remains unapplied; the RUN441 lock-order correction is still held pending PostgreSQL rehearsal.
+5. RUN429 remains classified REVIEW_REQUIRED for other targets; it is applied to this Testnet under generated history version `20261126161651` with the RUN441 Community-before-Invitation lock-order correction incorporated. Disposable PostgreSQL transaction rehearsal is still pending.
 
 ## Product experience standard
 
@@ -40,27 +41,34 @@ The following repository-level files were restored from the former archive and v
 
 ### Supabase migration reconciliation
 
-The active source inventory contains **246 SQL migration files**. After RUN442, Supabase Testnet reports **243 migration-history rows**. The source/history reconciliation is:
+The active source inventory contains **246 SQL migration files**. After RUN443, Supabase Testnet reports **247 migration-history rows and 246 distinct migration names**. `run406_server_read_privilege_reconciliation` remains duplicated at versions `20261125075911` and `20261125075936`.
 
-- **234** source migrations match a remote history row by exact version and normalized name.
-- **Four** source migrations have no corresponding Testnet migration-history entry and remain held: RUN388 (`20261124150000`), RUN396 (`20261125120000`), RUN405 (`20261125150000`) and RUN429 (`20261126090001`).
-- **Eight** logical migrations have source/history version drift: RUN383 identity privacy grants; RUN407 earnings-ledger privileges; RUN397 registration bonus; RUN397 referral quality caps; RUN406 server-read privilege reconciliation; RUN384 research FK indexes; RUN384 server REST grants; and RUN390 Marketplace/Membership/Feed read grants.
-- The three RUN442 migrations were applied through the Supabase migration tool and recorded under generated history versions `20261126153605`, `20261126153609`, and `20261126153614`, not their original source timestamps. Their SQL effects are postflight-verified, but the original source timestamps remain unrecorded.
-- The remote history still contains two versions for the same RUN406 migration name (`20261125075911` and `20261125075936`). This is a duplicate-name history condition, not a duplicate version number.
+Seven migration operations from RUN442/RUN443 have been applied through the Supabase migration tool. The generated history versions differ from their canonical source timestamps:
 
-Do not run `supabase db push`, replay, repair, squash or re-version these migrations automatically. The Supabase tool generated new history IDs for RUN442, so source/history synchronization must be explicitly reconciled before a CLI push. Do not replay the three applied migrations by assumption. The four remaining source migrations are held for disposable PostgreSQL 17 and target-specific validation. Mainnet was not accessed.
+| Migration | Source version | Generated Testnet version |
+|---|---:|---:|
+| RUN384 research FK indexes | `20261124110000` | `20261126153605` |
+| RUN384 REST table grants | `20261124120000` | `20261126153609` |
+| RUN390 Membership/Feed/Marketplace read grants | `20261124143000` | `20261126153614` |
+| RUN388 Research quota RPC | `20261124150000` | `20261126161545` |
+| RUN396 Pi payout history RPC | `20261125120000` | `20261126161553` |
+| RUN405 registration account discovery | `20261125150000` | `20261126161603` |
+| RUN429 Community invitations with RUN441 lock-order correction | `20261126090001` | `20261126161651` |
 
+These generated records prove the operations were submitted through the migration tool, but they do not restore exact source-version identity. The pre-existing RUN383/RUN397/RUN406/RUN407 source/history drift and duplicate RUN406 row remain. The row count and distinct-name count are not proof of a one-to-one source/history match.
+
+Do not run `supabase db push`, replay, repair, squash, re-version or manually edit migration history until each source migration is matched to its exact remote effect. Do not replay the seven applied operations by assumption. The four migrations formerly held in RUN442 are now applied to this Testnet only; their classifications remain relevant to other targets. Mainnet was not accessed.
 ### Supabase security and performance observations
 
-Read-only catalog checks found 37 public tables with RLS enabled and no policies; these are intentional server-only deny-client tables, so do not add generic policies. The RUN442 security postflight retained client-deny ACLs. The Performance Advisor now reports 200 INFO unused-index candidates; do not remove indexes without workload evidence. The 17 RUN384 foreign-key indexes have been applied and all 17 were verified valid. Supabase Health Advisor returned no findings.
+Read-only catalog checks found 37 public tables with RLS enabled and no policies; these are intentional server-only deny-client tables, so do not add generic policies. The RUN442/RUN443 security postflight retained client-deny ACLs. The Performance Advisor now reports 202 INFO unused-index candidates; do not remove indexes without workload evidence. The 17 RUN384 foreign-key indexes have been applied and all 17 were verified valid. Supabase Health Advisor returned no findings.
 
 ## Verification and release boundary
 
-- RUN441 focused identity/session/profile and Community/Messenger contracts remain passing; the last full static run was an incomplete timed run and is not claimed as a full-suite pass.
+- Full static verification: **63/63 gates passed, 5,369 PASS lines, zero FAIL lines**. RUN441 identity/session/profile and Community/Messenger contracts remain passing. This is source/static evidence, not a deployed build or live transaction rehearsal.
 - Release hygiene: **PASS, 17/17**.
 - Project truth: **PASS, 11/11**.
 - Dependency-lock integrity and repository consistency checks: **PASS**.
-- Prebuild dry-run: **464 checks discovered**; execution is blocked by the Node 22.16.0 runtime guard.
+- Prebuild dry-run: **464 checks discovered**; actual prebuild is blocked by the Node 22.16.0 runtime guard (project requires Node 24.15.0).
 - RUN434 authority contract: **17/17 PASS**; operator-key runtime: **6/6 PASS**; RUN435 identity input classification: **16/16 PASS**.
 - Supported Node runtime: **BLOCKED locally**. This workspace has Node `v22.16.0`; the project pins Node `24.15.0`.
 - Typecheck, lint, dependency audit refresh and production build: **NOT RUN** in this environment because the supported Node runtime/dependency installation was unavailable.
@@ -141,4 +149,4 @@ RUN441 adds 34 runtime assertions covering same-provider/different-canonical-acc
 
 SQL review identified two transaction hazards and prepared held corrections without editing the historical RUN429 migration: (1) Community invitation creation locks Community then invitation, while the original response function inverted that order; `supabase/proposals/20261126_run441_community_invitation_lock_order_correction.sql` now follows Community → invitation order. (2) Messenger member-count recalculation now locks affected conversation rows in deterministic order before counting. The full disposable PostgreSQL 17 two-connection rehearsal matrix is in `docs/RUN441-PHASE4-COMMUNITY-MESSENGER-TRANSACTION-REHEARSAL.md`. No `psql`, PostgreSQL server binary or Docker runtime was available, so the database rehearsal was not executed. Both corrections remain held proposals; RUN429 remains REVIEW_REQUIRED and no migration was applied.
 
-Historical RUN441 point-in-time status (before RUN442): source candidate `gh-connect@0.338.153`, not accepted, pushed or deployed. RUN442 subsequently applied three additive Testnet migrations as recorded above. The user-designated accepted archive remains `0.338.139`. Phase 3 operational acceptance remains blocked. Node 24.15.x dependency-backed typecheck/lint/build and live two-account/multidevice acceptance remain outstanding. No financial/provider operation, GitHub push or Vercel deployment occurred. Production and Mainnet remain NOT APPROVED.
+Historical RUN441 point-in-time status (before RUN442): source candidate `gh-connect@0.338.153`, not accepted, pushed or deployed. RUN442/RUN443 subsequently applied seven additive Testnet migration operations as recorded above. The user-designated accepted archive remains `0.338.139`. Phase 3 operational acceptance remains blocked. Node 24.15.x dependency-backed typecheck/lint/build and live two-account/multidevice acceptance remain outstanding. No financial/provider operation, GitHub push or Vercel deployment occurred. Production and Mainnet remain NOT APPROVED.
