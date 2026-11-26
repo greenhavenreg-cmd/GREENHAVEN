@@ -1,3 +1,11 @@
+> **Current candidate authority (26 November 2026):** The working source candidate is `gh-connect@0.338.161` / RUN449 Environment Template Restoration. The last user-designated accepted source archive remains `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`. RUN449 restores the required credential-free root `.env.example`; it has not been pushed or deployed. See `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md`.
+
+## RUN449 — Environment Template Restoration (26 November 2026)
+
+**Current source version:** `0.338.161`
+
+RUN449 restores the canonical credential-free `.env.example` missing from RUN448, preventing the RUN444 prebuild contract from failing with `ENOENT`. Generic A2U/payout defaults remain disabled, privileged credentials remain blank, and the separate Testnet Preview activation profile remains unchanged. The focused RUN449 contract passes 6/6. The supplied dependency audit reports 22 findings; the audit JSON is needed for safe advisory-specific remediation, and the security gate remains fail-closed.
+
 ## RUN448 — Discovery Toast and Operational Hash Repair (26 November 2026)
 
 **Current source version:** `0.338.160`

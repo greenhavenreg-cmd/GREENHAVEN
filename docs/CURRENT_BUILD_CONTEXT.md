@@ -1,14 +1,18 @@
-# CURRENT BUILD CONTEXT — GreenHaven RUN448
+# CURRENT BUILD CONTEXT — GreenHaven RUN449
 
 This document supersedes historical prompts and worklogs for the current working candidate; historical records remain evidence, not active instructions.
 
-## Latest implementation — 0.338.160 Discovery toast and operational hash repair / RUN448 (26 November 2026)
+## Latest implementation — 0.338.161 Environment template restoration / RUN449 (26 November 2026)
 
-RUN448 fixes the two TypeScript failures reported by the user's RUN447 Vercel build log. `components/ghc/discovery-grid-screen.tsx` now has exactly one `addToast` declaration, retaining the success/error/info severity union used by call sites. `lib/server/marketplace/operational-rpc.ts` imports `createHash` from `node:crypto`, preserving the SHA-256 evidence fingerprint. A focused regression contract is registered in `verify:static` and `prebuild:checks`.
+RUN449 restores the canonical credential-free root `.env.example` omitted from the RUN448 archive. Its absence caused the supplied Vercel Preview prebuild to fail at RUN444 check 5/469 with `ENOENT`. The template retains blank privileged credentials and disabled generic Pi A2U/earnings payout defaults; the separate Testnet Preview activation profile remains unchanged. A focused RUN449 regression contract is registered in `verify:static` and `prebuild:checks`.
 
-**Current source version:** `0.338.160` (unaccepted working candidate; parent `0.338.159` / RUN447).
+**Current source version:** `0.338.161` (unaccepted working candidate; parent `0.338.160` / RUN448).
 
-The user-reported RUN447 Vercel log confirms all 468 prebuild checks passed and the optimized production bundle compiled, but TypeScript then failed on the duplicate toast declaration and missing crypto import. RUN448 has not yet been run through a supported-runtime `tsc --noEmit` or Next.js production build. The local environment has Node.js 22.16.0; the project requires Node.js 24.15.0.
+The supplied RUN448 Vercel log confirms checks 1–4 passed and check 5 failed due to the missing root template. It does not prove completion of the remaining prebuild checks, TypeScript validation or the Next.js production build. The project requires Node.js 24.15.0. The supplied dependency-security output reports 22 npm audit findings (1 critical, 13 high, 6 moderate, 2 low); the advisory JSON is required before safe dependency-specific remediation. The zero-vulnerability security gate remains enabled.
+
+RUN447 community role normalization and RUN446 marketplace spend signature repair remain included. RUN443 Testnet migration closeout remains historical operational evidence and does not establish new migration application, current schema parity or live financial acceptance for RUN449.
+
+**Acceptance status:** not accepted, pushed or deployed. **Mainnet/production financial release:** NOT APPROVED. No remote Git, Vercel, database or payment-provider action was performed. See `docs/RUN449-ENV-TEMPLATE-RESTORATION-2026-11-26.md`.
 
 The coordinated RUN385 upgrade program remains documented in `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`. RUN447 community role normalization and RUN446 marketplace spend signature repair remain included. RUN443 Testnet migration closeout remains historical operational evidence and does not establish new migration application, current schema parity or live financial acceptance for RUN448.
 

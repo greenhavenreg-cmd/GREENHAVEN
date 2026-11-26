@@ -5,6 +5,9 @@
 
 ## Current authority
 
+- [RUN449 root environment template restoration](RUN449-ENV-TEMPLATE-RESTORATION-2026-11-26.md) — restores the credential-free root `.env.example` required by Vercel prebuild and CI.
+- [RUN449 upgrade worklog](UPGRADE-WORKLOG-0.338.161.md) — source changes, checks and unresolved dependency audit boundary.
+
 - [RUN447 Community role type repair](RUN447-COMMUNITY-ROLE-TYPE-REPAIR-2026-11-26.md) — canonical membership-role normalization for the community directory card contract.
 - [RUN447 upgrade worklog](UPGRADE-WORKLOG-0.338.159.md) — implementation and verification boundary.
 

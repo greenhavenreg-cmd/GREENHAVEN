@@ -1,9 +1,11 @@
-# Current project truth — 0.338.160 RUN448 Discovery Toast and Operational Hash Repair candidate (2026-11-26)
+# Current project truth — 0.338.161 RUN449 Environment Template Restoration candidate (2026-11-26)
 
-**Current package candidate:** `gh-connect@0.338.160`.
-**Current source version:** `0.338.160` (working candidate)
-**Package identity:** `gh-connect@0.338.160`
+**Current package candidate:** `gh-connect@0.338.161`.
+**Current source version:** `0.338.161` (working candidate)
+**Package identity:** `gh-connect@0.338.161`
 **User-designated accepted baseline:** `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`.
+
+RUN449 restores the missing root `.env.example` required by existing prebuild and release contracts. RUN444 check 5/469 had failed with `ENOENT`; the restored template keeps privileged credentials blank and generic payout/A2U flags disabled, while preserving the separate Testnet Preview activation profile. The focused RUN449 contract passes 6/6. The supplied dependency audit reports 22 findings (1 critical, 13 high, 6 moderate, 2 low); no blind upgrades or audit bypass were applied, and the complete npm audit artifact is required for remediation.
 
 RUN448 removes the duplicate Discovery `addToast` type property and imports Node `createHash` in the marketplace operational RPC module. The focused RUN448 regression contract passes. A full TypeScript check and Next.js production build on Node.js 24.15.0 remain required; the supplied Vercel log documents RUN447 failures, not a successful RUN448 build. No remote push, deployment, database mutation or provider transaction occurred.
 

@@ -1,10 +1,14 @@
 # GreenHaven
 
-**Package:** `gh-connect@0.338.160`  
-**Current source version:** `0.338.160`  
-**Candidate:** RUN448 — Discovery Toast and Operational Hash Repair  
+**Package:** `gh-connect@0.338.161`  
+**Current source version:** `0.338.161`  
+**Candidate:** RUN449 — Environment Template Restoration  
 **Accepted source archive:** `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`  
-**Candidate archive:** `GREENHAVEN-0.338.160-RUN448-DISCOVERY-TOAST-AND-OPERATIONAL-HASH-REPAIR-2026-11-26.zip`
+**Candidate archive:** `GREENHAVEN-0.338.161-RUN449-ENV-TEMPLATE-RESTORATION-2026-11-26.zip`
+
+## RUN449 — Environment Template Restoration
+
+RUN449 restores the canonical credential-free root `.env.example` that was omitted from the RUN448 release archive. The absence caused the Testnet payment-rail prebuild contract to fail with `ENOENT` and also contradicted the existing release/security contracts. The restored template retains blank privileged credentials and disabled generic A2U/payout defaults; the separate Testnet Preview activation profile remains unchanged. A focused RUN449 regression check is registered in static and prebuild checks. The supplied Vercel log confirms the earlier RUN448 checks passed before this missing-file failure.
 
 ## RUN448 — Discovery Toast and Operational Hash Repair
 
