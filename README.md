@@ -1,10 +1,14 @@
 # GreenHaven
 
-**Package:** `gh-connect@0.338.161`  
-**Current source version:** `0.338.161`  
-**Candidate:** RUN449 — Environment Template Restoration  
+**Package:** `gh-connect@0.338.162`  
+**Current source version:** `0.338.162`  
+**Candidate:** RUN450 — Wallet, Withdrawal, Membership, Referral and Missions Repair  
 **Accepted source archive:** `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`  
-**Candidate archive:** `GREENHAVEN-0.338.161-RUN449-ENV-TEMPLATE-RESTORATION-2026-11-26.zip`
+**Candidate archive:** `GREENHAVEN-0.338.162-RUN450-WALLET-WITHDRAWAL-MEMBERSHIP-REFERRAL-MISSIONS-2026-11-26.zip`
+
+## RUN450 — Wallet, Withdrawal, Membership, Referral and Missions Repair
+
+RUN450 fixes the PI wallet action layout, stages Pi withdrawal, prevents payout reservations when the Testnet executor is not ready, repairs authoritative membership and GreenHaven ID RPC reads, adds the `/join` referral landing route, and links the first-post mission to the composer. Mission GHC rewards remain blocked by the existing Daily-Claim-only issuance policy pending an approved reward schedule. See `docs/RUN450-WALLET-WITHDRAWAL-MEMBERSHIP-REFERRAL-MISSIONS-2026-11-26.md`.
 
 ## RUN449 — Environment Template Restoration
 

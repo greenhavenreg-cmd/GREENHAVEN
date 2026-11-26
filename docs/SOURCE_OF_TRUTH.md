@@ -1,10 +1,16 @@
-> **Current candidate authority (26 November 2026):** The working source candidate is `gh-connect@0.338.161` / RUN449 Environment Template Restoration. The last user-designated accepted source archive remains `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`. RUN449 restores the required credential-free root `.env.example`; it has not been pushed or deployed. See `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md`.
+> **Current candidate authority (26 November 2026):** The working source candidate is `gh-connect@0.338.162` / RUN450 Wallet, Withdrawal, Membership, Referral and Missions Repair. The last user-designated accepted source archive remains `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`. RUN450 repairs the wallet/withdrawal UX, membership REST reads, referral ID RPCs and landing path, and mission CTAs; RUN447 community role normalization and RUN443 migration closeout are preserved historical increments. Pi Testnet secrets remain operator-supplied; mission GHC issuance remains locked pending an approved schedule and reviewed migration. It has not been pushed or deployed. See `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md`.
+
+## RUN450 — Wallet, Withdrawal, Membership, Referral and Missions Repair (26 November 2026)
+
+**Current source version:** `0.338.162`
+
+See `docs/RUN450-WALLET-WITHDRAWAL-MEMBERSHIP-REFERRAL-MISSIONS-2026-11-26.md` for scope, safeguards and acceptance limits.
 
 ## RUN449 — Environment Template Restoration (26 November 2026)
 
 **Current source version:** `0.338.161`
 
-RUN449 restores the canonical credential-free `.env.example` missing from RUN448, preventing the RUN444 prebuild contract from failing with `ENOENT`. Generic A2U/payout defaults remain disabled, privileged credentials remain blank, and the separate Testnet Preview activation profile remains unchanged. The focused RUN449 contract passes 6/6. The supplied dependency audit reports 22 findings; the audit JSON is needed for safe advisory-specific remediation, and the security gate remains fail-closed.
+RUN449 restored the canonical credential-free `.env.example` missing from RUN448. This is historical context; RUN450 is current.
 
 ## RUN448 — Discovery Toast and Operational Hash Repair (26 November 2026)
 

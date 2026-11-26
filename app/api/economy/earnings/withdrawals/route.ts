@@ -7,6 +7,7 @@ import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
 import { quoteWithdrawal, createPiEarningsPayoutRequest, grossForRequestedNetAtomic } from "@/lib/server/earnings/unified-ledger"
 import { checkPinProof, pinProofConfigured } from "@/lib/server/identity/withdrawal-pin-proof"
 import { assertPayoutWalletAuthorization } from "@/lib/server/identity/wallet-authorization"
+import { resolvePiSandbox } from "@/lib/pi-env"
 import { supabaseRpc } from "@/lib/server/supabase/rest-client"
 
 export const runtime = "nodejs"
@@ -73,13 +74,26 @@ export async function POST(request: Request) {
   if (
     process.env.PI_EARNINGS_PAYOUT_EXECUTION_ENABLED !== "true" ||
     process.env.PI_A2U_ENABLED !== "true" ||
-    process.env.PI_A2U_TESTNET_ONLY !== "true"
+    process.env.PI_A2U_TESTNET_ONLY !== "true" ||
+    process.env.PI_EARNINGS_AUTO_EXECUTE !== "true" ||
+    process.env.PI_ENV !== "production" ||
+    process.env.VERCEL_ENV === "production" ||
+    !resolvePiSandbox()
   ) {
     return reply({
       ok: false,
       error: "PI_EARNINGS_PAYOUT_EXECUTION_DISABLED",
-      message: "Withdrawals are not being processed yet. Your balance is untouched and stays available.",
+      message: "Testnet payout execution is not fully enabled. Your balance is untouched and stays available.",
     }, 503)
+  }
+  const executorKey = String(process.env.PI_EARNINGS_EXECUTOR_KEY || "").trim()
+  if (Buffer.byteLength(executorKey, "utf8") < 32) {
+    return reply({ ok: false, error: "PI_EARNINGS_EXECUTOR_NOT_CONFIGURED", message: "The Testnet payout executor is not configured. No Pi was reserved." }, 503)
+  }
+  const piApiKey = String(process.env.PI_API_KEY || process.env.PI_SERVER_API_KEY || "").trim()
+  const piWalletSeed = String(process.env.PI_WALLET_PRIVATE_SEED || "").trim()
+  if (!piApiKey || !/^S[A-Z2-7]{55}$/.test(piWalletSeed)) {
+    return reply({ ok: false, error: "PI_SERVER_CREDENTIALS_MISSING", message: "The Testnet Pi payout wallet is not configured. No Pi was reserved." }, 503)
   }
   const parsed = await readBoundedJson(request, 8 * 1024)
   if (!parsed.ok) return reply({ ok: false, error: parsed.error }, parsed.error === "REQUEST_TOO_LARGE" ? 413 : 400)

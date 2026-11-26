@@ -4380,7 +4380,11 @@ body { background: var(--gh-premium-canvas); letter-spacing: -.008em; }
 /* 05 · Wallet hero typography scales without clipping larger balances. */
 [data-gh-module="wallet"] .gh-balance-hero :where([data-balance-value], .tabular-nums) { font-variant-numeric: tabular-nums lining-nums; overflow-wrap: anywhere; }
 /* 06 · Wallet primary actions remain evenly sized on narrow screens. */
-[data-gh-module="wallet"] :where([aria-label="GHC wallet actions"], [aria-label="PI wallet actions"]) { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
+[data-gh-module="wallet"] :where([aria-label="GHC wallet actions"], [aria-label="PI wallet actions"]) { display: block; }
+[data-gh-module="wallet"] [aria-label="GHC wallet actions"] > div:last-child { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
+[data-gh-module="wallet"] [aria-label="PI wallet actions"] > div:last-child { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
+[data-gh-module="wallet"] [aria-label="PI wallet actions"] > div:last-child > button { min-width: 0; min-height: 4.5rem; padding-inline: .75rem; }
+[data-gh-module="wallet"] [aria-label="PI wallet actions"] > div:last-child > button > span:last-child { min-width: 0; }
 /* 07 · Transaction rows use stable alignment for amounts and status labels. */
 [data-gh-module="wallet"] :where([data-transaction-row], .gh-wallet-transaction-row) { min-width: 0; display: flex; align-items: center; gap: .75rem; }
 /* 08 · Wallet history section headings remain visible while scanning long activity. */
@@ -4446,7 +4450,8 @@ body { background: var(--gh-premium-canvas); letter-spacing: -.008em; }
   [data-gh-module="membership"] .gh-premium-membership-content { padding-inline: 1.25rem; }
 }
 @media (max-width: 420px) {
-  [data-gh-module="wallet"] :where([aria-label="GHC wallet actions"], [aria-label="PI wallet actions"]) { gap: .25rem; }
+  [data-gh-module="wallet"] [aria-label="GHC wallet actions"] > div:last-child { gap: .25rem; }
+  [data-gh-module="wallet"] [aria-label="PI wallet actions"] > div:last-child { gap: .5rem; }
   .gh-message-bubble { max-width: min(86vw, 30rem); }
   .gh-marketplace-listing-grid { gap: .5rem; }
 }

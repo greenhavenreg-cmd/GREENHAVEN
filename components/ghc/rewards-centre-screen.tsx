@@ -172,7 +172,7 @@ function navigateTab(tab: string) {
   }
 }
 
-function runCta(hint?: string) {
+function runCta(hint?: string, challengeId?: string) {
   switch (hint) {
     case "profile":
       navigateTab("profile")
@@ -182,6 +182,10 @@ function runCta(hint?: string) {
       break
     case "feed":
       navigateTab("feed")
+      if (challengeId === "challenge_first_post") {
+        // The composer is a global app surface, so it can open directly from Rewards.
+        window.setTimeout(() => window.dispatchEvent(new CustomEvent("ghc:open-compose", { detail: { mode: "post" } })), 120)
+      }
       break
     case "find":
       navigateTab("discover")
@@ -1518,13 +1522,19 @@ function ChallengeCardView({
             {nextStep && nextStep !== "Completed" ? (
               <p className="mt-2 text-[11px] text-muted-foreground">{nextStep}</p>
             ) : null}
+            {challenge.id === "challenge_first_post" && progress.progress === 0 && status !== "completed" ? (
+              <p className="mt-1 text-[11px] font-medium text-emerald-800 dark:text-emerald-200">No post is verified yet. Create your first post, or tap Check if you have already posted.</p>
+            ) : null}
+            {challenge.id === "challenge_join_community" && progress.progress === 0 && status !== "completed" ? (
+              <p className="mt-1 text-[11px] font-medium text-emerald-800 dark:text-emerald-200">No community membership is verified yet. Browse communities, join one, then return here to verify.</p>
+            ) : null}
             {(status === "available" || status === "in_progress") && challenge.ctaHint && (
               <button
                 type="button"
-                onClick={() => runCta(challenge.ctaHint)}
+                onClick={() => runCta(challenge.ctaHint, challenge.id)}
                 className="mt-2.5 inline-flex items-center gap-1 rounded-full bg-[var(--gh-green)] px-3.5 py-1.5 text-[11px] font-bold text-white shadow-sm"
               >
-                {status === "in_progress" ? "Continue" : "Start"}
+                {challenge.id === "challenge_first_post" ? "Create post" : challenge.id === "challenge_join_community" ? "Browse communities" : status === "in_progress" ? "Continue" : "Start"}
                 <ChevronRight size={12} aria-hidden />
               </button>
             )}

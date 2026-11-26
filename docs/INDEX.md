@@ -5,6 +5,9 @@
 
 ## Current authority
 
+- [RUN450 wallet, withdrawal, membership, referral and missions repair](RUN450-WALLET-WITHDRAWAL-MEMBERSHIP-REFERRAL-MISSIONS-2026-11-26.md) — staged PI withdrawal, safe Testnet executor preflight, membership authority read repair, referral identity/landing repair and direct mission CTAs.
+- [RUN450 upgrade worklog](UPGRADE-WORKLOG-0.338.162.md) — implementation and acceptance boundaries.
+
 - [RUN449 root environment template restoration](RUN449-ENV-TEMPLATE-RESTORATION-2026-11-26.md) — restores the credential-free root `.env.example` required by Vercel prebuild and CI.
 - [RUN449 upgrade worklog](UPGRADE-WORKLOG-0.338.161.md) — source changes, checks and unresolved dependency audit boundary.
 

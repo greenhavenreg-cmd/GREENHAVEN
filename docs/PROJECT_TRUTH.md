@@ -1,8 +1,12 @@
-# Current project truth — 0.338.161 RUN449 Environment Template Restoration candidate (2026-11-26)
+## RUN450 wallet, withdrawal, membership, referral and missions repair (26 November 2026)
 
-**Current package candidate:** `gh-connect@0.338.161`.
-**Current source version:** `0.338.161` (working candidate)
-**Package identity:** `gh-connect@0.338.161`
+RUN450 / `gh-connect@0.338.162` is the current working candidate derived from RUN449 / 0.338.161. It fixes the PI wallet action grid, introduces staged withdrawal UX and server readiness preflight, fixes membership entitlement reads and GreenHaven public-ID RPCs, adds `/join` referral redirect, and routes first-post mission into the composer. No migration or remote operation was performed. Mission GHC issuance remains blocked by the current Daily-Claim-only policy pending an approved schedule and reviewed migration. Pi Testnet payout secrets remain blank until supplied by the operator.
+
+# Current project truth — 0.338.162 RUN450 Wallet, Withdrawal, Membership, Referral and Missions Repair candidate (2026-11-26)
+
+**Current package candidate:** `gh-connect@0.338.162`.
+**Current source version:** `0.338.162` (working candidate)
+**Package identity:** `gh-connect@0.338.162`
 **User-designated accepted baseline:** `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`.
 
 RUN449 restores the missing root `.env.example` required by existing prebuild and release contracts. RUN444 check 5/469 had failed with `ENOENT`; the restored template keeps privileged credentials blank and generic payout/A2U flags disabled, while preserving the separate Testnet Preview activation profile. The focused RUN449 contract passes 6/6. The supplied dependency audit reports 22 findings (1 critical, 13 high, 6 moderate, 2 low); no blind upgrades or audit bypass were applied, and the complete npm audit artifact is required for remediation.

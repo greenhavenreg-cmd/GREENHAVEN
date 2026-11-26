@@ -78,7 +78,19 @@ function humanizeApiError(code?: string | null, message?: string | null, hints?:
     return "Withdrawal requests are not enabled on this deployment yet."
   }
   if (c === "PI_EARNINGS_PAYOUT_EXECUTION_DISABLED") {
-    return "Withdrawals are not being processed yet. Your balance is untouched and stays available."
+    return "Testnet payout execution is not fully enabled. Your balance is untouched and stays available."
+  }
+  if (c === "PAYOUT_SERVICE_UNAVAILABLE") {
+    return "The Testnet payout service is not connected to its secure database. No Pi was reserved."
+  }
+  if (c === "PIN_PROOF_SECRET_MISSING") {
+    return "Withdrawal PIN verification is not configured on this deployment. Set GH_PIN_PROOF_SECRET (or GHC_PIN_PROOF_SECRET) in Testnet Preview. No Pi was reserved."
+  }
+  if (c === "PI_EARNINGS_EXECUTOR_NOT_CONFIGURED") {
+    return "The Testnet payout executor key is missing or too short. No Pi was reserved; the operator must configure PI_EARNINGS_EXECUTOR_KEY in Preview."
+  }
+  if (c === "PI_SERVER_CREDENTIALS_MISSING") {
+    return "The Testnet Pi payout wallet credentials are not configured. No Pi was reserved; the operator must configure the Pi API key and Testnet wallet seed."
   }
   if (c === "AMOUNT_REQUIRED" || c === "AMOUNT_TOO_SMALL") {
     return "Enter a valid Pi amount to withdraw."
@@ -135,6 +147,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
   const [submitting, setSubmitting] = useState(false)
   const [releasingReserved, setReleasingReserved] = useState(false)
   const [releaseNote, setReleaseNote] = useState<string | null>(null)
+  const [showRecovery, setShowRecovery] = useState(false)
   const [quote, setQuote] = useState<{
     amountAtomic: number
     gross: number
@@ -150,8 +163,12 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
   const [pinConfigured, setPinConfigured] = useState<boolean | null>(null)
   const [pinStatusError, setPinStatusError] = useState<string | null>(null)
   const [pinInput, setPinInput] = useState("")
+  const [pinConfirmInput, setPinConfirmInput] = useState("")
+  const [pinProofValue, setPinProofValue] = useState("")
+  const [withdrawalStep, setWithdrawalStep] = useState<"amount" | "pin" | "pin-confirm" | "review">("amount")
   const [showPin, setShowPin] = useState(false)
   const [pinBusy, setPinBusy] = useState(false)
+  const bodyScrollRef = useRef<HTMLDivElement | null>(null)
 
   // Sticky max: once we have a positive withdrawable figure for this open session,
   // do not regress to 0 when the parent briefly re-hydrates with null (looks like a reserve wipe).
@@ -243,6 +260,8 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
       wasOpenRef.current = false
       // Never keep a typed PIN around once the sheet is closed.
       setPinInput("")
+      setPinConfirmInput("")
+      setPinProofValue("")
       setShowPin(false)
       return
     }
@@ -258,8 +277,13 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
     setConsentChecked(false)
     setConsentError(null)
     setConsentDone(false)
+    setReleaseNote(null)
+    setShowRecovery(false)
     setConfirmCode("")
     setPinInput("")
+    setPinConfirmInput("")
+    setPinProofValue("")
+    setWithdrawalStep("amount")
     setPinConfigured(null)
     setPinStatusError(null)
     quoteSeq.current += 1
@@ -267,6 +291,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
     // Start empty: pre-filling the whole balance led users to reserve everything by accident.
     // "Max" below remains one tap for anyone who wants to withdraw the full amount.
     setAmountStr("")
+    bodyScrollRef.current?.scrollTo({ top: 0 })
     void loadAuthRef.current?.()
     const sessionAtOpen = sessionIdRef.current
     ;(async () => {
@@ -321,9 +346,14 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
   }, [amountPi])
 
   useEffect(() => {
-    // A quote is only valid for the exact amount it was issued for.
-    setQuote((q) => (q && q.amountAtomic !== floorToAtomic(amountPi) ? null : q))
-  }, [amountPi])
+    // A quote and its PIN proof are valid only for the exact amount reviewed.
+    if (quote && quote.amountAtomic !== floorToAtomic(amountPi)) {
+      setQuote(null)
+      setPinProofValue("")
+      setWithdrawalStep("amount")
+      intentRef.current = null
+    }
+  }, [amountPi, quote])
 
   const destination = auth?.mappedUsername || linkedUsername || null
   const needsConsent = auth !== null && auth.authorizationActive !== true
@@ -456,92 +486,148 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
     }
   }
 
-  /** Authorize, then continue straight to the quote — no reopening or repeating. */
+  /** Authorize, quote, then advance to the PIN stage without reopening the sheet. */
   const onAuthorizeAndContinue = async () => {
     const ok = await onAuthorize()
-    if (ok) await runQuote()
+    if (ok) {
+      const quoted = await runQuote()
+      if (quoted) {
+        setWithdrawalStep("pin")
+        setMsg("Enter your six-digit withdrawal PIN to continue.")
+      }
+    }
+  }
+
+  const continueFromAmount = async () => {
+    if (amountPi <= 0 || !parsedAmount.ok || overBalance) {
+      setMsg(amountError || (overBalance ? `You can withdraw up to ${formatPi(maxPi)} π.` : "Enter a valid Pi amount."))
+      return
+    }
+    if (needsConsent || auth?.authorizationActive !== true) {
+      setMsg("Authorize your linked Pi wallet below before continuing.")
+      return
+    }
+    // Check the server-side Testnet payout worker before asking for a PIN.
+    // This prevents users entering a PIN for a rail whose executor/secrets are absent.
+    try {
+      const readiness = await fetch("/api/economy/earnings/withdrawals/readiness", {
+        credentials: "include", cache: "no-store", headers: { Accept: "application/json" },
+      })
+      const state = await readiness.json().catch(() => null) as { ok?: boolean; ready?: boolean; error?: string } | null
+      if (!readiness.ok || state?.ready !== true) {
+        setMsg(humanizeApiError(state?.error || (readiness.status === 401 ? "AUTH_REQUIRED" : "PAYOUT_SERVICE_UNAVAILABLE")))
+        return
+      }
+    } catch {
+      setMsg("Could not verify Pi Testnet payout readiness. No withdrawal was started; try again when online.")
+      return
+    }
+    const quoted = await onQuote()
+    if (quoted) {
+      setWithdrawalStep("pin")
+      setMsg("Enter your six-digit withdrawal PIN to continue.")
+    }
+  }
+
+  const continueFromPin = () => {
+    if (!/^\d{6}$/.test(pinInput)) {
+      setMsg("Enter all six digits of your withdrawal PIN.")
+      return
+    }
+    setPinConfirmInput("")
+    setMsg("Re-enter your six-digit PIN to confirm this withdrawal.")
+    setWithdrawalStep("pin-confirm")
+  }
+
+  const verifyPinAndReview = async () => {
+    if (!/^\d{6}$/.test(pinConfirmInput)) {
+      setMsg("Re-enter all six digits of your withdrawal PIN.")
+      return
+    }
+    if (pinInput !== pinConfirmInput) {
+      setPinConfirmInput("")
+      setMsg("The PIN entries do not match. Please enter the confirmation PIN again.")
+      return
+    }
+    if (pinConfigured !== true) {
+      setMsg("Your withdrawal PIN could not be confirmed. Set up or refresh Wallet Security & PIN first.")
+      return
+    }
+    if (amountPi <= 0 || floorToAtomic(amountPi) <= 0 || !quote || quote.amountAtomic !== floorToAtomic(amountPi)) {
+      setWithdrawalStep("amount")
+      setMsg("The withdrawal quote has changed. Review your amount again.")
+      return
+    }
+    const amountAtomic = floorToAtomic(amountPi)
+    let pinIntent = intentRef.current
+    if (!pinIntent || pinIntent.amountAtomic !== amountAtomic) {
+      const nonce = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
+      pinIntent = { amountAtomic, key: `sheet-payout:${nonce}` }
+      intentRef.current = pinIntent
+    }
+    setPinBusy(true)
+    setMsg(null)
+    try {
+      const vRes = await fetch("/api/identity/withdrawal-pin", {
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "verify", pin: pinConfirmInput, bindKey: pinIntent.key }),
+        cache: "no-store",
+      })
+      const vBody = (await vRes.json().catch(() => null)) as { ok?: boolean; error?: string; pinProof?: string } | null
+      if (!vRes.ok || !vBody?.ok || !vBody.pinProof) {
+        setMsg(
+          vBody?.error === "PIN_LOCKED" ? "PIN locked after too many attempts. Try again later."
+            : vBody?.error === "PIN_COOLDOWN" ? "Withdrawals are paused for 24 hours after a PIN reset, for your protection."
+            : vBody?.error === "PIN_INVALID" ? "Incorrect withdrawal PIN."
+            : vBody?.error === "PIN_NOT_CONFIGURED" ? "No withdrawal PIN is set yet. Create one in Security & PIN."
+            : vBody?.error === "PIN_PROOF_SECRET_MISSING" ? "Withdrawals are temporarily unavailable because the server-side PIN signing key is not configured. Your funds are unchanged."
+            : vRes.status === 429 || vBody?.error === "RATE_LIMITED" ? "Too many attempts. Wait a minute and try again."
+            : vRes.status === 401 && vBody?.error === "AUTH_REQUIRED" ? "Your session expired. Sign in again."
+            : `PIN verification is temporarily unavailable. Nothing was changed; try again shortly.${vBody?.error ? ` (ref: ${vBody.error})` : ""}`,
+        )
+        return
+      }
+      // Store only the short-lived, amount-bound proof; never retain the raw PIN.
+      setPinProofValue(String(vBody.pinProof))
+      setPinInput("")
+      setPinConfirmInput("")
+      setShowPin(false)
+      setWithdrawalStep("review")
+      setMsg("PIN confirmed. Review the fee and destination, then confirm your withdrawal.")
+    } catch {
+      setMsg("Could not verify your PIN. Nothing was changed; please try again.")
+    } finally {
+      setPinBusy(false)
+    }
   }
 
   const onSubmit = async () => {
     if (submitting) return
     if (needsConsent || auth?.authorizationActive !== true) {
       setMsg("Authorize your Pi wallet first. No withdrawal was started.")
+      setWithdrawalStep("amount")
       return
     }
-    // Final confirmation always follows a fresh server quote for this exact amount.
     if (!quote || quote.amountAtomic !== floorToAtomic(amountPi)) {
-      const quoted = await onQuote()
-      if (quoted) setMsg("Review the amounts above, enter your PIN, then confirm the withdrawal.")
+      setWithdrawalStep("amount")
+      setMsg("The quote has expired. Review your amount again before confirming.")
       return
     }
-    if (!/^\d{6}$/.test(pinInput)) {
-      setMsg("Enter your 6-digit withdrawal PIN.")
+    if (!pinProofValue) {
+      setWithdrawalStep("pin")
+      setMsg("Confirm your withdrawal PIN before submitting.")
       return
     }
     if (amountPi <= 0 || floorToAtomic(amountPi) <= 0) {
+      setWithdrawalStep("amount")
       setMsg("Enter a valid amount.")
       return
     }
-    // The idempotency key is created BEFORE PIN verification: the server binds the PIN proof to it.
-    const preAtomic = floorToAtomic(amountPi)
-    let pinIntent = intentRef.current
-    if (!pinIntent || pinIntent.amountAtomic !== preAtomic) {
-      const nonce =
-        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-          ? crypto.randomUUID()
-          : `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
-      pinIntent = { amountAtomic: preAtomic, key: `sheet-payout:${nonce}` }
-      intentRef.current = pinIntent
-    }
-    let pinProof = ""
-    setPinBusy(true)
-    try {
-      if (pinConfigured === false) {
-        // PINs are created once in Wallet → Security & PIN, never in the middle of a transaction.
-        setMsg("Set up your withdrawal PIN in Security & PIN first, then return to withdraw.")
-        return
-      }
-      {
-        const vRes = await fetch("/api/identity/withdrawal-pin", {
-          method: "POST",
-          credentials: "include",
-          headers: { Accept: "application/json", "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "verify", pin: pinInput, bindKey: pinIntent.key }),
-          cache: "no-store",
-        })
-        const vBody = (await vRes.json().catch(() => null)) as { ok?: boolean; error?: string; pinProof?: string } | null
-        if (!vRes.ok || !vBody?.ok) {
-          setMsg(
-            vBody?.error === "PIN_LOCKED"
-              ? "PIN locked after too many attempts. Try again later."
-              : vBody?.error === "PIN_COOLDOWN"
-                ? "Withdrawals are paused for 24 hours after a PIN reset, for your protection."
-              : vBody?.error === "PIN_INVALID"
-                ? "Incorrect withdrawal PIN."
-              : vBody?.error === "PIN_NOT_CONFIGURED"
-                ? "No withdrawal PIN is set yet. Create one in Security & PIN."
-              : vBody?.error === "PIN_PROOF_SECRET_MISSING"
-                ? "Withdrawals are temporarily unavailable because the server-side PIN signing key is not configured. Set GH_PIN_PROOF_SECRET (or the compatibility alias GHC_PIN_PROOF_SECRET) in the Testnet Preview environment. Your PIN was correct and your funds are unchanged. (ref: PIN_PROOF_SECRET_MISSING)"
-              : vRes.status === 429 || vBody?.error === "RATE_LIMITED"
-                ? "Too many attempts. Wait a minute and try again."
-              : vRes.status === 401 && vBody?.error === "AUTH_REQUIRED"
-                ? "Your session expired. Sign in again."
-                : `PIN verification is temporarily unavailable. Nothing was changed; try again shortly.${vBody?.error ? ` (ref: ${vBody.error})` : ""}`,
-          )
-          return
-        }
-        pinProof = String(vBody?.pinProof || "")
-        // The PIN has done its job: never keep it on screen or in memory beyond verification.
-        setPinInput("")
-        setShowPin(false)
-      }
-    } finally {
-      setPinBusy(false)
-    }
-    if (amountPi <= 0) {
-      setMsg("Enter a valid amount.")
-      return
-    }
+    const pinProof = pinProofValue
     const amountAtomic = floorToAtomic(amountPi)
     if (amountAtomic <= 0) {
       setMsg("Amount too small.")
@@ -578,7 +664,9 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
           await loadAuth()
           setMsg("Your wallet authorization is no longer active. Please authorize again.")
         } else if (code === "PIN_PROOF_REQUIRED") {
-          setMsg("Please re-enter your withdrawal PIN to confirm this request.")
+          setPinProofValue("")
+          setWithdrawalStep("pin")
+          setMsg("Your PIN confirmation expired. Please enter and confirm your PIN again.")
         } else if (code === "PI_EARNINGS_PAYOUT_REQUESTS_DISABLED") {
           setMsg("Withdrawal requests are not enabled on this deployment yet. No transfer started.")
         } else {
@@ -588,6 +676,8 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
       }
       intentRef.current = null
       setPinInput("")
+      setPinConfirmInput("")
+      setPinProofValue("")
       setShowPin(false)
       let finalMsg =
         "Withdrawal request accepted. Your Pi is reserved while the payout is processed."
@@ -684,7 +774,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
         tabIndex={-1}
       />
       <div
-        className="relative z-[1] flex max-h-[min(100dvh,92vh)] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-card shadow-2xl sm:rounded-3xl"
+        className="relative z-[1] flex h-[min(92dvh,900px)] max-h-[calc(100dvh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-card shadow-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
       >
@@ -710,8 +800,18 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
           </button>
         </div>
 
-        <div className="space-y-4 overflow-y-auto px-4 py-4">
-          <div>
+        <div className="shrink-0 border-b border-border/40 px-4 py-2.5">
+          <ol className="grid grid-cols-4 gap-1 text-center text-[9px] font-bold uppercase tracking-wide" aria-label="Withdrawal steps">
+            {[{ id: "amount", label: "Amount" }, { id: "pin", label: "PIN" }, { id: "pin-confirm", label: "Confirm PIN" }, { id: "review", label: "Review" }].map((item, index) => {
+              const order = ["amount", "pin", "pin-confirm", "review"].indexOf(withdrawalStep)
+              const active = order === index
+              const done = order > index
+              return <li key={item.id} className={`rounded-lg px-1.5 py-2 ${active ? "bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-200" : done ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"}`} aria-current={active ? "step" : undefined}>{done ? "✓ " : `${index + 1}. `}{item.label}</li>
+            })}
+          </ol>
+        </div>
+        <div ref={bodyScrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4" style={{ WebkitOverflowScrolling: "touch" }}>
+          <div className={withdrawalStep === "amount" ? "space-y-2" : "hidden"}>
             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
               <span>Amount</span>
               <button
@@ -720,6 +820,9 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
                 onClick={() => {
                   amountTouchedRef.current = true
                   setAmountStr(maxPi > 0 ? atomicToPiString(floorToAtomic(maxPi)) : "")
+                  setQuote(null)
+                  setPinProofValue("")
+                  intentRef.current = null
                 }}
                 aria-label={`Use maximum available ${formatPi(maxPi)} Pi`}
               >
@@ -741,6 +844,9 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
                 const cleaned =
                   parts.length <= 1 ? raw : `${parts[0]}.${parts.slice(1).join("").slice(0, 7)}`
                 setAmountStr(cleaned)
+                setQuote(null)
+                setPinProofValue("")
+                intentRef.current = null
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") e.preventDefault()
@@ -757,24 +863,24 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
             ) : null}
           </div>
 
-          {(feePreview || quote) && (
+          {(withdrawalStep === "amount" || withdrawalStep === "review") ? (
+            <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+              <button type="button" onClick={() => setShowRecovery((value) => !value)} className="flex min-h-9 w-full items-center justify-between gap-2 text-left text-[11px] font-semibold text-foreground">
+                <span>Have a previous Pi withdrawal stuck as reserved?</span><span aria-hidden>{showRecovery ? "−" : "+"}</span>
+              </button>
+              {showRecovery ? (
+                <div className="space-y-2 pb-2 text-[11px] leading-relaxed text-muted-foreground">
+                  <p>If a previous attempt never reached Pi, ask the server to release only a request that has no provider payment attempt. Requests with an uncertain Pi payment remain protected for reconciliation.</p>
+                  <button type="button" onClick={() => void onReturnReserved()} disabled={releasingReserved} className="min-h-10 w-full rounded-full bg-amber-600 px-4 text-[11px] font-bold text-white disabled:opacity-60">{releasingReserved ? "Checking reserved requests…" : "Check and return safely releasable Pi"}</button>
+                  {releaseNote ? <p role="status" className="rounded-lg bg-background px-2.5 py-2">{releaseNote}</p> : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {withdrawalStep === "review" && (feePreview || quote) && (
             <div className="rounded-2xl border border-border/60 bg-muted/30 px-3 py-3 text-[12px]">
               <p className="font-semibold text-foreground" title="Fee estimate only. Funds are reserved only after you confirm with your PIN.">Review</p>
-            {(releaseNote || true) ? (
-              <div className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-[12px] leading-relaxed text-amber-950 dark:text-amber-50">
-                <p className="font-semibold">Incomplete withdrawal held as reserved?</p>
-                <p className="mt-1 opacity-90">If a previous attempt never completed on Pi, you can ask the server to return that reserved π to Available. Requests that already have a Pi payment id stay protected until reconcile.</p>
-                <button
-                  type="button"
-                  onClick={() => void onReturnReserved()}
-                  disabled={releasingReserved}
-                  className="mt-2 min-h-11 w-full rounded-full bg-amber-600 px-4 text-[12px] font-bold text-white disabled:opacity-60"
-                >
-                  {releasingReserved ? "Returning reserved π…" : "Return reserved π to available"}
-                </button>
-                {releaseNote ? <p className="mt-2 text-[11px] opacity-90" role="status">{releaseNote}</p> : null}
-              </div>
-            ) : null}
 
               <div className="mt-2 space-y-1 text-muted-foreground">
                 <p className="flex justify-between">
@@ -803,11 +909,11 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
             </div>
           )}
 
-          {authLoading ? (
+          {withdrawalStep === "amount" && authLoading ? (
             <p className="flex items-center gap-2 text-[12px] text-muted-foreground" role="status" aria-live="polite">
               <Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking payout consent…
             </p>
-          ) : needsConsent ? (
+          ) : withdrawalStep === "amount" && needsConsent ? (
             <>
           {/* Identity map: GreenHaven account vs linked Pi wallet */}
           <div className="rounded-lg border border-violet-100 bg-violet-50/60 px-3 py-2 text-xs text-violet-900 space-y-1" role="group" aria-label="Withdrawal identity details">
@@ -912,60 +1018,47 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
             </p>
           )}
 
-          {!needsConsent && (
-            <div className="space-y-2">
-              <label htmlFor="withdrawal-pin" className="block text-[11px] font-medium text-muted-foreground">
-                Withdrawal PIN (6 digits — separate from login; never sent to Pi)
-              </label>
-              <p id="withdraw-pin-hint" className="text-[10px] text-muted-foreground">Enter the six-digit withdrawal PIN configured in Wallet Security.</p>
-              {pinStatusError ? (
-                <p id="withdraw-pin-status-error" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100" role="alert">{pinStatusError}</p>
-              ) : null}
-              {pinConfigured === false ? (
-                <div className="space-y-2 rounded-2xl border border-violet-200 bg-violet-50 px-3 py-3 text-[12px] text-violet-950 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-100" role="status">
-                  <p className="font-semibold">Set up your withdrawal PIN first</p>
-                  <p className="text-[11px] leading-relaxed">Your PIN is created once in Wallet → Security &amp; PIN, not during a withdrawal. Then come back and enter it here.</p>
-                  {onSetupPin ? (
-                    <button type="button" onClick={onSetupPin} className="min-h-10 w-full rounded-full bg-violet-700 px-4 text-[12px] font-bold text-white">Go to Security &amp; PIN</button>
-                  ) : null}
-                </div>
+          {!needsConsent && withdrawalStep !== "amount" && (
+            <div className="space-y-3 rounded-2xl border border-border/60 bg-muted/20 p-3">
+              {withdrawalStep === "pin" ? (
+                <>
+                  <div>
+                    <p className="text-sm font-bold text-foreground">Enter withdrawal PIN</p>
+                    <label htmlFor="withdrawal-pin" className="mt-1 block text-[11px] leading-relaxed text-muted-foreground">Use the six-digit PIN you created in Wallet Security. This is separate from your login password.</label>
+                    <p id="withdraw-pin-hint" className="sr-only">Enter six numeric digits.</p>
+                  </div>
+                  {pinStatusError ? <p id="withdraw-pin-status-error" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100" role="alert">{pinStatusError}</p> : null}
+                  {pinConfigured === false ? (
+                    <div className="space-y-2 rounded-2xl border border-violet-200 bg-violet-50 px-3 py-3 text-[12px] text-violet-950 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-100" role="status">
+                      <p className="font-semibold">Set up your withdrawal PIN first</p>
+                      <p className="text-[11px] leading-relaxed">Create your PIN in Wallet → Security &amp; PIN, then return to withdraw.</p>
+                      {onSetupPin ? <button type="button" onClick={onSetupPin} className="min-h-10 w-full rounded-full bg-violet-700 px-4 text-[12px] font-bold text-white">Go to Security &amp; PIN</button> : null}
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <input id="withdrawal-pin" type={showPin ? "text" : "password"} inputMode="numeric" minLength={6} maxLength={6} required autoComplete="off" autoCapitalize="off" spellCheck={false} enterKeyHint="done" value={pinInput} onChange={(e) => setPinInput(e.target.value.replace(/\D/g, "").slice(0, 6))} className="w-full rounded-2xl border border-border/70 bg-background py-3 pl-4 pr-12 text-base font-semibold tracking-[0.35em] text-foreground outline-none focus:border-violet-500" placeholder="••••••" aria-label="Enter withdrawal PIN" aria-describedby={pinStatusError ? "withdraw-pin-hint withdraw-pin-status-error" : "withdraw-pin-hint"} pattern="[0-9]{6}" aria-invalid={pinInput.length > 0 && pinInput.length !== 6} />
+                      <button type="button" onClick={() => setShowPin((v) => !v)} className="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted" aria-label={showPin ? "Hide PIN" : "Show PIN"} aria-controls="withdrawal-pin" aria-pressed={showPin}>{showPin ? <EyeOff size={17} /> : <Eye size={17} />}</button>
+                    </div>
+                  )}
+                  {pinConfigured === true ? <PinRecoveryPanel onPinReset={() => { setPinInput(""); setPinConfirmInput(""); setPinProofValue(""); setMsg("PIN reset. Set a new PIN in Wallet Security before continuing.") }} /> : null}
+                </>
+              ) : withdrawalStep === "pin-confirm" ? (
+                <>
+                  <div>
+                    <p className="text-sm font-bold text-foreground">Confirm your withdrawal PIN</p>
+                    <label htmlFor="withdrawal-pin-confirm" className="mt-1 block text-[11px] text-muted-foreground">Re-enter the same six digits. Your PIN is checked securely before the final review.</label>
+                  </div>
+                  <div className="relative">
+                    <input id="withdrawal-pin-confirm" type={showPin ? "text" : "password"} inputMode="numeric" minLength={6} maxLength={6} required autoComplete="off" autoCapitalize="off" spellCheck={false} enterKeyHint="done" value={pinConfirmInput} onChange={(e) => setPinConfirmInput(e.target.value.replace(/\D/g, "").slice(0, 6))} className="w-full rounded-2xl border border-border/70 bg-background py-3 pl-4 pr-12 text-base font-semibold tracking-[0.35em] text-foreground outline-none focus:border-violet-500" placeholder="••••••" aria-label="Confirm withdrawal PIN" pattern="[0-9]{6}" aria-invalid={pinConfirmInput.length > 0 && pinConfirmInput.length !== 6} />
+                    <button type="button" onClick={() => setShowPin((v) => !v)} className="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted" aria-label={showPin ? "Hide PIN" : "Show PIN"} aria-controls="withdrawal-pin-confirm" aria-pressed={showPin}>{showPin ? <EyeOff size={17} /> : <Eye size={17} />}</button>
+                  </div>
+                </>
               ) : (
-                <div className="relative">
-                  <input
-                    id="withdrawal-pin"
-                    type={showPin ? "text" : "password"}
-                    inputMode="numeric"
-                    minLength={6}
-                    maxLength={6}
-                    required
-                    autoComplete="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    enterKeyHint="done"
-                    value={pinInput}
-                    onChange={(e) => setPinInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    className="w-full rounded-2xl border border-border/70 bg-background py-2.5 pl-4 pr-12 text-sm font-semibold tracking-[0.3em] text-foreground outline-none focus:border-violet-500"
-                    placeholder="••••••"
-                    aria-label="Enter withdrawal PIN"
-                    pattern="[0-9]{6}"
-                    aria-invalid={pinInput.length > 0 && pinInput.length !== 6}
-                    aria-describedby={pinStatusError ? "withdraw-pin-hint withdraw-pin-status-error" : "withdraw-pin-hint"}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPin((v) => !v)}
-                    className="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted active:scale-95"
-                    aria-label={showPin ? "Hide PIN" : "Show PIN"}
-                    aria-controls="withdrawal-pin"
-                    aria-pressed={showPin}
-                  >
-                    {showPin ? <EyeOff size={17} /> : <Eye size={17} />}
-                  </button>
+                <div className="flex items-center gap-3 rounded-xl bg-emerald-50 px-3 py-3 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100" role="status">
+                  <ShieldCheck className="h-5 w-5 shrink-0" />
+                  <div><p className="text-sm font-bold">PIN confirmed</p><p className="mt-0.5 text-[11px]">Your raw PIN has been cleared. Review the amount, fee and linked destination below.</p></div>
                 </div>
               )}
-              {pinConfigured === true ? (
-                <PinRecoveryPanel onPinReset={() => { setPinInput(""); setMsg("PIN reset. Enter your new PIN to continue.") }} />
-              ) : null}
             </div>
           )}
 
@@ -976,39 +1069,22 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
           ) : null}
         </div>
 
-        <div className="space-y-2 border-t border-border/50 px-4 py-3">
-          <button
-            type="button"
-            disabled={quoting || authLoading || authorizing || needsConsent || auth === null || amountPi <= 0}
-            aria-busy={quoting}
-            onClick={() => void onQuote()}
-            className="flex min-h-11 w-full items-center justify-center rounded-full border border-border/70 bg-background text-[13px] font-bold text-foreground disabled:opacity-50"
-          >
-            {quoting ? "Quoting…" : needsConsent ? "Authorize to preview fee" : "Preview fee"}
-          </button>
-          <button
-            type="button"
-            disabled={submitting || quoting || authLoading || authorizing || pinBusy || needsConsent || auth === null || pinConfigured !== true || pinInput.length !== 6 || amountPi <= 0}
-            aria-busy={submitting || pinBusy}
-            onClick={() => void onSubmit()}
-            className="flex min-h-12 w-full items-center justify-center rounded-full bg-violet-700 text-[15px] font-bold text-white shadow-sm disabled:opacity-50"
-            data-testid="pi-withdraw-submit"
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting…
-              </>
-            ) : needsConsent ? (
-              "Authorize first"
-            ) : quote && quote.amountAtomic === floorToAtomic(amountPi) ? (
-              "Confirm withdrawal"
-            ) : (
-              "Review withdrawal"
-            )}
-          </button>
-          <p className="text-center text-[10px] text-muted-foreground" aria-live="polite">
-            Funds are reserved only after you confirm a withdrawal request; success shows after Pi confirms payment. Success is shown only after Pi confirms it.
-          </p>
+        <div className="shrink-0 space-y-2 border-t border-border/60 bg-card px-4 py-3 pb-[max(.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,.04)]">
+          {withdrawalStep === "amount" ? (
+            <button type="button" disabled={quoting || authLoading || authorizing || amountPi <= 0 || overBalance || !parsedAmount.ok} aria-busy={quoting || authLoading || authorizing} onClick={() => void (needsConsent ? setMsg("Authorize your linked Pi wallet above, then continue.") : continueFromAmount())} className="flex min-h-12 w-full items-center justify-center rounded-full bg-violet-700 text-[15px] font-bold text-white shadow-sm disabled:opacity-50">
+              {quoting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Getting fee quote…</> : needsConsent ? "Authorize wallet above" : "Continue to PIN"}
+            </button>
+          ) : withdrawalStep === "pin" ? (
+            <button type="button" disabled={pinConfigured !== true || pinBusy || pinInput.length !== 6} onClick={continueFromPin} className="flex min-h-12 w-full items-center justify-center rounded-full bg-violet-700 text-[15px] font-bold text-white shadow-sm disabled:opacity-50">Continue</button>
+          ) : withdrawalStep === "pin-confirm" ? (
+            <button type="button" disabled={pinBusy || pinConfirmInput.length !== 6} aria-busy={pinBusy} onClick={() => void verifyPinAndReview()} className="flex min-h-12 w-full items-center justify-center rounded-full bg-violet-700 text-[15px] font-bold text-white shadow-sm disabled:opacity-50">{pinBusy ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying PIN…</> : "Verify PIN & review"}</button>
+          ) : (
+            <button type="button" disabled={submitting || pinBusy || !pinProofValue || !quote || quote.amountAtomic !== floorToAtomic(amountPi)} aria-busy={submitting} onClick={() => void onSubmit()} className="flex min-h-12 w-full items-center justify-center rounded-full bg-violet-700 text-[15px] font-bold text-white shadow-sm disabled:opacity-50" data-testid="pi-withdraw-submit">
+              {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting…</> : "Confirm withdrawal"}
+            </button>
+          )}
+          {withdrawalStep !== "amount" ? <button type="button" disabled={submitting || pinBusy} onClick={() => { setMsg(null); if (withdrawalStep === "pin") { setPinInput(""); setWithdrawalStep("amount") } else if (withdrawalStep === "pin-confirm") { setPinConfirmInput(""); setWithdrawalStep("pin") } else { setPinProofValue(""); setPinInput(""); setPinConfirmInput(""); setWithdrawalStep("pin") } }} className="min-h-10 w-full rounded-full border border-border/70 bg-background text-[12px] font-semibold text-foreground disabled:opacity-50">Back</button> : null}
+          <p className="text-center text-[10px] text-muted-foreground" aria-live="polite">Your Pi is reserved only after final confirmation. The transfer is complete only after Pi confirms payment.</p>
         </div>
       </div>
     </div>
