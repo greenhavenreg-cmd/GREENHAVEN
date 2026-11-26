@@ -1,10 +1,14 @@
 # GreenHaven
 
-**Package:** `gh-connect@0.338.158`  
-**Current source version:** `0.338.158`  
-**Candidate:** RUN446 — Marketplace Spend Signature Repair  
+**Package:** `gh-connect@0.338.159`  
+**Current source version:** `0.338.159`  
+**Candidate:** RUN447 — Community Role Type Repair  
 **Accepted source archive:** `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`  
-**Candidate archive:** `GREENHAVEN-0.338.158-RUN446-MARKETPLACE-SPEND-SIGNATURE-REPAIR-2026-11-26.zip`
+**Candidate archive:** `GREENHAVEN-0.338.159-RUN447-COMMUNITY-ROLE-TYPE-REPAIR-2026-11-26.zip`
+
+## RUN447 — Community Role Type Repair
+
+The community directory now normalizes persisted membership roles to the canonical `CommunityRoleLabel` union before passing them to `GroupCard`. Legacy `mod` maps to `moderator`; unknown values use a safe joined-member/guest fallback; creator identity retains owner precedence. The Discovery preference callback now depends on its exact functions rather than the full context object. A focused regression gate is registered in static and prebuild checks. The supplied Vercel log showed RUN446 bundle compilation succeeding before this new TypeScript error; RUN447 still requires a fresh supported-runtime build.
 
 ## RUN446 — Marketplace spend signature repair
 

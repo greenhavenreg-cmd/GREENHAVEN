@@ -3,6 +3,9 @@
 
 ## Current authority
 
+- [RUN447 Community role type repair](RUN447-COMMUNITY-ROLE-TYPE-REPAIR-2026-11-26.md) — canonical membership-role normalization for the community directory card contract.
+- [RUN447 upgrade worklog](UPGRADE-WORKLOG-0.338.159.md) — implementation and verification boundary.
+
 - [RUN444 Testnet payment and withdrawal rails](RUN444-TESTNET-PAYMENT-WITHDRAWAL-RAILS-2026-11-26.md) — Testnet activation profile, Paystack test-key isolation, GHC withdrawal network fences and outstanding provider acceptance.
 - [RUN444 upgrade worklog](UPGRADE-WORKLOG-0.338.156.md) — implementation and verification boundaries.
 

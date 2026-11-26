@@ -29,7 +29,7 @@ const checks = [
   ['Discovery people are loaded through canonical server candidate RPC', /gh_discovery_candidates/.test(discoverApi) && /p_actor_id: auth\.userId/.test(discoverApi)],
   ['Discovery applies privacy projection before returning identities', /publicIdentityPayload/.test(discoverApi) && /if \(!publicIdentity\) return \[\]/.test(discoverApi)],
   ['Discovery supports multi-category filtering and explainable intent ranking', /DISCOVERY_CATEGORIES/.test(discovery) && /scoreIntentMatch/.test(read('../lib/domains/adapters/discovery-adapter.ts'))],
-  ['Discovery intent changes use server-authoritative profile persistence', /ghc\.updateProfile\(\{ connectionIntents: normalized \}\)/.test(discovery)],
+  ['Discovery intent changes use server-authoritative profile persistence', /const updateProfile = ghc\.updateProfile/.test(discovery) && /updateProfile\(\{ connectionIntents: normalized \}\)/.test(discovery)],
   ['Connection request search verifies conversation membership', /resolveAuthenticatedUser/.test(searchApi) && /membership is rechecked inside the RPC/.test(searchApi) && /gh_search_conversation_messages/.test(searchApi)],
   ['Live calls remain disabled until production policy and TURN are configured', /CALLS_PRODUCTION_ENABLED = false/.test(callPolicy) && /GH_CALLS_ENABLED/.test(callConfig) && /GH_CALL_TURN_SHARED_SECRET/.test(callConfig)],
   ['Call config derives short-lived TURN credentials server-side', /createHmac\("sha1", sharedSecret\)/.test(callConfig) && /expiresAt/.test(callConfig)],

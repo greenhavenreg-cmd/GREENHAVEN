@@ -95,6 +95,8 @@ export function DiscoveryGridScreen() {
   const meId = IdentityService.getCurrentUserId()
   const profileIntents = resolveUserIntents(meId, ghc.profile as any)
   const [selectedIntents, setSelectedIntents] = useState<ConnectionIntentId[]>(() => profileIntents)
+  const updateProfile = ghc.updateProfile
+  const addToast = ghc.addToast
   useSectionRefresh(
     "discover",
     () => {
@@ -117,23 +119,23 @@ export function DiscoveryGridScreen() {
       const previous = selectedIntents
       const normalized = Array.from(new Set(ids)).slice(0, 11)
       setSelectedIntents(normalized)
-      if (!ghc.updateProfile) {
+      if (!updateProfile) {
         setSelectedIntents(previous)
-        ghc.addToast?.("Connection preferences cannot be saved right now", "error")
+        addToast?.("Connection preferences cannot be saved right now", "error")
         return
       }
-      const saved = await ghc.updateProfile({ connectionIntents: normalized })
+      const saved = await updateProfile({ connectionIntents: normalized })
       if (!saved) {
         // updateProfile may have queued the account change for reconnect. Keep the
         // current selection visible, but clearly distinguish it from server-confirmed state.
-        ghc.addToast?.("Connection preferences are not yet confirmed by the server", "info")
+        addToast?.("Connection preferences are not yet confirmed by the server", "info")
         return
       }
       // Local mirror is a convenience cache only; the profile service is authoritative.
       saveConnectionIntentsWithStatus(meId, normalized)
-      ghc.addToast?.("Discovery preferences updated", "success")
+      addToast?.("Discovery preferences updated", "success")
     },
-    [ghc.updateProfile, ghc.addToast, meId, selectedIntents],
+    [updateProfile, addToast, meId, selectedIntents],
   )
   const [query, setQuery] = useState("")
   const [pickerTarget, setPickerTarget] = useState<{ id: string; name?: string } | null>(null)

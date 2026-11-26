@@ -4,6 +4,26 @@
 
 export type CommunityRoleLabel = "owner" | "admin" | "moderator" | "member" | "guest"
 
+/** Normalize untrusted/persisted membership role values to the UI role contract. */
+export function normalizeCommunityRole(
+  role: string | null | undefined,
+  fallback: CommunityRoleLabel = "guest",
+): CommunityRoleLabel {
+  const normalized = String(role || "").trim().toLowerCase()
+  switch (normalized) {
+    case "owner":
+    case "admin":
+    case "moderator":
+    case "member":
+    case "guest":
+      return normalized
+    case "mod":
+      return "moderator"
+    default:
+      return fallback
+  }
+}
+
 export function formatCommunityRole(role: string | null | undefined): string {
   const r = String(role || "").toLowerCase()
   switch (r) {

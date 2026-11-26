@@ -1,3 +1,9 @@
+## RUN447 — Community Role Type Repair (26 November 2026)
+
+**Current source version:** `0.338.159`
+
+The working candidate is `gh-connect@0.338.159`. Community directory role values are normalized through `normalizeCommunityRole` to the canonical `CommunityRoleLabel` union before reaching `GroupCard`. Legacy `mod` maps to `moderator`; unknown values use a safe member/guest fallback; creator identity keeps owner precedence. A focused regression gate is registered in static and prebuild checks. The supplied Vercel log reports the type error on RUN446; a fresh RUN447 production build is still required. No remote push, deployment, database mutation or provider transaction occurred. See `docs/RUN447-COMMUNITY-ROLE-TYPE-REPAIR-2026-11-26.md`.
+
 **Current source version:** `0.338.156`
 **Current package identity:** `gh-connect@0.338.158`
 **Current source version:** `0.338.158`

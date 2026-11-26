@@ -1,3 +1,12 @@
+RUN447 source change: community directory roles are normalized to the canonical GroupCard role union, with legacy alias and safe fallback handling; creator ownership remains first priority. The RUN447 focused contract is registered in static and prebuild checks. The supplied Vercel log reports this error on RUN446; RUN447 has not yet been built by Vercel.
+
+## RUN447 Community role type repair
+
+**Current source version:** `0.338.159` (working candidate)
+**Current package candidate:** `gh-connect@0.338.159`. `components/ghc/communities-screen.tsx` now passes a `CommunityRoleLabel`-typed value to `GroupCard` through `normalizeCommunityRole`; the focused RUN447 regression gate is included. The unused Discover memo dependency was removed. No remote push, deployment, database mutation or provider transaction occurred.
+
+> **Current authority notice (26 November 2026):** The last user-designated accepted source archive remains `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`; 0.338.159 is a working candidate, not yet accepted, pushed or deployed.
+
 RUN446 source verification: marketplace spend signature contract passes; RUN445 earnings snapshot contract passes; RUN444 Testnet payment/withdrawal contract passes. The supplied RUN445 Vercel log confirms 466 prebuild checks and bundle compilation, but TypeScript validation then failed. RUN446 corrects that type mismatch; a fresh Node 24.15.x Vercel build is required to confirm it.
 
 ## RUN446 Marketplace spend signature repair

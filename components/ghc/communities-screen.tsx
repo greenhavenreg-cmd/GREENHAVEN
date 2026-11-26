@@ -40,7 +40,7 @@ import { useScrollHeader } from "@/lib/use-scroll-header"
 import { navigateTo } from "@/lib/navigation/navigate"
 import { GroupCard } from "./group-card"
 import { CreateGroupModal, type CreateGroupFormData } from "./create-group-modal"
-import { privacyJoinHint, formatCommunityRole } from "@/lib/community/role-labels"
+import { privacyJoinHint, formatCommunityRole, normalizeCommunityRole } from "@/lib/community/role-labels"
 import {
   matchesPrivacyFilter,
   normalizeCommunityPrivacy,
@@ -808,7 +808,7 @@ export function CommunitiesScreen() {
       const state = resolveMembershipState(c, IdentityService.getCurrentUserId() || "")
       return state === "discoverable" || state === "pending"
     }),
-    [communityGroups, communityIdentityId]
+    [communityGroups]
   )
 
   // Management is derived only from the canonical membership role/creator identity.
@@ -1872,7 +1872,7 @@ export function CommunitiesScreen() {
               const roleEntry = Object.entries(community.groupRoles || {}).find(([memberId]) => isSameIdentity(memberId))
               const role = community.createdBy && isSameIdentity(community.createdBy)
                 ? "owner"
-                : roleEntry?.[1] || (joined ? "member" : "guest")
+                : normalizeCommunityRole(roleEntry?.[1], joined ? "member" : "guest")
               return (
                 <GroupCard
                   key={community.id}

@@ -1,3 +1,11 @@
+## Latest implementation — 0.338.159 Community role type repair / RUN447 (26 November 2026)
+
+RUN447 fixes the TypeScript error reported after RUN446's optimized bundle compiled: the community directory now normalizes stored roles to the canonical `CommunityRoleLabel` union before passing them to `GroupCard`. Legacy `mod` maps to `moderator`, unknown roles use safe member/guest fallbacks, and creator identity retains owner precedence. The unnecessary `communityIdentityId` dependency was removed from the Discover memo. The Discovery preference callback now captures `updateProfile` and `addToast` directly, clearing the reported missing-`ghc` dependency warning without depending on the entire context object. A focused regression check is registered in static and prebuild gates. A fresh Node 24.15.x Vercel build is required; the supplied log proves RUN446 only.
+
+**Current source version:** `0.338.159` (unaccepted review candidate; parent `0.338.158` / RUN446).
+
+RUN443 Testnet migration closeout remains historical operational evidence and does not establish a fresh migration apply, current schema parity or live financial acceptance for RUN447.
+
 ## Latest implementation — 0.338.158 Testnet migration closeout and marketplace spend signature repair / RUN446 (26 November 2026)
 
 RUN446 fixes the TypeScript build blocker in `app/api/marketplace/orders/[orderId]/pay/route.ts`. The in-memory fallback now passes only the store and spend input to `executeAuthoritativeSpend`, matching its declared two-argument API. The `transportError: "SPEND_FAILED"` option remains on the durable `executeGhcSpendRpc` call only. A focused contract check is registered in static and prebuild checks. The supplied RUN445 Vercel log confirms 466 prebuild checks and successful production bundle compilation before TypeScript validation found the mismatch. A fresh Vercel build is pending; no deployment, database mutation or provider transaction occurred.

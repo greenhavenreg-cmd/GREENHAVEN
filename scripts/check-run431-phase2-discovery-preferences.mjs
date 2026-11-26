@@ -11,7 +11,7 @@ const checks = [
   ["Discovery context exposes the canonical profile update action", /GHCDiscoveryContext = createContext<[\s\S]{0,900}updateProfile: GHCContextType\[\"updateProfile\"\]/.test(context)],
   ["Discovery context exposes the shared toast action", /GHCDiscoveryContext = createContext<[\s\S]{0,1000}addToast: \(message: string/.test(context)],
   ["Discovery provider supplies profile persistence and toast actions", /const discoveryValue = useMemo\([\s\S]{0,650}updateProfile,[\s\S]{0,100}addToast,[\s\S]{0,100}profile: state\.profile/.test(context)],
-  ["Intent changes use the canonical account profile update", /ghc\.updateProfile\(\{ connectionIntents: normalized \}\)/.test(screen)],
+  ["Intent changes use the canonical account profile update", /const updateProfile = ghc\.updateProfile/.test(screen) && /updateProfile\(\{ connectionIntents: normalized \}\)/.test(screen)],
   ["Discovery only announces success after profile update confirmation", /if \(!saved\)[\s\S]{0,260}not yet confirmed by the server[\s\S]{0,180}saveConnectionIntentsWithStatus[\s\S]{0,160}Discovery preferences updated/.test(screen)],
   ["Local intent mirror reports actual storage persistence", /function saveConnectionIntentsWithStatus[\s\S]{0,650}localStorage\.setItem[\s\S]{0,100}return true[\s\S]{0,100}catch[\s\S]{0,80}return false/.test(intents)],
   ["Legacy local intent helper remains backward compatible", /function saveConnectionIntents\(userId: string, intents: ConnectionIntentId\[\]\): void[\s\S]{0,160}saveConnectionIntentsWithStatus/.test(intents)],
