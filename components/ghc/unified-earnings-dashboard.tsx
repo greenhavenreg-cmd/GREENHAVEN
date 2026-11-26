@@ -218,7 +218,7 @@ function humanizeLedgerReason(raw?: string | null): string {
 export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolean }) {
   // Wallet primary actions (Withdraw / Status / Linked) focus this surface as source of truth.
 
-  const [snap, setSnap] = useState<Withdrawable | null>(null)
+  const [serverSnap, setSnap] = useState<Withdrawable | null>(null)
   const [entries, setEntries] = useState<LedgerEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
@@ -502,11 +502,11 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
 
 
   const onPreviewFee = useCallback(async () => {
-    if (snap?.eligible !== true || snap.piWalletLinked !== true) {
+    if (serverSnap?.eligible !== true || serverSnap.piWalletLinked !== true) {
       setQuoteMsg("A quote is unavailable until the server confirms payout eligibility and a linked Pi identity.")
       return
     }
-    if (typeof snap.withdrawable !== "number" || !Number.isFinite(snap.withdrawable) || snap.withdrawable <= 0) {
+    if (typeof serverSnap.withdrawable !== "number" || !Number.isFinite(serverSnap.withdrawable) || serverSnap.withdrawable <= 0) {
       setQuoteMsg("No valid withdrawable balance is available to quote.")
       return
     }
@@ -530,7 +530,7 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
         recipientUsername?: string
       }>("/api/economy/earnings/quote", {
         method: "POST",
-        body: { amountPi: snap.withdrawable },
+        body: { amountPi: serverSnap.withdrawable },
         signal: controller.signal,
         timeoutMs: 15_000,
       })
@@ -559,7 +559,7 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
       if (sequence === quoteSequence.current) setQuoting(false)
       if (quoteController.current === controller) quoteController.current = null
     }
-  }, [snap])
+  }, [serverSnap])
 
   const runWithdraw = useCallback(() => {
     // All entry points must use the same sheet. It owns amount selection, a fresh
@@ -586,7 +586,7 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
     return () => window.removeEventListener("ghc:wallet-pi-focus", onFocus as EventListener)
   }, [runWithdraw, refresh, openWithdrawSheet])
 
-  if (loading && !snap) {
+  if (loading && !serverSnap) {
     return (
       <section className="mx-3 mt-3 rounded-2xl border border-black/5 bg-white p-4 shadow-sm" aria-busy>
         <div className="h-4 w-40 animate-pulse rounded bg-slate-100" />
@@ -596,11 +596,11 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
     )
   }
 
-  if (loading && !snap && !lastKnownSnapRef.current) {
+  if (loading && !serverSnap && !lastKnownSnapRef.current) {
     return <PiEarningsSkeleton compact={compact} />
   }
 
-    if ((failed || !snap) && !lastKnownSnapRef.current) {
+    if ((failed || !serverSnap) && !lastKnownSnapRef.current) {
     return (
       <section className="mx-3 mt-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
         <div className="flex items-start gap-2">
@@ -629,7 +629,7 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
   }
 
   // Prefer live snap; fall back to last known when refresh degraded.
-  const displaySnap = snap || lastKnownSnapRef.current
+  const displaySnap = serverSnap || lastKnownSnapRef.current
   if (!displaySnap) {
     return null
   }

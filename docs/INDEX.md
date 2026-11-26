@@ -56,3 +56,5 @@ Older RUN, PHASE, PASS and worklog records are historical evidence, not current 
 - [RUN437 upgrade worklog](UPGRADE-WORKLOG-0.338.150.md) — reconciliation diagnostics and remaining operational gates.
 - [RUN439 Phase 4 worklog](UPGRADE-WORKLOG-0.338.151.md) — identity principal-boundary regression and Phase 4 kickoff.
 - [RUN440 Phase 4 worklog](UPGRADE-WORKLOG-0.338.152.md) — durable compare-and-swap session rotation and concurrent replay/revocation race hardening.
+
+- [RUN445 Earnings Dashboard Build Repair](RUN445-EARNINGS-DASHBOARD-BUILD-REPAIR-2026-11-26.md)

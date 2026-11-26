@@ -1,13 +1,19 @@
-> **Current authority notice (26 November 2026):** This document is historical context. The working package candidate is `gh-connect@0.338.156` (RUN444 Testnet Payment and Withdrawal Rails), documented in `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md`. The last user-designated accepted source archive remains `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`; 0.338.156 is not yet accepted, pushed or deployed.
+RUN445 source verification: focused earnings-dashboard contract 13/13; `npm run verify:static` exits 0; prebuild dry-run discovers 466 checks. The actual Next.js build remains unverified in the local Node 22.16.0 workspace.
+
+## RUN445 build repair
+
+The unified earnings dashboard React state is now named `serverSnap`; `snap` is retained as the render-only alias for the live-or-last-known display snapshot. The fee quote callback dependency is aligned with the state name. This resolves the duplicate lexical declaration identified by the RUN444 Vercel build log. A fresh production build under Node 24.15.x remains required for acceptance.
+
+> **Current authority notice (26 November 2026):** This document is historical context. The working package candidate is `gh-connect@0.338.157` (RUN445 Earnings Dashboard Build Repair), documented in `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md`. The last user-designated accepted source archive remains `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`; 0.338.157 is not yet accepted, pushed or deployed.
 
 
-# Current project truth — 0.338.156 RUN444 Testnet Payment and Withdrawal Rails candidate (2026-11-26)
+# Current project truth — 0.338.157 RUN445 Earnings Dashboard Build Repair candidate (2026-11-26)
 
-**Current package candidate:** `gh-connect@0.338.156`, derived from the user-designated 0.338.139 RUN426 archive through RUN427–RUN441. It is not yet accepted, pushed or deployed. RUN443 applied the four migrations previously held by RUN442; combined with RUN442, seven operations are installed on Testnet. RUN388/RUN396/RUN405/RUN429 RPCs and ACLs were postflight-verified; RUN429 includes the corrected Community-before-Invitation lock order. No backfill or financial operation was invoked. Disposable PostgreSQL concurrency rehearsal, exact migration-history reconciliation, Node 24.15.0 build and two-account Testnet acceptance remain outstanding. Full static verification passed 63/63 gates with 5,369 PASS lines and zero failures; prebuild dry-run discovered 464 checks. Node 24.15.x dependency-backed typecheck/lint/build and end-to-end Testnet acceptance remain outstanding.
+**Current package candidate:** `gh-connect@0.338.157`, derived from the user-designated 0.338.139 RUN426 archive through RUN427–RUN441. It is not yet accepted, pushed or deployed. RUN443 applied the four migrations previously held by RUN442; combined with RUN442, seven operations are installed on Testnet. RUN388/RUN396/RUN405/RUN429 RPCs and ACLs were postflight-verified; RUN429 includes the corrected Community-before-Invitation lock order. No backfill or financial operation was invoked. Disposable PostgreSQL concurrency rehearsal, exact migration-history reconciliation, Node 24.15.0 build and two-account Testnet acceptance remain outstanding. Full static verification passed 63/63 gates with 5,369 PASS lines and zero failures; prebuild dry-run discovered 464 checks. Node 24.15.x dependency-backed typecheck/lint/build and end-to-end Testnet acceptance remain outstanding.
 
-**Current source version:** `0.338.156` (working candidate)
+**Current source version:** `0.338.157` (working candidate)
 **Coordinated programme:** `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`  
-**Package identity:** `gh-connect@0.338.156`  
+**Package identity:** `gh-connect@0.338.157`  
 **User-designated parent baseline:** `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`; current candidate is its controlled derivative.  
 **Delivery report:** `RUN414-RELEASE-METADATA-SYNCHRONIZATION-REPORT.md`  
 **Marketplace audit:** `docs/RUN411-MARKETPLACE-COMMERCE-RELIABILITY-AUDIT-2026-11-25.md`

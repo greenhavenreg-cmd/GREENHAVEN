@@ -1,10 +1,14 @@
+## RUN445 — Earnings dashboard build repair
+
+RUN445 resolves the duplicate `snap` declaration in the unified earnings dashboard by separating the React state name (`serverSnap`) from the render-only `snap` alias. The source fix preserves the last-known snapshot fallback and does not alter payment or withdrawal policy. A focused regression gate is part of static verification. The Vercel log supplied for RUN444 showed all 465 prebuild checks passing before this Next.js compilation error. The full static suite passes and the prebuild dry-run discovers 466 checks. A fresh production build of RUN445 must still be confirmed on Node.js 24.15.x.
+
 # GreenHaven
 
-**Package:** `gh-connect@0.338.156`  
-**Current source version:** `0.338.156`  
-**Candidate:** RUN444 — Testnet Payment and Withdrawal Rails  
+**Package:** `gh-connect@0.338.157`  
+**Current source version:** `0.338.157`  
+**Candidate:** RUN445 — Earnings Dashboard Build Repair  
 **Accepted source archive:** `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`  
-**Candidate archive:** `GREENHAVEN-0.338.156-RUN444-TESTNET-PAYMENT-WITHDRAWAL-RAILS-2026-11-26.zip`
+**Candidate archive:** `GREENHAVEN-0.338.157-RUN445-EARNINGS-DASHBOARD-BUILD-REPAIR-2026-11-26.zip`
 
 ## RUN444 — Testnet payment and withdrawal activation profile
 

@@ -1,7 +1,8 @@
 **Current source version:** `0.338.156`
-**Current package identity:** `gh-connect@0.338.156`
+**Current package identity:** `gh-connect@0.338.157`
+**Current source version:** `0.338.157`
 
-> **Current authority notice (26 November 2026):** This file retains historical architecture and release context. The working candidate is `gh-connect@0.338.156` (RUN444 Testnet Payment and Withdrawal Rails), documented in `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md`. The last user-designated accepted archive remains `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`; 0.338.156 is not accepted, pushed or deployed.
+> **Current authority notice (26 November 2026):** This file retains historical architecture and release context. The working candidate is `gh-connect@0.338.157` (RUN445 Earnings Dashboard Build Repair), documented in `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md`. The last user-designated accepted archive remains `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`; 0.338.157 is not accepted, pushed or deployed.
 
 
 
@@ -353,3 +354,8 @@ Working candidate `gh-connect@0.338.151` adds a manual classification of all eig
 ## RUN440 current source overlay
 
 The working candidate is `gh-connect@0.338.152` / RUN440. Durable session token rotation uses compare-and-swap against the old token hash and an unrevoked-row predicate; a successful response requires exactly one changed row. This closes the stale concurrent-rotation success race and prevents a rotation update from winning over a prior revocation. The memory-only fallback rechecks the current token index before replacing it. Focused source contract: 12/12; runtime concurrency/outage regression: 7 assertions. Live PostgreSQL concurrency rehearsal, supported Node 24.15.x build, Phase 3 operational acceptance and Testnet multi-account/device verification remain outstanding. The accepted baseline remains 0.338.139; RUN440 is an unaccepted review candidate.
+
+
+## RUN445 — Earnings Dashboard Build Repair (26 November 2026)
+
+The working candidate is `gh-connect@0.338.157`. The React state snapshot in `components/ghc/unified-earnings-dashboard.tsx` is named `serverSnap`, while the render-only `snap` alias continues to select the live snapshot or last-known fallback. The quote callback dependency is updated, and a focused scope regression is registered in static and prebuild checks. This addresses the duplicate lexical declaration reported after all 465 RUN444 prebuild checks passed in Vercel. A fresh Node 24.15.x Next.js build remains required; no remote push, deployment or payment operation has occurred. See `docs/RUN445-EARNINGS-DASHBOARD-BUILD-REPAIR-2026-11-26.md`.
