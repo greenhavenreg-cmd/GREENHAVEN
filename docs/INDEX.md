@@ -1,3 +1,6 @@
+- [RUN515 Media upload CSP fetch failure](RUN515-MEDIA-UPLOAD-CSP-FETCH-FAILURE-2026-11-28.md) — uploads failed with "Failed to fetch" because data:/blob: fetches were blocked by connect-src; now decoded locally and CSP corrected.
+- [RUN514 One-line post actions and compact stories](RUN514-ONE-LINE-POST-ACTIONS-AND-COMPACT-STORIES-2026-11-28.md) — vote button: tap = like/reactions, hold = Community curation; vote, quality, comment, save and share on one line; smaller story cards.
+- [RUN513 Testnet A2U gate and referral defaults](RUN513-TESTNET-A2U-GATE-AND-REFERRAL-DEFAULTS-2026-11-28.md) — one shared Testnet gate for every A2U/withdrawal/referral flag (default on in Testnet only, names the missing setting).
 - [RUN512 Testnet Profile Parity](RUN512-TESTNET-PROFILE-PARITY-2026-11-28.md) — Testnet env profile now enables the earnings adapters and operator ids; a guard keeps the profile and the code's gate flags in sync.
 - [RUN511 Marketplace Positive Price](RUN511-MARKETPLACE-POSITIVE-PRICE-2026-11-28.md) — published products must have a price greater than zero on the seller form and the listings API.
 - [RUN510 RPC Source Drift](RUN510-RPC-SOURCE-DRIFT-2026-11-28.md) — inventories 20 RPCs called by live routes with no migration source, adds a drift guard and an operator verification query.

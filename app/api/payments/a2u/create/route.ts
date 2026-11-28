@@ -17,6 +17,7 @@ import type { PiBackendPayment } from "pi-backend"
 
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
 import { operatorKeyAuthorized, SHARED_WORKER_KEY_MIN_BYTES } from "@/lib/server/security/operator-key"
+import { a2uTestnetGate } from "@/lib/server/economy/testnet-unlock"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
   if (!rl.ok) return reply({ ok: false, error: durableRateLimitCode(rl), retryAfterSec: rl.retryAfterSec }, durableRateLimitStatus(rl))
 
   // A2U is currently Testnet-only. Never infer a safe network from deployment defaults.
-  if (process.env.PI_A2U_ENABLED !== "true" || process.env.PI_A2U_TESTNET_ONLY !== "true" || !resolvePiSandbox() || process.env.PI_ENV !== "production") {
+  if (!a2uTestnetGate(resolvePiSandbox(), ["PI_A2U_ENABLED", "PI_A2U_TESTNET_ONLY"]).open) {
     return reply({ ok: false, error: "PI_A2U_DISABLED", message: "A2U is Testnet-only and requires PI_A2U_ENABLED=true, PI_A2U_TESTNET_ONLY=true, NEXT_PUBLIC_PI_SANDBOX=true, and PI_ENV=production for the official SDK configuration bundle." }, 503)
   }
   const apiKey = String(process.env.PI_API_KEY || process.env.PI_SERVER_API_KEY || "").trim()

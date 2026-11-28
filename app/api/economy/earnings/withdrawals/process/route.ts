@@ -13,6 +13,7 @@
 import { NextResponse } from "next/server"
 import { POST as executeWorker } from "../execute/route"
 import { readBoundedText } from "@/lib/server/http/read-bounded-text"
+import { testnetOperatorFlag } from "@/lib/server/economy/testnet-unlock"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -21,7 +22,7 @@ const headers = { "Cache-Control": "private, no-store, max-age=0", Pragma: "no-c
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers })
 
 export async function POST(request: Request) {
-  if (process.env.PI_EARNINGS_AUTO_EXECUTE !== "true") {
+  if (!testnetOperatorFlag("PI_EARNINGS_AUTO_EXECUTE")) {
     return reply({ ok: false, error: "PI_EARNINGS_AUTO_EXECUTE_DISABLED" }, 503)
   }
   const key = String(process.env.PI_EARNINGS_EXECUTOR_KEY || "").trim()

@@ -280,6 +280,16 @@ function EnhancedPostCardInner({
   }, [post.id, propUp, propDown, propViewerChoice])
   const visibleCommentCount = Math.max(0, Number(post.engagement?.comments ?? post.comments?.length ?? 0) || 0)
   const visibleShareCount = Math.max(0, Number(post.engagement?.shares ?? post.shares ?? 0) || 0)
+  const socialLikeTotal = Math.max(
+    0,
+    Object.values(post.reactionCounts || {}).reduce((sum: number, n) => sum + (Number.isFinite(Number(n)) ? Number(n) : 0), 0),
+  )
+  // The reaction tray that opens after a like dismisses itself so it never lingers over the post.
+  useEffect(() => {
+    if (!showReactions) return
+    const t = setTimeout(() => setShowReactions(false), 6000)
+    return () => clearTimeout(t)
+  }, [showReactions])
   const visibleReactionEntries = Object.entries(post.reactionCounts || {})
     .filter(([type, count]) => type !== "like" && Number(count) > 0)
     .sort((a, b) => Number(b[1]) - Number(a[1]))
@@ -1172,6 +1182,14 @@ function EnhancedPostCardInner({
       {!readOnly ? <>
       <div className="border-t border-border/35" />
       <PostActionBar
+        liked={Boolean(isLiked || (post as { likedByMe?: boolean }).likedByMe)}
+        likeCount={socialLikeTotal}
+        onLike={() => {
+          // Tap = social like + reactions (independent from quality curation and GHC rewards).
+          if (onLike) onLike(post.id)
+          if (!(isLiked || (post as { likedByMe?: boolean }).likedByMe)) setShowReactions(true)
+          else setShowReactions(false)
+        }}
         choice={curationChoice}
         busy={curationBusy}
         upCount={upvoteCount}

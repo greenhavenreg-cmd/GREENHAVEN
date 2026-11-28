@@ -9,6 +9,7 @@ import { resolvePiSandbox } from "@/lib/pi-env"
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
 import { enqueueA2uReview } from "@/lib/server/payments/a2u-orchestration"
 import { getPiIncompleteA2uPayments, piA2uErrorDiagnostic, piA2uErrorHttpStatus, type PiA2uPayment } from "@/lib/server/payments/pi-platform-a2u"
+import { a2uTestnetGate } from "@/lib/server/economy/testnet-unlock"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -46,7 +47,7 @@ export async function POST(request:Request) {
   if(!secretOk(request)) return reply({ok:false,error:"FORBIDDEN"},403)
   const rl=await checkDurableRateLimit(`pi-earnings-execute:${auth.userId}`,2,60_000,{onUnavailable:"deny"})
   if(!rl.ok) return reply({ok:false,error:durableRateLimitCode(rl),retryAfterSec:rl.retryAfterSec},durableRateLimitStatus(rl))
-  if(process.env.PI_EARNINGS_PAYOUT_EXECUTION_ENABLED!=="true" || process.env.PI_A2U_ENABLED!=="true" || process.env.PI_A2U_TESTNET_ONLY!=="true" || process.env.PI_NETWORK!=="testnet" || process.env.PI_ENV!=="production" || !resolvePiSandbox()) return reply({ok:false,error:"PI_EARNINGS_EXECUTION_DISABLED"},503)
+  const gate=a2uTestnetGate(resolvePiSandbox(),["PI_A2U_ENABLED","PI_A2U_TESTNET_ONLY","PI_EARNINGS_PAYOUT_EXECUTION_ENABLED"]); if(!gate.open) return reply({ok:false,error:"PI_EARNINGS_EXECUTION_DISABLED",missing:gate.missing},503)
   const apiKey=String(process.env.PI_API_KEY||process.env.PI_SERVER_API_KEY||"").trim()
   const seed=String(process.env.PI_WALLET_PRIVATE_SEED||"").trim()
   if(!apiKey||!/^S[A-Z2-7]{55}$/.test(seed)) return reply({ok:false,error:"PI_SERVER_CREDENTIALS_MISSING"},503)

@@ -29,6 +29,11 @@ export function mediaUserMessage(code: string | undefined, fallback?: string): s
       return "Photo storage is not ready on the server yet. Photos can stay on this device for now — ask the operator to set SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and GH_MEDIA_BUCKET."
     case "NETWORK":
       return "Connection issue while uploading. Check your network and retry."
+    case "STORAGE_UNREACHABLE":
+      return "Your device could not reach GreenHaven file storage. Check your connection and retry. If it keeps happening, the operator should confirm the storage host is allowed by the app's Content-Security-Policy."
+    case "MEDIA_SOURCE_UNREADABLE":
+    case "MEDIA_DATA_URL_INVALID":
+      return "We couldn't read that photo after preparing it. Pick it again and retry."
     case "INVALID_MEDIA_URL":
       return "That photo or video isn't ready to share yet. Wait for the upload to finish, then try again."
     case "INVALID_MEDIA_TYPE":

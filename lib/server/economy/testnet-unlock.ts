@@ -73,6 +73,46 @@ export function buyGhcWithPiEnabled(): boolean {
   return configured ?? isTestnetProductUnlocked()
 }
 
+/**
+ * Testnet operator flag with a safe default.
+ * - Explicit value always wins: any of 1/true/yes/on enables, any other non-empty value
+ *   (for example "false" or "0") is an operator kill switch and disables.
+ * - When unset, the flag is ON only in a Testnet runtime (PI_NETWORK=testnet outside
+ *   Vercel Production). Mainnet, unknown networks and Production stay OFF.
+ */
+export function testnetOperatorFlag(name: string): boolean {
+  return configuredFlag(name) ?? isTestnetRuntime()
+}
+
+export const A2U_TESTNET_FLAGS = [
+  "PI_A2U_ENABLED",
+  "PI_A2U_TESTNET_ONLY",
+  "PI_EARNINGS_PAYOUT_REQUESTS_ENABLED",
+  "PI_EARNINGS_PAYOUT_EXECUTION_ENABLED",
+  "PI_EARNINGS_AUTO_EXECUTE",
+  "PI_EARNINGS_ADAPTERS_ENABLED",
+] as const
+
+export type A2uGate = { open: boolean; missing: string[] }
+
+/**
+ * Single source of truth for the Pi A2U Testnet payout gate. Names only are returned
+ * in `missing` (never values) so the operator can see exactly what to set.
+ * Secrets (executor key, Pi API key, wallet seed, PIN proof key) are checked by the
+ * routes themselves and are never defaulted.
+ */
+export function a2uTestnetGate(sandbox: boolean, only?: readonly string[]): A2uGate {
+  const missing: string[] = []
+  if (!isTestnetRuntime()) missing.push("PI_NETWORK=testnet (and not Vercel Production)")
+  const piEnv = String(process.env.PI_ENV || "").trim().toLowerCase()
+  if (piEnv && piEnv !== "production") missing.push("PI_ENV (unset or production)")
+  if (!sandbox) missing.push("NEXT_PUBLIC_PI_SANDBOX=true")
+  for (const name of only ?? A2U_TESTNET_FLAGS) {
+    if (!testnetOperatorFlag(name)) missing.push(name)
+  }
+  return { open: missing.length === 0, missing }
+}
+
 export function testnetUnlockSnapshot() {
   return {
     explicitUnlock: isExplicitTestnetUnlock(),

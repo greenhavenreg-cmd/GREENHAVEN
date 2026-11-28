@@ -1,11 +1,13 @@
 # GreenHaven — Current Project Bundle
 
 **Package:** `gh-connect@0.338.177`  
-**Candidate:** RUN506 — Direct-call control state and accessibility  
+**Candidate:** RUN515 — Media upload fix; RUN514 — One-line post actions, compact stories, shared Testnet A2U gate (RUN506 detail below)  
 **Baseline archive:** `GREENHAVEN-0.338.176-RUN505-CONVERSATION-INBOX-OUTAGE-INTEGRITY-2026-11-28.zip`  
 **Working archive:** `GREENHAVEN-0_338_177-RUN512B-PREBUILD-NAV-FIX-2026-11-28.zip`  
 **Date:** 28 November 2026  
 **Status:** Source candidate only; production NOT APPROVED.
+
+RUN515 fixes the media-upload "Failed to fetch" failure (data:/blob: fetches were blocked by the CSP `connect-src`; now decoded locally and the CSP corrected; `docs/RUN515-MEDIA-UPLOAD-CSP-FETCH-FAILURE-2026-11-28.md`). RUN514 makes the post vote button tap = like/reactions and hold = Community curation, puts vote, quality, comment, save and share on one line, and shrinks the story rail (`docs/RUN514-ONE-LINE-POST-ACTIONS-AND-COMPACT-STORIES-2026-11-28.md`). RUN513 routes every Testnet A2U, withdrawal, adapter and referral flag through one shared gate that defaults on only in Testnet and names the missing setting; Production/Mainnet stay closed and secrets are never defaulted (`docs/RUN513-TESTNET-A2U-GATE-AND-REFERRAL-DEFAULTS-2026-11-28.md`).
 
 RUN506 resets microphone and camera UI state when a new call session replaces the previous one, exposes toggle state through `aria-pressed`, and announces call phase changes through a polite live region. It preserves server-authorized call signaling, media acquisition, call policy, and hangup behavior. See `docs/RUN506-DIRECT-CALL-CONTROL-STATE-2026-11-28.md`.
 

@@ -23,7 +23,7 @@ add(card.includes('focus-visible:ring-2') && card.includes('tabIndex={onOpenPost
 add(card.includes('isDurableMediaUrl') && card.includes('SafeTextWithLinks'), 'Post media and linked text retain existing safe rendering boundaries')
 add(card.includes('contentExpanded') && card.includes('Read more'), 'Long post content has an explicit expansion control')
 add(actions.includes('aria-label="Post actions and Community curation"') && actions.includes('aria-label="Respond to post"'), 'Post action controls have distinct accessible groups')
-add(actions.includes('grid-cols-3') && actions.includes('gh-post-response-action'), 'Comment, save and share controls have a stable mobile grid')
+add(actions.includes('flex-nowrap') && actions.includes('gh-post-response-action'), 'Comment, save and share controls sit on the single-line action row (RUN513)')
 add(actions.includes('aria-pressed={isSaved}') && actions.includes('aria-label={`Comment'), 'Save state and comment count remain exposed to assistive technology')
 add(css.includes('.gh-post-card[data-post-surface]') && css.includes('.gh-post-action-secondary .gh-post-response-action'), 'Shared post surface and responsive action styles are registered')
 add(css.includes('@media (prefers-reduced-motion: reduce)') && css.includes('.gh-post-card[data-post-surface] { transition: none; }'), 'Post interactions respect reduced-motion preferences')

@@ -1,5 +1,6 @@
 "use client"
 
+import { urlToBlob } from "@/lib/media/data-url"
 import { DurableImage } from "./durable-image"
 import { isPiOnlyCommerceClient } from "@/lib/client/pi-only-commerce"
 
@@ -162,8 +163,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
         // Rebuild a File for durable upload from compressed data when possible
         let uploadFile = file
         if (typeof compressedBase64 === "string" && compressedBase64.startsWith("data:")) {
-          const res = await fetch(compressedBase64)
-          const blob = await res.blob()
+          const blob = await urlToBlob(compressedBase64)
           uploadFile = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg") || "cover.jpg", {
             type: blob.type || "image/jpeg",
           })

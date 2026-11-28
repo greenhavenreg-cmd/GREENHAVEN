@@ -8,7 +8,7 @@ const checks = [
   ['sheet verifies PIN and obtains proof before request', sheet.includes('action: \"verify\"') && sheet.includes('bindKey: pinIntent.key') && sheet.includes('setPinProofValue(String(vBody.pinProof))') && sheet.includes('const pinProof = pinProofValue')],
   ['sheet sends PIN proof with withdrawal request', /body: \{ amountAtomic, idempotencyKey: intent\.key, pinProof \}/.test(sheet)],
   ['server requires PIN proof before reserving', /checkPinProof\(auth\.userId, key, body\.pinProof\)/.test(route)],
-  ['request creation remains fail-closed behind explicit Testnet flags', /PI_EARNINGS_PAYOUT_REQUESTS_ENABLED !== "true"/.test(route) && /PI_NETWORK !== "testnet"/.test(route) && /PI_EARNINGS_PAYOUT_EXECUTION_ENABLED !== "true"/.test(route) && /PI_A2U_TESTNET_ONLY !== "true"/.test(route)],
+  ['request creation remains fail-closed behind explicit Testnet flags', /testnetOperatorFlag\("PI_EARNINGS_PAYOUT_REQUESTS_ENABLED"\)/.test(route) && /PI_NETWORK !== "testnet"/.test(route) && /a2uTestnetGate\(resolvePiSandbox\(\)\)/.test(route) && /if \(!gate\.open\)/.test(route)],
 ]
 let failed = 0
 for (const [name, ok] of checks) { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`); if (!ok) failed++ }

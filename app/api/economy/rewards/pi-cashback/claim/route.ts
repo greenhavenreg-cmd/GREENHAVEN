@@ -10,6 +10,7 @@ import { assertPayoutWalletAuthorization } from "@/lib/server/identity/wallet-au
 import { postEarningsCredit, reserveEarningsForPayout, settleEarningsPayout, piToAtomic } from "@/lib/server/earnings/unified-ledger"
 import { findMatchingIncompleteA2u, enqueueA2uReview } from "@/lib/server/payments/a2u-orchestration"
 import { verifyA2uReceipt, publicReceiptView } from "@/lib/server/payments/a2u-receipt"
+import { a2uTestnetGate } from "@/lib/server/economy/testnet-unlock"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
   if (!rate.ok) return reply({ ok: false, error: durableRateLimitCode(rate), retryAfterSec: rate.retryAfterSec }, durableRateLimitStatus(rate))
 
   // Fail closed: never permit a cashback claim on Mainnet through this Testnet release.
-  if (process.env.PI_A2U_ENABLED !== "true" || process.env.PI_A2U_TESTNET_ONLY !== "true" || !resolvePiSandbox() || process.env.PI_ENV !== "production") {
+  if (!a2uTestnetGate(resolvePiSandbox(), ["PI_A2U_ENABLED", "PI_A2U_TESTNET_ONLY"]).open) {
     return reply({ ok: false, error: "PI_CASHBACK_A2U_TESTNET_DISABLED", message: "Cashback withdrawals are available only on an explicitly configured Pi Testnet deployment." }, 503)
   }
   const apiKey = String(process.env.PI_API_KEY || process.env.PI_SERVER_API_KEY || "").trim()

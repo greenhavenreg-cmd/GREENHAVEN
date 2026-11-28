@@ -8,6 +8,7 @@ import type { PiBackendPayment } from "pi-backend"
 
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
 import { operatorKeyAuthorized, SHARED_WORKER_KEY_MIN_BYTES } from "@/lib/server/security/operator-key"
+import { a2uTestnetGate } from "@/lib/server/economy/testnet-unlock"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
   if (!authorized(request)) return reply({ ok: false, error: "FORBIDDEN" }, 403)
   const rl = await checkDurableRateLimit("a2u-complete-privileged", 10, 60_000, { onUnavailable: "deny" })
   if (!rl.ok) return reply({ ok: false, error: durableRateLimitCode(rl), retryAfterSec: rl.retryAfterSec }, durableRateLimitStatus(rl))
-  if (process.env.PI_A2U_ENABLED !== "true" || process.env.PI_A2U_TESTNET_ONLY !== "true" || !resolvePiSandbox() || process.env.PI_ENV !== "production") {
+  if (!a2uTestnetGate(resolvePiSandbox(), ["PI_A2U_ENABLED", "PI_A2U_TESTNET_ONLY"]).open) {
     return reply({ ok: false, error: "PI_A2U_DISABLED" }, 503)
   }
   const apiKey = String(process.env.PI_API_KEY || process.env.PI_SERVER_API_KEY || "").trim()

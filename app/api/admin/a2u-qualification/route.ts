@@ -6,6 +6,7 @@ import { operatorKeyAuthorized, SHARED_WORKER_KEY_MIN_BYTES } from "@/lib/server
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
 import type { PiBackendPayment } from "pi-backend"
 import { getWalletAuthorization } from "@/lib/server/identity/wallet-authorization"
+import { a2uTestnetGate, testnetOperatorFlag } from "@/lib/server/economy/testnet-unlock"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -15,7 +16,7 @@ function authorized(request: Request) {
   return operatorKeyAuthorized(request, { headers: ["x-ghc-a2u-admin-key"], envNames: ["GHC_A2U_ADMIN_KEY"], minBytes: SHARED_WORKER_KEY_MIN_BYTES })
 }
 function testnetQualificationEnabled() {
-  return process.env.PI_NETWORK === "testnet" && process.env.PI_A2U_TESTNET_ONLY === "true" && process.env.PI_ENV === "production" && resolvePiSandbox()
+  return a2uTestnetGate(resolvePiSandbox(), ["PI_A2U_TESTNET_ONLY"]).open
 }
 async function rpc<T>(name: string, body: Record<string, unknown>): Promise<T | null> {
   const env = readGhcServerEnv()
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
   }
 
   if (action === "record_verified_payment") {
-    if (process.env.PI_A2U_ENABLED !== "true") return reply({ ok: false, error: "PI_A2U_DISABLED" }, 503)
+    if (!testnetOperatorFlag("PI_A2U_ENABLED")) return reply({ ok: false, error: "PI_A2U_DISABLED" }, 503)
     const paymentId = String(body.providerPaymentId || "").trim()
     const txid = String(body.txid || "").trim()
     const piAppUid = String(body.piAppUid || "").trim()

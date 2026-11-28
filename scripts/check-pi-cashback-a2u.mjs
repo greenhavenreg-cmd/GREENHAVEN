@@ -13,7 +13,7 @@ const pkg = JSON.parse(read('package.json'))
 const checks = []
 const test = (name, ok) => { checks.push(Boolean(ok)); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`) }
 test('Dedicated authenticated user cashback A2U endpoint exists', existsSync(join(root, routePath)) && /resolveAuthenticatedUser\(request\.headers\)/.test(route))
-test('A2U payout is hard-gated to explicit Pi Testnet configuration', /PI_A2U_ENABLED !== "true"/.test(route) && /PI_A2U_TESTNET_ONLY !== "true"/.test(route) && /!resolvePiSandbox\(\)/.test(route) && /PI_ENV !== "production"/.test(route) && /network: "Pi Testnet"/.test(route))
+test('A2U payout is hard-gated to explicit Pi Testnet configuration', /a2uTestnetGate\(resolvePiSandbox\(\), \["PI_A2U_ENABLED", "PI_A2U_TESTNET_ONLY"\]\)/.test(route) && /network: "Pi Testnet"/.test(route))
 test('Amount and recipient are derived server-side, not trusted from request body', /gh_pi_identities/.test(route) && /gh_pi_cashback_a2u_begin/.test(route) && !/request\.json\(\)/.test(route))
 test('Separate payout ledger has unique entitlement and provider transaction bindings', /entitlement_id uuid NOT NULL UNIQUE/.test(migration) && /provider_payment_id text UNIQUE/.test(migration) && /txid text UNIQUE/.test(migration))
 test('Cashback A2U shares the global Pi wallet sequence lease', /gh_pi_a2u_sequence_lease/.test(migration) && /gh_pi_a2u_release_sequence_lease/.test(route))

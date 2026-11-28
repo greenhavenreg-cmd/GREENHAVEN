@@ -9,6 +9,7 @@ import { checkPinProof, pinProofConfigured } from "@/lib/server/identity/withdra
 import { assertPayoutWalletAuthorization } from "@/lib/server/identity/wallet-authorization"
 import { resolvePiSandbox } from "@/lib/pi-env"
 import { supabaseRpc } from "@/lib/server/supabase/rest-client"
+import { a2uTestnetGate, testnetOperatorFlag } from "@/lib/server/economy/testnet-unlock"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -64,26 +65,20 @@ export async function POST(request: Request) {
 
   // Request creation is intentionally disabled until the reviewed migration is applied
   // and the operator has explicitly enabled Testnet request intake.
-  if (process.env.PI_EARNINGS_PAYOUT_REQUESTS_ENABLED !== "true" || process.env.PI_NETWORK !== "testnet") {
-    return reply({ ok: false, error: "PI_EARNINGS_PAYOUT_REQUESTS_DISABLED" }, 503)
+  const gate = a2uTestnetGate(resolvePiSandbox())
+  if (!testnetOperatorFlag("PI_EARNINGS_PAYOUT_REQUESTS_ENABLED") || process.env.PI_NETWORK !== "testnet") {
+    return reply({ ok: false, error: "PI_EARNINGS_PAYOUT_REQUESTS_DISABLED", missing: gate.missing }, 503)
   }
   // Never reserve (lock) a user's available PI unless the Testnet executor that can
   // settle or release that reservation is also enabled. Otherwise the requested
   // amount is stranded in "reserved" and the user's genuinely earned balance
   // (registration bonus, rewards, cashback) cannot be used.
-  if (
-    process.env.PI_EARNINGS_PAYOUT_EXECUTION_ENABLED !== "true" ||
-    process.env.PI_A2U_ENABLED !== "true" ||
-    process.env.PI_A2U_TESTNET_ONLY !== "true" ||
-    process.env.PI_EARNINGS_AUTO_EXECUTE !== "true" ||
-    process.env.PI_ENV !== "production" ||
-    process.env.VERCEL_ENV === "production" ||
-    !resolvePiSandbox()
-  ) {
+  if (!gate.open) {
     return reply({
       ok: false,
       error: "PI_EARNINGS_PAYOUT_EXECUTION_DISABLED",
-      message: "Testnet payout execution is not fully enabled. Your balance is untouched and stays available.",
+      missing: gate.missing,
+      message: `Testnet payout execution is not fully enabled. Your balance is untouched and stays available.${gate.missing.length ? ` Operator: set ${gate.missing.join(", ")}.` : ""}`,
     }, 503)
   }
   const executorKey = String(process.env.PI_EARNINGS_EXECUTOR_KEY || "").trim()

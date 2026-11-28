@@ -1,5 +1,6 @@
 "use client"
 
+import { urlToBlob } from "@/lib/media/data-url"
 import { DurableImage } from "./durable-image"
 import { secureUUID } from "@/lib/secure-id"
 import { DurableVideo } from "./durable-video"
@@ -301,7 +302,7 @@ export default function ProfileStorySection({ scope = "profile", creatorHost = f
       let preview = ""
       if (type === "image") {
         preview = await compressImage(file)
-        if (preview) uploadBlob = await (await fetch(preview)).blob()
+        if (preview) uploadBlob = await urlToBlob(preview)
       }
       const uploaded = await uploadDurableMedia(uploadBlob, { fileName: file.name, category: type === "video" ? "videos" : "images" })
       if (uploaded.ok && uploaded.url && uploaded.kind === type) {
@@ -545,10 +546,10 @@ export default function ProfileStorySection({ scope = "profile", creatorHost = f
             e.preventDefault()
             openCreator()
           }}
-          className="group relative h-[158px] w-[104px] shrink-0 snap-start overflow-hidden rounded-[14px] border border-border/70 bg-card text-left shadow-sm transition hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          className="group relative h-[128px] w-[88px] shrink-0 snap-start overflow-hidden rounded-[14px] border border-border/70 bg-card text-left shadow-sm transition hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           aria-label={ownStory ? "View your story. Long-press or right-click to add another." : "Create a story"}
         >
-          <span className="absolute inset-x-0 top-0 h-[112px] overflow-hidden bg-muted">
+          <span className="absolute inset-x-0 top-0 h-[92px] overflow-hidden bg-muted">
             {ownStory?.media?.url && ownStory.media.type === "image" ? (
               <LazyImage src={ownStory.media.url} alt="" className="h-full w-full object-cover" />
             ) : ownStory?.media?.url && ownStory.media.type === "video" && profileAvatar ? (
@@ -561,11 +562,11 @@ export default function ProfileStorySection({ scope = "profile", creatorHost = f
               </span>
             )}
           </span>
-          <span className="absolute inset-x-0 bottom-0 flex h-[54px] items-end justify-center bg-card px-1.5 pb-2 text-center text-[11px] font-semibold leading-tight text-foreground">
+          <span className="absolute inset-x-0 bottom-0 flex h-[36px] items-end justify-center bg-card px-1.5 pb-2 text-center text-[11px] font-semibold leading-tight text-foreground">
             {ownStory ? "Your story" : "Create story"}
           </span>
           {!ownStory ? (
-            <span className="absolute left-1/2 top-[94px] flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border-[3px] border-card bg-primary text-primary-foreground shadow-sm">
+            <span className="absolute left-1/2 top-[74px] flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border-[3px] border-card bg-primary text-primary-foreground shadow-sm">
               <Plus size={19} strokeWidth={2.7} aria-hidden />
             </span>
           ) : (
@@ -577,7 +578,7 @@ export default function ProfileStorySection({ scope = "profile", creatorHost = f
         </button>
 
         {otherStories.length === 0 ? (
-          <div className="flex h-[158px] w-[104px] shrink-0 flex-col items-center justify-center rounded-[14px] border border-dashed border-border/70 bg-muted/35 px-2 text-center" aria-label="No other stories yet">
+          <div className="flex h-[128px] w-[88px] shrink-0 flex-col items-center justify-center rounded-[14px] border border-dashed border-border/70 bg-muted/35 px-2 text-center" aria-label="No other stories yet">
             <Sparkles size={18} className="mb-2 text-emerald-600" aria-hidden />
             <span className="text-[11px] font-bold text-foreground">Be first</span>
             <span className="mt-1 text-[10px] leading-snug text-muted-foreground">Share a moment with your community</span>
@@ -596,7 +597,7 @@ export default function ProfileStorySection({ scope = "profile", creatorHost = f
               type="button"
               role="listitem"
               onClick={() => openStory(firstUnseen || group[0])}
-              className={`group relative h-[158px] w-[104px] shrink-0 snap-start overflow-hidden rounded-[14px] border text-left shadow-sm transition hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${seen ? "border-border/50 bg-muted" : "border-emerald-500/70 bg-muted ring-2 ring-emerald-500/25"}`}
+              className={`group relative h-[128px] w-[88px] shrink-0 snap-start overflow-hidden rounded-[14px] border text-left shadow-sm transition hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${seen ? "border-border/50 bg-muted" : "border-emerald-500/70 bg-muted ring-2 ring-emerald-500/25"}`}
               aria-label={`View story from ${label}${seen ? " (seen)" : ""}`}
             >
               {thumb && item.media?.type === "image" ? (

@@ -28,13 +28,18 @@ function envFlag(name: string): boolean {
   }
 }
 
+/** An explicitly set flag wins (so "false" is a kill switch); an unset flag follows the public Testnet unlock. */
+function flagOrUnlock(unlocked: boolean, ...names: string[]): boolean {
+  for (const name of names) {
+    if (String(process.env[name] ?? "").trim()) return envFlag(name)
+  }
+  return unlocked
+}
+
 export function getEconomyProgramStatus(): EconomyProgramRow[] {
-  const referral =
-    envFlag("NEXT_PUBLIC_GHC_REFERRAL_SETTLEMENT_ENABLED") ||
-    envFlag("GHC_REFERRAL_SETTLEMENT_ENABLED")
-  const curation =
-    envFlag("NEXT_PUBLIC_GHC_CURATION_REDISTRIBUTE_ENABLED") ||
-    envFlag("GHC_CURATION_REDISTRIBUTE_ENABLED")
+  const unlocked = envFlag("NEXT_PUBLIC_GHC_TESTNET_UNLOCK") || envFlag("GHC_TESTNET_UNLOCK")
+  const referral = flagOrUnlock(unlocked, "NEXT_PUBLIC_GHC_REFERRAL_SETTLEMENT_ENABLED", "GHC_REFERRAL_SETTLEMENT_ENABLED")
+  const curation = flagOrUnlock(unlocked, "NEXT_PUBLIC_GHC_CURATION_REDISTRIBUTE_ENABLED", "GHC_CURATION_REDISTRIBUTE_ENABLED")
 
   return [
     {

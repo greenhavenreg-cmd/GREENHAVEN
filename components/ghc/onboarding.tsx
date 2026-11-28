@@ -1,5 +1,6 @@
 "use client"
 
+import { urlToBlob } from "@/lib/media/data-url"
 import { DurableImage } from "./durable-image"
 import { IdentityService } from "@/lib/identity/identity-service"
 
@@ -382,7 +383,7 @@ export function Onboarding() {
     setUploading(true)
     try {
       const compressed = await compressForAvatar(file)
-      const blob = await fetch(compressed).then((response) => response.blob())
+      const blob = await urlToBlob(compressed)
       const uploaded = await uploadDurableMedia(blob, {
         fileName: `onboarding-avatar-${Date.now()}.${blob.type === "image/webp" ? "webp" : "jpg"}`,
         category: "avatars",

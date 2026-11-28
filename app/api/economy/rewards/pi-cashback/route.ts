@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
 import { readGhcServerEnv } from "@/lib/server/economy/env"
 import { resolvePiSandbox } from "@/lib/pi-env"
+import { a2uTestnetGate } from "@/lib/server/economy/testnet-unlock"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
       }, { status: 503, headers: noStore })
     }
 
-    const withdrawalConfigured = process.env.PI_A2U_ENABLED === "true" && process.env.PI_A2U_TESTNET_ONLY === "true" && resolvePiSandbox() && process.env.PI_ENV === "production" && Boolean(String(process.env.PI_API_KEY || process.env.PI_SERVER_API_KEY || "").trim()) && /^S[A-Z2-7]{55}$/.test(String(process.env.PI_WALLET_PRIVATE_SEED || "").trim())
+    const withdrawalConfigured = a2uTestnetGate(resolvePiSandbox(), ["PI_A2U_ENABLED", "PI_A2U_TESTNET_ONLY"]).open && Boolean(String(process.env.PI_API_KEY || process.env.PI_SERVER_API_KEY || "").trim()) && /^S[A-Z2-7]{55}$/.test(String(process.env.PI_WALLET_PRIVATE_SEED || "").trim())
     let payouts: Array<{ entitlement_id?: string; amount_atomic?: string | number; status?: string; provider_payment_id?: string | null; txid?: string | null; paid_at?: string | null; created_at?: string }> = []
     let reservedAtomic = BigInt(0)
     let payoutReviewAtomic = BigInt(0)

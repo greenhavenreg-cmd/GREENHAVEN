@@ -4,6 +4,7 @@
  * Profile — owner identity and owner posts, with non-essential account tools grouped
  * inside a collapsed Dashboard. Profile post actions reuse the canonical feed card.
  */
+import { urlToBlob } from "@/lib/media/data-url"
 import { useMemo, useState, useCallback, useEffect, useRef, type ReactNode } from "react"
 import { useSectionRefresh } from "@/hooks/use-section-refresh"
 import { useGHCProfile, useGHCMessaging, useGHCFeed } from "@/contexts/ghc-context"
@@ -649,7 +650,7 @@ export function ProfileScreen({
               preferWebp: true,
               maxInputBytes: 25 * 1024 * 1024,
             })
-            const compressedBlob = await fetch(compressedDataUrl).then((r) => r.blob())
+            const compressedBlob = await urlToBlob(compressedDataUrl)
             const uploaded = offline ? null : await uploadDurableMedia(compressedBlob, { fileName: `${kind}-${Date.now()}.${compressedBlob.type === "image/webp" ? "webp" : "jpg"}`, category: "avatars" })
             if (uploaded?.ok && uploaded.kind === "image") {
               imageUrl = toRelativeMediaFacadeUrl(uploaded.url)

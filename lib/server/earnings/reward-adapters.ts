@@ -12,6 +12,7 @@ import { readGhcServerEnv, hasPrivilegedDatabase } from "@/lib/server/economy/en
 import { resolvePiSandbox } from "@/lib/pi-env"
 import { postEarningsCredit, PI_ATOMIC_SCALE } from "@/lib/server/earnings/unified-ledger"
 import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
+import { a2uTestnetGate } from "@/lib/server/economy/testnet-unlock"
 
 export type RewardSourceKind =
   | "activity_reward"
@@ -56,9 +57,7 @@ const MAX_SINGLE_ATOMIC: Record<RewardSourceKind, number> = {
 
 function adaptersEnabled(): boolean {
   return (
-    String(process.env.PI_EARNINGS_ADAPTERS_ENABLED || "").trim() === "true" &&
-    String(process.env.PI_A2U_TESTNET_ONLY || "").trim() === "true" &&
-    resolvePiSandbox() === true
+    a2uTestnetGate(resolvePiSandbox() === true, ["PI_EARNINGS_ADAPTERS_ENABLED", "PI_A2U_TESTNET_ONLY"]).open
   )
 }
 

@@ -38,7 +38,7 @@ test('new migration is classified REVIEW_REQUIRED with disposable DB/Testnet gat
 test('package registers the ledger contract check in prebuild and static verification', packageJson.scripts?.['prebuild:checks']?.includes('check-pi-cashback-ledger.mjs') && read('scripts/verify-phase14-static.mjs').includes('check-pi-cashback-ledger.mjs'))
 test('cashback calculation example: 20 PI net revenue produces 0.6 PI cashback', cashback(200_000_000n) === 6_000_000n)
 test('cashback calculation floors fractional atomic unit results', cashback(33n) === 0n && cashback(34n) === 1n)
-test('cashback payout implementation is separately gated and not conflated with the ledger foundation', /20261029010004_pi_cashback_testnet_a2u_payouts\.sql/i.test(read('docs/PI-A2U-EARNINGS-AND-CASHBACK-ROADMAP.md')) && /PI_A2U_TESTNET_ONLY !== "true"/.test(read('app/api/economy/rewards/pi-cashback/claim/route.ts')) && /withdrawalEnabled/.test(read('app/api/economy/rewards/pi-cashback/route.ts')))
+test('cashback payout implementation is separately gated and not conflated with the ledger foundation', /20261029010004_pi_cashback_testnet_a2u_payouts\.sql/i.test(read('docs/PI-A2U-EARNINGS-AND-CASHBACK-ROADMAP.md')) && /a2uTestnetGate/.test(read('app/api/economy/rewards/pi-cashback/claim/route.ts')) && /withdrawalEnabled/.test(read('app/api/economy/rewards/pi-cashback/route.ts')))
 
 const failed = checks.filter(([, ok]) => !ok).length
 console.log(`\nPi cashback ledger contract: ${checks.length - failed}/${checks.length} passed`)

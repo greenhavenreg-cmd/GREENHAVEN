@@ -3580,11 +3580,12 @@ header img[alt="GreenHaven"],
 }
 .gh-post-action-primary,
 .gh-post-action-secondary {
-  width: 100%;
+  width: auto;
 }
+.gh-post-action-line { width: 100%; }
 .gh-post-action-secondary .gh-post-response-action {
   min-height: 44px;
-  min-width: 0;
+  min-width: 2.75rem;
   gap: .35rem;
   white-space: nowrap;
   font-size: 11px;
@@ -3612,8 +3613,8 @@ header img[alt="GreenHaven"],
   }
   .gh-post-action-secondary .gh-post-response-action {
     flex: 0 0 auto;
-    min-width: 6.25rem;
-    padding-inline: .75rem;
+    min-width: 2.75rem;
+    padding-inline: .625rem;
     font-size: 12px;
   }
 }

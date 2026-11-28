@@ -10,7 +10,7 @@ const checks = [
   ['PI sheet does not pre-fill the full balance', !/setAmountStr\(openingBalance/.test(sheet) && /setAmountStr\(""\)/.test(sheet)],
   ['PI sheet parses typed amounts exactly', /parsePiInput\(amountStr\)/.test(sheet)],
   ['PI sheet Max is floored and capped to available', /atomicToPiString\(floorToAtomic\(maxPi\)\)/.test(sheet)],
-  ['PI request route refuses to reserve when execution is disabled', /PI_EARNINGS_PAYOUT_EXECUTION_ENABLED !== "true"/.test(route) && /PI_EARNINGS_PAYOUT_EXECUTION_DISABLED/.test(route)],
+  ['PI request route refuses to reserve when execution is disabled', /a2uTestnetGate\(resolvePiSandbox\(\)\)/.test(route) && /PI_EARNINGS_PAYOUT_EXECUTION_DISABLED/.test(route)],
   ['PI sheet explains the execution-disabled response', /PI_EARNINGS_PAYOUT_EXECUTION_DISABLED/.test(sheet)],
   ['PI balance still fails closed', /setPiSnapshot\(null\)/.test(bal)],
   ['PI balance refreshes on visibility and reconnect', /visibilitychange/.test(bal) && /void refreshPi\(\)/.test(bal)],

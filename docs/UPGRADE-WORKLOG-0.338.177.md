@@ -27,3 +27,12 @@ No live Supabase, Pi SDK, Pi Testnet, Pi Mainnet, Vercel deployment, GitHub push
 
 ## RUN512
 Testnet activation profile gains `PI_EARNINGS_ADAPTERS_ENABLED=true` and `GH_WITHDRAWAL_OPERATOR_IDS`; new `check-run512-testnet-profile-parity` guard in `verify:static`. See `RUN512-TESTNET-PROFILE-PARITY-2026-11-28.md`.
+
+## RUN513
+Shared Testnet A2U gate (`a2uTestnetGate`, `testnetOperatorFlag`): flags default on in Testnet only, withdrawal error names the missing setting; referral/curation program status follows the Testnet unlock. See `RUN513-TESTNET-A2U-GATE-AND-REFERRAL-DEFAULTS-2026-11-28.md`.
+
+## RUN514
+Post action row is one line: vote tap = like/reactions, hold = Community curation; compact story rail. New `check-run514-one-line-post-actions` guard. See `RUN514-ONE-LINE-POST-ACTIONS-AND-COMPACT-STORIES-2026-11-28.md`.
+
+## RUN515
+Media upload "Failed to fetch": `fetch(dataUrl)` blocked by CSP `connect-src`; new `urlToBlob`, CSP fixed, `STORAGE_UNREACHABLE` diagnostics, new `check-run515-media-upload-csp`. See `RUN515-MEDIA-UPLOAD-CSP-FETCH-FAILURE-2026-11-28.md`.

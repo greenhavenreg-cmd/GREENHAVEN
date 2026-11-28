@@ -56,12 +56,14 @@ const guard = (p) => readFileSync(p, "utf8")
 const checks = [
   ...strictTrue.map((k) => [`${k} is exactly "true" in the Testnet profile`, env.get(k) === "true"]),
   ...strictTrue.map((k) => [`code still gates on ${k}`, codeMentions(k)]),
-  ...strictTrue.filter((k) => k !== "NEXT_PUBLIC_PI_SANDBOX").map((k) => [`code compares ${k} to "true" (profile must not use 1/yes)`, codeComparesToTrue(k)]),
+  // RUN513: operator flags resolve through the shared Testnet gate (explicit value wins; unset = on only in a Testnet runtime).
+  ...strictTrue.filter((k) => k !== "NEXT_PUBLIC_PI_SANDBOX" && k !== "GHC_WITHDRAWALS_ENABLED").map((k) => [`code gates ${k} ("true" or the shared Testnet gate)`, codeComparesToTrue(k) || (guard("lib/server/economy/testnet-unlock.ts").includes(`"${k}"`) && /testnetOperatorFlag|a2uTestnetGate/.test(guard("lib/server/economy/testnet-unlock.ts")))]),
+  ["GHC_WITHDRAWALS_ENABLED is still compared to exactly \"true\"", codeComparesToTrue("GHC_WITHDRAWALS_ENABLED")],
   ...truthy.map((k) => [`${k} is enabled in the Testnet profile`, ["1", "true", "yes", "on"].includes((env.get(k) || "").toLowerCase())]),
   ...truthy.map((k) => [`code still gates on ${k}`, codeMentions(k)]),
   ["NEXT_PUBLIC curation and referral flags mirror the server flags", env.get("NEXT_PUBLIC_GHC_CURATION_REDISTRIBUTE_ENABLED") === "true" && env.get("NEXT_PUBLIC_GHC_REFERRAL_SETTLEMENT_ENABLED") === "true"],
   ["PI_NETWORK is testnet", env.get("PI_NETWORK") === "testnet"],
-  ["PI_ENV is production (A2U routes require it)", env.get("PI_ENV") === "production" && sources.some(([, t]) => /PI_ENV\s*!==\s*"production"/.test(t))],
+  ["PI_ENV is production (A2U routes require it)", env.get("PI_ENV") === "production" && sources.some(([, t]) => /(PI_ENV|piEnv)\s*!==\s*"production"/.test(t))],
   ["profile never sets VERCEL_ENV", !env.has("VERCEL_ENV")],
   ["live Paystack transfers stay unapproved", env.get("PAYSTACK_LIVE_TRANSFERS_APPROVED") === "false"],
   ["profile header forbids Production use", /Never copy this profile into Vercel Production/.test(raw)],

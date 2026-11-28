@@ -13,6 +13,7 @@ import { resolvePiSandbox } from "@/lib/pi-env"
 import { readGhcServerEnv, hasPrivilegedDatabase } from "@/lib/server/economy/env"
 import { getPiIncompleteA2uPayments, piA2uErrorDiagnostic, piA2uErrorHttpStatus } from "@/lib/server/payments/pi-platform-a2u"
 import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
+import { a2uTestnetGate } from "@/lib/server/economy/testnet-unlock"
 
 export type A2uSourceKind = "cashback" | "seller_marketplace" | "creator" | "other"
 
@@ -210,10 +211,7 @@ export async function inspectPiIncompleteServerPayments(): Promise<{
   }>
 }> {
   if (
-    process.env.PI_NETWORK !== "testnet" ||
-    process.env.PI_A2U_TESTNET_ONLY !== "true" ||
-    process.env.PI_ENV !== "production" ||
-    !resolvePiSandbox()
+    !a2uTestnetGate(resolvePiSandbox(), ["PI_A2U_TESTNET_ONLY"]).open
   ) return { ok: false, state: "testnet_gate_closed" }
 
   const apiKey = String(process.env.PI_API_KEY || process.env.PI_SERVER_API_KEY || "").trim()

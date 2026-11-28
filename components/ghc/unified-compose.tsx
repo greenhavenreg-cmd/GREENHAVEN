@@ -25,6 +25,7 @@ import { ComposeMediaStrip, ComposeUploadProgress, ComposeDraftBanner } from "./
 import { MediaLightbox } from "./media-lightbox"
 import { DurableVideo } from "./durable-video"
 import { useDialogA11y } from "@/hooks/use-dialog-a11y"
+import { urlToBlob } from "@/lib/media/data-url"
 
 export type ComposeMode = "post" | "story"
 export type Audience = "public" | "followers" | "mutuals" | "private"
@@ -422,7 +423,7 @@ export function UnifiedCompose({ open, onOpenChange, initialMode = "post" }: Uni
         if (generation !== composeGenerationRef.current || controller.signal.aborted || IdentityService.getCurrentUserId() !== expectedUserId) return
         setUploadProgress(MEDIA_PROGRESS.uploading)
         try {
-          const blob = await (await fetch(dataUrl)).blob()
+          const blob = await urlToBlob(dataUrl)
           const up = await uploadDurableMedia(blob, {
             fileName: file.name,
             onProgress: (label) => { if (generation === composeGenerationRef.current) setUploadProgress(label) },
@@ -492,7 +493,7 @@ export function UnifiedCompose({ open, onOpenChange, initialMode = "post" }: Uni
           if (generation !== composeGenerationRef.current || controller.signal.aborted || IdentityService.getCurrentUserId() !== expectedUserId) return
           setUploadProgress(MEDIA_PROGRESS.uploading)
           try {
-            const blob = await (await fetch(dataUrl)).blob()
+            const blob = await urlToBlob(dataUrl)
             const up = await uploadDurableMedia(blob, {
               fileName: file.name,
               onProgress: (label) => { if (generation === composeGenerationRef.current) setUploadProgress(label) },

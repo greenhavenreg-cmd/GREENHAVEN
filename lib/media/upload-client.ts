@@ -268,12 +268,20 @@ async function uploadViaDirect(
     }
     if (meta?.signal?.aborted) return { ok: false, durable: false, error: "UPLOAD_CANCELLED", userMessage: "Upload cancelled." }
     if (meta?.expectedUserId && IdentityService.getCurrentUserId() !== meta.expectedUserId) return { ok: false, durable: false, error: "AUTH_CONTEXT_CHANGED", userMessage: "Your account changed. Reopen the composer and try again." }
-    const putRes = await fetch(String(intent.uploadUrl), {
-      method: "PUT",
-      headers: putHeaders,
-      body: file,
-      signal: meta?.signal,
-    })
+    let putRes: Response
+    try {
+      putRes = await fetch(String(intent.uploadUrl), {
+        method: "PUT",
+        headers: putHeaders,
+        body: file,
+        signal: meta?.signal,
+      })
+    } catch (error) {
+      if (meta?.signal?.aborted) return { ok: false, durable: false, error: "UPLOAD_CANCELLED", userMessage: "Upload cancelled." }
+      // A rejected fetch to the storage host (CSP connect-src, CORS, DNS, offline) is not a server answer.
+      console.warn("[media] storage PUT could not be sent", error instanceof Error ? error.name : "unknown")
+      return { ok: false, durable: false, error: "STORAGE_UNREACHABLE", userMessage: mediaUserMessage("STORAGE_UNREACHABLE") }
+    }
     // Some Supabase deployments expect POST to signed URL
     if (!putRes.ok) {
       if (meta?.signal?.aborted) return { ok: false, durable: false, error: "UPLOAD_CANCELLED", userMessage: "Upload cancelled." }
@@ -283,7 +291,8 @@ async function uploadViaDirect(
         headers: putHeaders,
         body: file,
         signal: meta?.signal,
-      })
+      }).catch(() => null)
+      if (!postRes) return { ok: false, durable: false, error: "STORAGE_UNREACHABLE", userMessage: mediaUserMessage("STORAGE_UNREACHABLE") }
       if (!postRes.ok) {
         return {
           ok: false,

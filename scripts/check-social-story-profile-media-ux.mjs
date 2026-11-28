@@ -8,7 +8,7 @@ const profile = read('components/ghc/profile-screen.tsx')
 const lightbox = read('components/ghc/media-lightbox.tsx')
 const pkg = JSON.parse(read('package.json'))
 const checks = [
-  ['story rail uses compact vertical cards instead of oversized decorative avatar bubbles', story.includes('h-[158px] w-[104px]') && story.includes('Story updates') && !story.includes('w-[76px]')],
+  ['story rail uses compact vertical cards instead of oversized decorative avatar bubbles', story.includes('h-[128px] w-[88px]') && story.includes('Story updates') && !story.includes('w-[76px]')],
   ['story rail has one clear create-story action and avoids duplicate create controls', story.includes('Create story') && !story.includes('Share a moment · visible 24 hours')],
   ['story thumbnails preserve image loading through the private-media-aware image component', story.includes('<LazyImage src={thumb}')],
   ['story viewer resolves private media facade URLs through shared session-aware image/video primitives', story.includes('DurableVideo ref={storyVideoRef} key={viewing.id} src={viewing.media.url}') && story.includes('DurableImage src={viewing.media.url}') && read('components/ghc/durable-video.tsx').includes('ghc:media-session-change') && read('components/ghc/durable-image.tsx').includes('ghc:media-session-change')],

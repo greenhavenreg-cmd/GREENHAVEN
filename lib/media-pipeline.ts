@@ -6,6 +6,7 @@
  * endpoint is available. Local/offline may use short-lived object URLs or compact previews.
  */
 
+import { urlToBlob } from "@/lib/media/data-url"
 import {
   validateMediaFile,
   validateImageFiles,
@@ -90,8 +91,7 @@ export async function transformImageToBlob(
   const bitmap = await createImageBitmap(file).catch(async () => {
     // Fallback path for older WebViews
     const dataUrl = await compressImage(file)
-    const res = await fetch(dataUrl)
-    const blob = await res.blob()
+    const blob = await urlToBlob(dataUrl)
     return createImageBitmap(blob)
   })
 
