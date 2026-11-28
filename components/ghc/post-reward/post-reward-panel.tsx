@@ -72,7 +72,12 @@ export function PostRewardPanel({
   const [qualifiedViews, setQualifiedViews] = useState<number | null>(null)
   const requestRef = useRef<AbortController | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
-  const dialogRef = useDialogA11y<HTMLElement>(open, () => setOpen(false))
+  const closePanel = useCallback(() => {
+    const triggerElement = triggerRef.current
+    setOpen(false)
+    window.requestAnimationFrame(() => triggerElement?.focus())
+  }, [])
+  const dialogRef = useDialogA11y<HTMLElement>(open, closePanel)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const sequenceRef = useRef(0)
   const mountedRef = useRef(true)
@@ -220,12 +225,12 @@ export function PostRewardPanel({
       </section>
 
       {open && typeof document !== "undefined" ? createPortal(
-        <div className="fixed inset-0 z-[240] flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-[3px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false) }}>
+        <div className="fixed inset-0 z-[240] flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-[3px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) closePanel() }}>
           <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={`curation-title-${postId}`} tabIndex={-1} className="flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[1.65rem] border border-white/15 bg-[var(--card)] shadow-[0_24px_90px_rgba(0,0,0,.28)] sm:rounded-[1.65rem]">
             <header className="flex shrink-0 items-center gap-3 border-b border-border/70 px-4 py-3.5 sm:px-5">
               <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"><Activity size={19} /></span>
               <div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-emerald-700 dark:text-emerald-300">Creator analytics</p><h2 id={`curation-title-${postId}`} className="text-base font-extrabold tracking-tight">Post performance</h2></div>
-              <button ref={closeButtonRef} type="button" onClick={() => setOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted/75" aria-label="Close post performance"><X size={18} /></button>
+              <button ref={closeButtonRef} type="button" onClick={closePanel} className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted/75" aria-label="Close post performance"><X size={18} /></button>
             </header>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
               <div className="flex items-center gap-4 rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-emerald-500/[.06] p-4">

@@ -4,6 +4,8 @@
 **Current source version:** `0.338.173` (working candidate; not accepted, pushed or deployed).  
 **Current status:** **NOT APPROVED**.
 
+**Canonical visible bottom navigation:** Home · Discover · Messages · Communities · Cart · Profile (source: `lib/navigation/destinations.ts`, `BOTTOM_NAV_IDS`).
+
 RUN461 hardens the authoritative GHC reward-claim response boundary and GHC membership purchase RPC response validation. The claim RPC parser requires explicit success, an exact boolean idempotency field, a bounded transaction identifier and a positive finite amount. Incomplete or malformed successful responses are treated as unavailable/ambiguous so the existing database idempotency path can safely recover. Matured Daily Claim reads validate authenticated owner, cutoff, row count, identifier, amount, timestamp and metadata before hold IDs can reach the claim RPC. Membership purchase responses are bounded by a 10-second timeout and require exact owner/reference/tier/amount linkage, explicit nested spend success and a matching active entitlement. No reward formula, eligibility, maturity window, settlement, ledger policy, membership/referral economics or SQL migration changed.
 
 RUN460 referral read/attribution hardening and RUN454–RUN459 improvements remain preserved. No live database mutation, payout or provider operation was performed.

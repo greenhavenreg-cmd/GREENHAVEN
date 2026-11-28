@@ -5,7 +5,7 @@ const checks = [
   ["earnings dashboard registers wallet focus effect before render-state early returns", () => {
     const source = read("components/ghc/unified-earnings-dashboard.tsx")
     const hook = source.indexOf('window.addEventListener("ghc:wallet-pi-focus"')
-    const earlyReturn = source.indexOf("if (loading && !snap)")
+    const earlyReturn = source.indexOf("if (loading && !serverSnap)")
     return hook > -1 && earlyReturn > hook && source.includes("const runWithdraw = useCallback")
   }],
   ["earnings action callbacks have stable dependencies", () => {
@@ -16,13 +16,13 @@ const checks = [
       source.includes("  }, [])\n\n  const onRevokeWalletAuth = useCallback(async () =>") &&
       source.includes("  }, [authorizingWallet, refresh])") &&
       source.includes("const onPreviewFee = useCallback(async () =>") &&
-      source.includes("  }, [snap])\n\n  const runWithdraw = useCallback") &&
+      source.includes("  }, [serverSnap])\n\n  const runWithdraw = useCallback") &&
       source.includes("  }, [openWithdrawSheet])") &&
       !source.includes("const onRequestPayout = useCallback") &&
       !source.includes("onAuthorizeWallet")
   }],
   ["comment sheet includes media preview in effect dependencies", () =>
-    read("components/ghc/comment-sheet.tsx").includes("}, [open, mediaPreview])")],
+    read("components/ghc/comment-sheet.tsx").includes("}, [mediaPreview])")],
   ["durable image always supplies an alt attribute", () =>
     read("components/ghc/durable-image.tsx").includes('alt = ""') &&
     read("components/ghc/durable-image.tsx").includes("alt={alt}")],
