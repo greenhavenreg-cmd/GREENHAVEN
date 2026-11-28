@@ -5,6 +5,7 @@
  * Not a separate app identity — sellers are GreenHaven profiles.
  */
 
+import { securePrefixedId } from "../secure-id.ts"
 import { runMutation, type MutationResult } from "./mutation-pipeline"
 import { domainEvents } from "../realtime/event-bus"
 import type { DomainServices } from "./create-domains"
@@ -170,7 +171,7 @@ export const MARKETPLACE_CATEGORIES = [
 ] as const
 
 function genId(prefix: string) {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+  return securePrefixedId(prefix)
 }
 
 function loadJSON<T>(key: string, fallback: T): T {

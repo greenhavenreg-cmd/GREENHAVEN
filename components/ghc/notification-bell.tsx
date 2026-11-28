@@ -148,6 +148,10 @@ export function NotificationBell({
   const [open, setOpen] = useState(false)
   const [identityUserId, setIdentityUserId] = useState(() => IdentityService.getCurrentUserId())
   const [items, setItems] = useState<Notification[]>([])
+  const itemsRef = useRef<Notification[]>([])
+  useEffect(() => {
+    itemsRef.current = items
+  }, [items])
   const [unread, setUnread] = useState<number>(0)
   const [markingAll, setMarkingAll] = useState(false)
   const markAllInFlightRef = useRef(false)
@@ -188,6 +192,12 @@ export function NotificationBell({
   )
 
   const refresh = useCallback(() => {
+    // Durable rows known before this refresh; also consulted by the async store
+    // merge below, so it must live outside the synchronous try block.
+    const priorDurableItems = itemsRef.current.filter((item) => {
+      const data = item.data as { durable?: boolean; durableEconomy?: boolean; durableAnnouncement?: boolean } | undefined
+      return Boolean(data?.durable || data?.durableEconomy || data?.durableAnnouncement)
+    })
     try {
       const visible =
         typeof notificationSystem.getVisibleNotifications === "function"
@@ -201,8 +211,13 @@ export function NotificationBell({
         seen.add(k)
         return true
       })
-      setItems(unique)
-      setUnread(unique.filter((n) => !n.read).length)
+      const initialRows = new Map<string, Notification>()
+      for (const item of [...priorDurableItems, ...unique]) {
+        if (item.id && !initialRows.has(item.id)) initialRows.set(item.id, item)
+      }
+      const initialItems = Array.from(initialRows.values())
+      setItems(initialItems)
+      setUnread(initialItems.filter((n) => !n.read).length)
     } catch {
       setItems([])
       setUnread(0)
@@ -258,7 +273,12 @@ export function NotificationBell({
           ? socialData.notifications : []
         const economyRows = economyRes?.ok && economyData.ok && Array.isArray(economyData.items)
           ? economyData.items : []
-        setDurableOk(Boolean((unifiedRes?.ok && unifiedData.ok) || (socialRes?.ok && socialData.ok) || (economyRes?.ok && economyData.ok)))
+        // Declared before first use: reading these ahead of declaration is a TDZ crash.
+        const unifiedAvailable = Boolean(unifiedRes?.ok && unifiedData.ok && Array.isArray(unifiedData.notifications))
+        const socialAvailable = Boolean(socialRes?.ok && socialData.ok && Array.isArray(socialData.notifications))
+        const economyAvailable = Boolean(economyRes?.ok && economyData.ok && Array.isArray(economyData.items))
+        const announcementsAvailable = Boolean(announcementsRes?.ok && announcementsData.ok && Array.isArray(announcementsData.announcements))
+        setDurableOk(unifiedAvailable || (socialAvailable && economyAvailable))
 
         const mappedUnified: Notification[] = unifiedRows.map((n) => {
           const eventType = String(n.type || "system")
@@ -410,7 +430,6 @@ export function NotificationBell({
         })
 
         const suppress = new Set([...blockedUsers, ...mutedUsers].map(String))
-        const unifiedAvailable = Boolean(unifiedRes?.ok && unifiedData.ok && Array.isArray(unifiedData.notifications))
         // gh_notification_inbox is the canonical projection of social + economy rows.
         // Fetch legacy feeds only as recovery lanes; merging all three duplicates every
         // social/economy event because database projection triggers already mirror them.
@@ -433,13 +452,25 @@ export function NotificationBell({
             })).filter((n) => Boolean((n.data as { announcementId?: string }).announcementId))
           : []
         const durableEconomyVisible = mappedEconomy.filter((n) => !unifiedAvailable || !unifiedIds.has(`economy_${n.id}`))
+        const staleStoreRows = priorDurableItems.filter((item) => {
+          const data = item.data as { sourceStore?: string; sourceType?: string; durable?: boolean; durableEconomy?: boolean; durableAnnouncement?: boolean } | undefined
+          if (data?.durableAnnouncement) return !announcementsAvailable
+          if (data?.sourceStore === "social") return !unifiedAvailable && !socialAvailable
+          if (data?.sourceStore === "economy" || data?.durableEconomy) return !unifiedAvailable && !economyAvailable
+          if (data?.sourceStore === "unified" || data?.durable) {
+            if (data.sourceType === "social") return !unifiedAvailable && !socialAvailable
+            if (data.sourceType === "economy") return !unifiedAvailable && !economyAvailable
+            return !unifiedAvailable && !socialAvailable && !economyAvailable
+          }
+          return false
+        })
         setItems((prev) => {
           const localOnly = prev.filter((x) => {
-            const d = x.data as { durable?: boolean; durableEconomy?: boolean } | undefined
-            return !d?.durable && !d?.durableEconomy
+            const d = x.data as { durable?: boolean; durableEconomy?: boolean; durableAnnouncement?: boolean } | undefined
+            return !d?.durable && !d?.durableEconomy && !d?.durableAnnouncement
           })
           const byId = new Map<string, Notification>()
-          for (const x of [...mappedUnified, ...durableSocialVisible, ...durableEconomyVisible, ...mappedAnnouncements, ...localOnly]) {
+          for (const x of [...mappedUnified, ...durableSocialVisible, ...durableEconomyVisible, ...mappedAnnouncements, ...staleStoreRows, ...localOnly]) {
             if (x.id && !byId.has(x.id)) byId.set(x.id, x)
           }
           return Array.from(byId.values())
@@ -457,7 +488,7 @@ export function NotificationBell({
         // behind a just-completed mark-read operation. Count the same deduplicated
         // rows the user can actually see instead of summing independent counters.
         const durableById = new Map<string, Notification>()
-        for (const item of [...mappedUnified, ...durableSocialVisible, ...durableEconomyVisible, ...mappedAnnouncements]) {
+        for (const item of [...mappedUnified, ...durableSocialVisible, ...durableEconomyVisible, ...mappedAnnouncements, ...staleStoreRows]) {
           if (!item.id || durableById.has(item.id)) continue
           let deleted = false
           try { deleted = Boolean(notificationSystem.isDeleted?.(item.id)) } catch { /* */ }
@@ -506,6 +537,7 @@ export function NotificationBell({
     activeRefreshControllerRef.current = null
     refreshInFlightRef.current = false
     refreshQueuedRef.current = false
+    itemsRef.current = []
     setItems([])
     setUnread(0)
     setDurableOk(null)

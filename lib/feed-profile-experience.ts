@@ -6,6 +6,7 @@ import { isOwnAuthor, CURRENT_USER_ID } from "@/lib/ownership"
 
 import type { Post, Profile } from "./ghc-types"
 
+import { secureHex } from "./secure-id.ts"
 /** Meaningful reactions (Feed #5) — beyond vanity likes */
 export const MEANINGFUL_REACTIONS = [
   { type: "like", emoji: "👍", label: "Like" },
@@ -135,7 +136,7 @@ export function createCollectionWithStatus(
   const existing = cols.find((c) => c.name.toLowerCase() === trimmed.toLowerCase())
   if (existing) return { collection: existing, persisted: true }
   const col: SavedCollection = {
-    id: `col_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+    id: `col_${Date.now().toString(36)}_${secureHex(5)}`,
     name: trimmed,
     postIds: [],
     createdAt: Date.now(),

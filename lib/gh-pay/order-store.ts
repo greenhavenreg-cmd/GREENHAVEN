@@ -10,6 +10,7 @@
  */
 import type { GhPayOrder, OrderStatus } from "./types"
 
+import { securePrefixedId } from "../secure-id.ts"
 const CLIENT_KEY = "gh_pay_orders_v1"
 const globalStore = globalThis as unknown as {
   __ghPayOrders?: Map<string, GhPayOrder>
@@ -86,5 +87,5 @@ export function updateOrderStatus(
 }
 
 export function genOrderId(): string {
-  return `gho_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
+  return securePrefixedId("gho")
 }

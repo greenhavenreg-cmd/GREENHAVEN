@@ -16,6 +16,7 @@ import { CreateGroupModal } from "./create-group-modal"
 import type { CreateGroupFormData } from "./create-group-modal"
 import { plural } from "@/lib/ui/plural"
 
+import { secureHex } from "@/lib/secure-id"
 // Enhanced Group type
 interface Group {
   id: string
@@ -129,7 +130,7 @@ export function ChatScreen() {
       }
 
       const newGroup: Group = {
-        id: `group_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: `group_${Date.now()}_${secureHex(5)}`,
         name: formData.name,
         description: formData.description,
         icon: "👥",

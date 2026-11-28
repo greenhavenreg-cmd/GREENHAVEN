@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { secureUUID } from "@/lib/secure-id"
 import { Loader2, Sparkles, Zap, Store, Users, Wand2, RefreshCw, ShieldCheck, X } from "lucide-react"
 import { ASSET_POLICY } from "@/lib/asset-separation"
 import { useDialogA11y } from "@/hooks/use-dialog-a11y"
@@ -54,12 +55,7 @@ export function GhcUtilityPanel({
   const requestKeys = useRef(new Map<string, string>())
 
   const needsTarget = (purpose: string) => ["boost_post", "boost_profile", "boost_listing", "feed_spotlight"].includes(purpose)
-  const createRequestKey = () => {
-    try {
-      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return `utility_${crypto.randomUUID()}`
-    } catch { /* use fallback */ }
-    return `utility_${Date.now()}_${Math.random().toString(36).slice(2, 14)}`
-  }
+  const createRequestKey = () => `utility_${secureUUID()}`
 
   const load = useCallback(async () => {
     setLoading(true)

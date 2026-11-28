@@ -12,6 +12,7 @@
  *   uses HttpOnly cookies (session-store).
  */
 
+import { secureHex } from "./secure-id.ts"
 const CSRF_COOKIE = "gh_csrf"
 const CSRF_HEADER_NAME = "X-CSRF-Token"
 const TOKEN_BYTES = 32
@@ -21,13 +22,7 @@ function bytesToHex(bytes: Uint8Array): string {
 }
 
 function generateRandomToken(): string {
-  const array = new Uint8Array(TOKEN_BYTES)
-  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-    crypto.getRandomValues(array)
-  } else {
-    for (let i = 0; i < array.length; i++) array[i] = Math.floor(Math.random() * 256)
-  }
-  return bytesToHex(array)
+  return secureHex(TOKEN_BYTES)
 }
 
 function readCookie(name: string): string | null {

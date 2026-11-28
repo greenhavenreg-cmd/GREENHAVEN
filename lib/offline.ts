@@ -1,3 +1,4 @@
+import { secureHex } from "./secure-id.ts"
 // Offline support utilities
 
 interface StoredAction {
@@ -26,7 +27,7 @@ export const offlineSupport = {
   queueAction: (action: string, data: any): string => {
     try {
       if (!canUseLocalStorage()) return ""
-      const id = `${action}_${Date.now()}_${Math.random()}`
+      const id = `${action}_${Date.now()}_${secureHex(6)}`
       const stored = localStorage.getItem(OFFLINE_STORAGE_KEY)
       const queue: StoredAction[] = stored ? JSON.parse(stored) : []
 

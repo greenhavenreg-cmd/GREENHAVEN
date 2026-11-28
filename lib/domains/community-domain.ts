@@ -10,6 +10,7 @@
  * Does not invent a second chat engine.
  */
 
+import { securePrefixedId } from "../secure-id.ts"
 import { runMutation, type MutationResult } from "./mutation-pipeline"
 import type { Conversation } from "../ghc-types"
 import {
@@ -207,7 +208,7 @@ export function createCommunityDomain(deps: {
         input,
         validate: (i) => (!(i.name || "").trim() ? "Name required" : null),
         mutate: (i) => {
-          const id = `comm_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
+          const id = securePrefixedId("comm")
           const now = Date.now()
           const members = Array.from(new Set([actorId, ...(i.invitedMembers || [])]))
           const welcomeBody =
@@ -731,7 +732,7 @@ export function createCommunityDomain(deps: {
         mutate: (i) => {
           const body = i.body.trim()
           const post = {
-            id: `bpost_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+            id: securePrefixedId("bpost"),
             communityId: i.communityId,
             authorId: actorId,
             authorName: "You",
@@ -785,7 +786,7 @@ export function createCommunityDomain(deps: {
         },
         mutate: (i) => {
           const reply = {
-            id: `breply_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+            id: securePrefixedId("breply"),
             postId: i.postId,
             authorId: actorId,
             authorName: "You",
@@ -977,7 +978,7 @@ export function createCommunityDomain(deps: {
           return null
         },
         mutate: (i) => ({
-          reportId: `crep_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+          reportId: securePrefixedId("crep"),
         }),
       })
     },

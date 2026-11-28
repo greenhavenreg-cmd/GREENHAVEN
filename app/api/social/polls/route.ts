@@ -2,6 +2,7 @@
  * POST /api/social/polls — create poll (author = session)
  * POST /api/social/polls with { pollId, optionId, action: "vote" } — vote once
  */
+import { securePrefixedId } from "@/lib/secure-id"
 import { NextResponse } from "next/server"
 import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
 import { socialDbConfigured, socialRpc } from "@/lib/server/social/rpc"
@@ -14,7 +15,7 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 function genId() {
-  return `poll_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+  return securePrefixedId("poll")
 }
 
 export async function POST(request: Request) {

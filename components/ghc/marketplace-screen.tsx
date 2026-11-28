@@ -1,6 +1,7 @@
 "use client"
 
 import { DurableImage } from "./durable-image"
+import { secureUUID } from "@/lib/secure-id"
 import { isPiOnlyCommerceClient } from "@/lib/client/pi-only-commerce"
 import { useRegionalContext } from "@/contexts/regional-context"
 import { getProductMessage } from "@/lib/i18n/product"
@@ -246,9 +247,7 @@ function CheckoutPanel({ listing }: { listing: MarketplaceListing }) {
         setErr("Your account changed. Reopen this listing before checking out.")
         return
       }
-      const nonce = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
+      const nonce = secureUUID()
       const idempotencyKey = idempotencyKeyRef.current?.namespace === checkoutNamespace
         ? idempotencyKeyRef.current.key
         : `buy_${nonce}`
@@ -1558,9 +1557,7 @@ function CartPanel({
         const lineKey = `${checkoutNamespace}:${item.listingId}:${item.variantId || "legacy"}:${item.quantity}:${item.sellerId}`
         let idempotencyKey = checkoutKeysRef.current.get(lineKey)
         if (!idempotencyKey) {
-          const nonce = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-            ? crypto.randomUUID()
-            : `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
+          const nonce = secureUUID()
           idempotencyKey = `cart_${nonce}`
           checkoutKeysRef.current.set(lineKey, idempotencyKey)
         }
@@ -3247,13 +3244,14 @@ export function MarketplaceScreen({
             }}
             onSubmit={async () => {
               setSellError(null)
-              const priceNum = Number(sellPrice)
+              // Number("") is 0; an empty price must never publish as a free product.
+              const priceNum = sellPrice.trim() === "" ? Number.NaN : Number(sellPrice)
               if (!sellTitle.trim()) {
                 setSellError("Add a title")
                 return
               }
-              if (!Number.isFinite(priceNum) || priceNum < 0) {
-                setSellError("Enter a valid price")
+              if (!Number.isFinite(priceNum) || priceNum <= 0) {
+                setSellError("Enter a price greater than zero")
                 return
               }
               const availabilityNum = sellAvailability.trim() === "" ? Number.NaN : Number(sellAvailability)

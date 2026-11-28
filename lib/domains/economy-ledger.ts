@@ -13,8 +13,9 @@ import type {
 } from "./economy-types"
 import { DEFAULT_ECONOMY_LIMITS } from "./economy-types"
 
+import { securePrefixedId } from "../secure-id.ts"
 function genId(prefix: string) {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+  return securePrefixedId(prefix)
 }
 
 export function emptyWallet(userId: string): GhcWalletSnapshot {

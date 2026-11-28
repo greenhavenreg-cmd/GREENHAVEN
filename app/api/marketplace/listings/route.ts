@@ -7,6 +7,7 @@
  *
  * Body: { id?, title, description?, price, currency?, availability?, status?, kind? }
  */
+import { securePrefixedId } from "@/lib/secure-id"
 import { NextResponse } from "next/server"
 import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
 import {
@@ -94,7 +95,7 @@ export async function POST(request: Request) {
     : []
   const id =
     String(body.id || "").trim() ||
-    `lst_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+    securePrefixedId("lst")
 
   if (!/^[A-Za-z0-9._:-]{1,160}$/.test(id)) {
     return NextResponse.json({ ok: false, error: "INVALID_LISTING_ID" }, { status: 400 })
@@ -119,6 +120,12 @@ export async function POST(request: Request) {
   }
   if (!["draft", "active", "paused", "sold_out", "removed"].includes(status)) {
     return NextResponse.json({ ok: false, error: "INVALID_STATUS" }, { status: 400 })
+  }
+  // A published product must carry a real price. Number(null) and Number("") are 0, so a
+  // missing price would otherwise publish a free product that can be ordered with no charge.
+  // Drafts, services and opportunities keep their existing rules.
+  if (kind === "product" && status === "active" && (body.price === null || body.price === undefined || String(body.price).trim() === "" || !(price > 0))) {
+    return NextResponse.json({ ok: false, error: "PRICE_REQUIRED", message: "Set a price greater than zero before publishing a product." }, { status: 400, headers: { "Cache-Control": "no-store" } })
   }
 
   // Ownership: updates only by original seller (SQL also enforces; check early for clear 403)

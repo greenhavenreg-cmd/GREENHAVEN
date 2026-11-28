@@ -2,6 +2,7 @@
  * Client helpers for durable social APIs.
  * Optimistic UI remains in domain/context; these calls make server authoritative.
  */
+import { securePrefixedId } from "../secure-id.ts"
 import { IdentityService } from "@/lib/identity/identity-service"
 import { buildSocialRequestIdentityKey } from "@/lib/social/request-identity"
 import type { Post, PostComment, StoryItem } from "@/lib/ghc-types"
@@ -1031,7 +1032,7 @@ export async function socialCreateMarketplaceOrder(input: {
 }> {
   const key =
     input.idempotencyKey ||
-    `ord_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+    securePrefixedId("ord")
   return json("/api/marketplace/orders", {
     method: "POST",
     headers: { "Idempotency-Key": key },

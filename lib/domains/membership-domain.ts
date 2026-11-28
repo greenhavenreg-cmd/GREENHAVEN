@@ -12,6 +12,7 @@ import { runMutation, type MutationResult } from "./mutation-pipeline"
 import { domainEvents } from "../realtime/event-bus"
 
 
+import { secureUUID } from "../secure-id.ts"
 function mapMembershipError(code: unknown, status?: number): string {
   const mapped = humanizeMembershipError(typeof code === "string" ? code : String(code || ""), status)
   if (mapped !== MEMBERSHIP_DEFAULT_ERROR) return mapped
@@ -431,10 +432,7 @@ function ghcPurchaseAttemptId(tier: string, periodKey: string): string {
   const now = Date.now()
   const existing = ghcPurchaseAttempts.get(key)
   if (existing && now - existing.at < GHC_ATTEMPT_TTL_MS) return existing.id
-  const id =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${now}-${Math.random().toString(36).slice(2, 12)}`
+  const id = secureUUID()
   ghcPurchaseAttempts.set(key, { id, at: now })
   return id
 }

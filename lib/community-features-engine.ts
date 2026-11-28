@@ -1,5 +1,6 @@
 // Community features engine for groups
 import { formatDateTime, getClientLocale, getClientTimeZone } from "@/lib/regional-context"
+import { secureHex } from "./secure-id.ts"
 // Announcements, polls, events, pinned resources, welcome messages, guidelines, recommendations
 
 export type AnnouncementType = "info" | "important" | "celebration" | "maintenance"
@@ -107,7 +108,7 @@ export function createAnnouncement(
   expiresIn?: number // milliseconds
 ): Announcement {
   return {
-    id: `ann_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `ann_${Date.now()}_${secureHex(5)}`,
     groupId,
     authorId,
     title,
@@ -129,12 +130,12 @@ export function createPoll(
 ): Poll {
   const now = Date.now()
   return {
-    id: `poll_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `poll_${Date.now()}_${secureHex(5)}`,
     groupId,
     creatorId,
     question,
     options: options.map((text) => ({
-      id: `opt_${Math.random().toString(36).substr(2, 9)}`,
+      id: `opt_${secureHex(5)}`,
       text,
       votes: 0,
     })),
@@ -157,7 +158,7 @@ export function createEvent(
   virtualLink?: string
 ): ScheduledEvent {
   return {
-    id: `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `evt_${Date.now()}_${secureHex(5)}`,
     groupId,
     creatorId,
     title,
@@ -183,7 +184,7 @@ export function createPinnedResource(
   content?: string
 ): PinnedResource {
   return {
-    id: `res_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `res_${Date.now()}_${secureHex(5)}`,
     groupId,
     title,
     description,

@@ -1,3 +1,10 @@
+- [RUN512 Testnet Profile Parity](RUN512-TESTNET-PROFILE-PARITY-2026-11-28.md) — Testnet env profile now enables the earnings adapters and operator ids; a guard keeps the profile and the code's gate flags in sync.
+- [RUN511 Marketplace Positive Price](RUN511-MARKETPLACE-POSITIVE-PRICE-2026-11-28.md) — published products must have a price greater than zero on the seller form and the listings API.
+- [RUN510 RPC Source Drift](RUN510-RPC-SOURCE-DRIFT-2026-11-28.md) — inventories 20 RPCs called by live routes with no migration source, adds a drift guard and an operator verification query.
+- [RUN509 Secure Random Sweep and Notification Bell Crashes](RUN509-SECURE-RANDOM-SWEEP-AND-NOTIFICATION-BELL-CRASHES-2026-11-28.md) — replaces Math.random() IDs/tokens with fail-closed secure IDs, fixes two notification-bell runtime crashes, removes a fabricated match.
+- [RUN508 Secure Idempotency and Comment Reactions](RUN508-SECURE-IDEMPOTENCY-AND-COMMENT-REACTIONS-2026-11-28.md) — removes Math.random() idempotency fallbacks on money/publish paths and replaces the random comment reaction with a real picker.
+- [RUN506 Direct-call Control State and Accessibility](RUN506-DIRECT-CALL-CONTROL-STATE-2026-11-28.md) — resets local microphone/camera UI state per call and announces call status accessibly.
+- [RUN503 Durable Discovery and RSVP](RUN503-DURABLE-DISCOVERY-RSVP-2026-11-28.md) — Discover Events and Services use authenticated durable directories; RSVP supports Going, Maybe and Can't go with server-confirmed state.
 - [RUN497 No Contradictory Success Toasts](RUN497-NO-CONTRADICTORY-SUCCESS-TOASTS-2026-11-28.md) — unblock, comment report and community mute no longer show a success toast after a failure.
 - [RUN496 Voice Note Delivery](RUN496-VOICE-NOTE-DELIVERY-2026-11-28.md) — recorded voice notes are now actually sent as attachments instead of showing a success toast and stopping.
 - [RUN495 Messaging Toast and Retry Draft](RUN495-MESSAGING-TOAST-AND-RETRY-DRAFT-2026-11-28.md) — messaging failures show as errors; retrying a failed message no longer overwrites the draft being typed.
@@ -130,3 +137,5 @@ Older RUN, PHASE, PASS and worklog records are historical evidence, not current 
 - [RUN452 upgrade worklog](UPGRADE-WORKLOG-0.338.164.md) — Create Others menu, owner-scoped shortcuts and scroll refinement.
 
 - [RUN453 upgrade worklog](UPGRADE-WORKLOG-0.338.165.md) — shared app-shell viewport fallback and navigation touch-target reliability.
+
+- RUN505 conversation inbox outage integrity: `RUN505-CONVERSATION-INBOX-OUTAGE-INTEGRITY-2026-11-28.md` and `UPGRADE-WORKLOG-0.338.176.md`.

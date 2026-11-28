@@ -28,14 +28,23 @@ export async function GET(request: Request) {
 
   if (url.searchParams.get("countOnly") === "1") {
     const result = await socialUnreadCount(auth.userId)
-    const count =
-      result.ok && result.data ? Number(result.data.unreadCount) || 0 : 0
-    return NextResponse.json({
-      ok: result.ok,
-      durable: result.ok,
-      unreadCount: count,
-      error: result.error,
-    })
+    if (!result.ok || !result.data) {
+      return NextResponse.json(
+        { ok: false, durable: false, error: result.error || "NOTIFICATIONS_UNAVAILABLE" },
+        { status: 503, headers: { "Cache-Control": "no-store, private" } }
+      )
+    }
+    const count = Number(result.data.unreadCount)
+    if (!Number.isFinite(count) || count < 0) {
+      return NextResponse.json(
+        { ok: false, durable: false, error: "NOTIFICATIONS_UNAVAILABLE" },
+        { status: 503, headers: { "Cache-Control": "no-store, private" } }
+      )
+    }
+    return NextResponse.json(
+      { ok: true, durable: true, unreadCount: Math.floor(count) },
+      { headers: { "Cache-Control": "no-store, private" } }
+    )
   }
 
   const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 40) || 40))
@@ -49,17 +58,17 @@ export async function GET(request: Request) {
     beforeMs,
     unreadOnly,
   })
-  const notifications =
-    result.ok && result.data && Array.isArray(result.data.notifications)
-      ? result.data.notifications
-      : []
+  if (!result.ok || !result.data || !Array.isArray(result.data.notifications)) {
+    return NextResponse.json(
+      { ok: false, durable: false, error: result.error || "NOTIFICATIONS_UNAVAILABLE" },
+      { status: 503, headers: { "Cache-Control": "no-store, private" } }
+    )
+  }
 
-  return NextResponse.json({
-    ok: result.ok,
-    durable: result.ok,
-    notifications,
-    error: result.error,
-  })
+  return NextResponse.json(
+    { ok: true, durable: true, notifications: result.data.notifications },
+    { headers: { "Cache-Control": "no-store, private" } }
+  )
 }
 
 export async function POST(request: Request) {

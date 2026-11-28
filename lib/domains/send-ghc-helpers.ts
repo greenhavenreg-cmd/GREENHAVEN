@@ -1,5 +1,6 @@
 /** Pure Send GHC helpers (Phase D2) — no React */
 
+import { secureHex } from "../secure-id.ts"
 export function parseGhcAmount(raw: string): number | null {
   const cleaned = String(raw || "").replace(/,/g, "").trim()
   if (!cleaned) return null
@@ -15,6 +16,6 @@ export function buildTransferReference(
   amount: number
 ): string {
   const a = Math.round(amount * 10000) / 10000
-  const salt = Math.random().toString(36).slice(2, 8)
+  const salt = secureHex(4)
   return `p2p_${senderHint || "user"}_${toUserId}_${a}_${Date.now().toString(36)}_${salt}`
 }

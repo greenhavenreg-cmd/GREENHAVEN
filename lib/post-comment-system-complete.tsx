@@ -6,6 +6,7 @@
 
 import type { Post, PostComment } from "./ghc-types"
 
+import { secureHex } from "./secure-id.ts"
 // ============================================================================
 // TYPES (Unified, no duplication)
 // ============================================================================
@@ -539,7 +540,7 @@ export function sanitizePostText(text: string): string {
 // ============================================================================
 
 function generateId(): string {
-  return Math.random().toString(36).substring(2, 11)
+  return secureHex(5)
 }
 
 export function findCommentById(comments: EnhancedComment[], id: string): EnhancedComment | null {

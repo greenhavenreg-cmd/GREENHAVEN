@@ -18,16 +18,11 @@ import {
   withdrawalStatusLabel,
 } from "@/lib/wallet/ghc-amount"
 import { SettlementPanelSkeleton } from "@/components/ghc/skeleton-loaders"
+import { secureUUID } from "@/lib/secure-id"
 
 function newWithdrawalIdempotencyKey(): string {
-  try {
-    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-      return `wd_${crypto.randomUUID()}`
-    }
-  } catch {
-    /* */
-  }
-  return `wd_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
+  // Fails closed if no secure random source exists; never weaken a money idempotency key.
+  return `wd_${secureUUID()}`
 }
 
 type Quote = {

@@ -23,16 +23,32 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   if (url.searchParams.get("countOnly") === "1") {
     const result = await unifiedUnreadCount(auth.userId)
-    return NextResponse.json({ ok: result.ok, durable: result.ok, unreadCount: result.ok ? result.data : 0, error: result.error }, { headers: privateNoStore })
+    if (!result.ok) {
+      return NextResponse.json(
+        { ok: false, durable: false, error: result.error || "NOTIFICATIONS_UNAVAILABLE" },
+        { status: 503, headers: privateNoStore }
+      )
+    }
+    return NextResponse.json(
+      { ok: true, durable: true, unreadCount: Math.max(0, Math.floor(Number(result.data) || 0)) },
+      { headers: privateNoStore }
+    )
   }
   const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 60) || 60))
   const beforeCreatedAt = url.searchParams.get("beforeCreatedAt")
   const beforeId = url.searchParams.get("beforeId")
   const unreadOnly = url.searchParams.get("unreadOnly") === "1"
   const result = await listUnifiedNotifications(auth.userId, { limit, beforeCreatedAt, beforeId, unreadOnly })
-  const rows = result.ok ? result.data.notifications : []
-  const hasMore = result.ok && result.data.hasMore
-  return NextResponse.json({ ok: result.ok, durable: result.ok, notifications: rows, hasMore, error: result.error }, { headers: privateNoStore })
+  if (!result.ok) {
+    return NextResponse.json(
+      { ok: false, durable: false, error: result.error || "NOTIFICATIONS_UNAVAILABLE" },
+      { status: 503, headers: privateNoStore }
+    )
+  }
+  return NextResponse.json(
+    { ok: true, durable: true, notifications: result.data.notifications, hasMore: result.data.hasMore },
+    { headers: privateNoStore }
+  )
 }
 
 export async function POST(request: Request) {

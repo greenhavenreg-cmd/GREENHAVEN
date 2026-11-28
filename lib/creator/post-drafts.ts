@@ -7,6 +7,7 @@ import type { PostDraft } from "@/lib/ghc-types"
 import { IdentityService } from "@/lib/identity/identity-service"
 import { isDurableMediaUrl } from "@/lib/media/durable-url"
 
+import { secureHex } from "../secure-id.ts"
 const KEY_PREFIX = "ghc.post-drafts.v2:"
 const LEGACY_KEY = "ghc.post-drafts.v1"
 const MAX = 20
@@ -93,7 +94,7 @@ export function upsertPostDraft(input: {
   mentions?: string[]
 }): PostDraft {
   const list = readRaw()
-  const id = (input.id || `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`).trim()
+  const id = (input.id || `draft-${Date.now()}-${secureHex(5)}`).trim()
   const now = Date.now()
   const existing = list.find((d) => d.id === id)
   const next: PostDraft = {

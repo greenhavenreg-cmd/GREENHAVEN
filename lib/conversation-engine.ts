@@ -6,6 +6,7 @@
 
 import type { Conversation, Message } from "@/lib/ghc-types"
 
+import { secureHex } from "./secure-id.ts"
 export type ConversationType = "private" | "group"
 
 /**
@@ -795,7 +796,7 @@ export function canDeleteMessage(message: Message, userId: string): boolean {
  * Helper to generate unique message IDs
  */
 export function generateMessageId(): string {
-  return `msg_${Math.random().toString(36).substring(2, 11)}_${Date.now()}`
+  return `msg_${secureHex(5)}_${Date.now()}`
 }
 
 /**

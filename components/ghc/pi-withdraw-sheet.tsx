@@ -1,6 +1,7 @@
 "use client"
 
 import { fetchWithTimeout } from "@/lib/client/fetch-timeout"
+import { secureUUID } from "@/lib/secure-id"
 import { buildWithdrawalAuthorizationChecklist, withdrawalNotReadyMessage } from "@/lib/wallet/withdrawal-authorization-checklist"
 
 import { releaseReservedPi, emitWalletBalanceRefresh } from "@/lib/wallet/release-reserved-pi"
@@ -571,9 +572,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
     const amountAtomic = floorToAtomic(amountPi)
     let pinIntent = intentRef.current
     if (!pinIntent || pinIntent.amountAtomic !== amountAtomic) {
-      const nonce = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
+      const nonce = secureUUID()
       pinIntent = { amountAtomic, key: `sheet-payout:${nonce}` }
       intentRef.current = pinIntent
     }
@@ -653,9 +652,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
       let intent = intentRef.current
       if (!intent || intent.amountAtomic !== amountAtomic) {
         const nonce =
-          typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-            ? crypto.randomUUID()
-            : `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
+          secureUUID()
         intent = { amountAtomic, key: `sheet-payout:${nonce}` }
         intentRef.current = intent
       }

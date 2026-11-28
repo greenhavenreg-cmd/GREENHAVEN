@@ -3,6 +3,7 @@
  * All share destinations go through canShare → create reference → event.
  */
 
+import { securePrefixedId } from "./secure-id.ts"
 import type { Post, Conversation, StoryItem } from "./ghc-types"
 import type {
   ShareRecord,
@@ -14,7 +15,7 @@ import { isBlocked, isSoftDeleted } from "./social-graph"
 import { domainEvents } from "./realtime/event-bus"
 
 function id() {
-  return `share_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
+  return securePrefixedId("share")
 }
 
 export interface ShareContext {

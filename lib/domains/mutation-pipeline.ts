@@ -14,6 +14,7 @@
  * Every write should go through `runMutation`.
  */
 
+import { securePrefixedId } from "../secure-id.ts"
 import { domainEvents, type DomainEventType } from "../realtime/event-bus"
 
 export type MutationPhase =
@@ -42,7 +43,7 @@ export interface MutationFailure {
 export type MutationResult<T> = MutationSuccess<T> | MutationFailure
 
 function requestId() {
-  return `mut_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+  return securePrefixedId("mut")
 }
 
 export interface MutationSpec<TInput, TOutput> {

@@ -1,6 +1,7 @@
 "use client"
 
 import { DurableImage } from "./durable-image"
+import { secureUUID } from "@/lib/secure-id"
 import { confirmDialog } from "@/lib/ui/global-interactions"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRegionalContext } from "@/contexts/regional-context"
@@ -757,9 +758,7 @@ export function UnifiedCompose({ open, onOpenChange, initialMode = "post" }: Uni
         postRequestRef.current = null
       }
       const requestId = postRequestRef.current?.id || (() => {
-        const randomPart = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-          ? crypto.randomUUID().replace(/-/g, "")
-          : `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
+        const randomPart = secureUUID().replace(/-/g, "")
         return `post_${Date.now().toString(36)}_${randomPart}`
       })()
       postRequestRef.current = { id: requestId, signature: requestSignature }
@@ -795,9 +794,7 @@ export function UnifiedCompose({ open, onOpenChange, initialMode = "post" }: Uni
         const storySignature = stableComposeSignature({ text: text.trim(), media: storyMedia, audience: storyAudience, storyMode })
         if (storyRequestRef.current && storyRequestRef.current.signature !== storySignature) storyRequestRef.current = null
         if (!storyRequestRef.current) {
-          const randomPart = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-            ? crypto.randomUUID().replace(/-/g, "")
-            : `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
+          const randomPart = secureUUID().replace(/-/g, "")
           storyRequestRef.current = { id: `story_${randomPart}`, signature: storySignature }
         }
         const next: StoryItem = {

@@ -4,6 +4,7 @@
  * Optional messaging utilities — never required to send a normal message.
  */
 import { useRef, useState } from "react"
+import { secureUUID } from "@/lib/secure-id"
 import { X, Sparkles, Loader2 } from "lucide-react"
 import {
   listMessagingPremiumProducts,
@@ -42,9 +43,7 @@ export function MessagingPremiumSheet({
     let referenceId = referenceRef.current.get(productId)
     if (!referenceId) {
       const nonce =
-        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+        secureUUID()
       referenceId = `msg_premium_${productId}_${nonce}`
       referenceRef.current.set(productId, referenceId)
     }

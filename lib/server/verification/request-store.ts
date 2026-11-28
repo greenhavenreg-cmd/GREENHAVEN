@@ -8,6 +8,7 @@
  * - Review mutations require privileged review API (not this module's public surface)
  */
 
+import { securePrefixedId } from "../../secure-id.ts"
 import { readGhcServerEnv } from "@/lib/server/economy/env"
 import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
@@ -61,7 +62,7 @@ function now() {
 }
 
 export function genVerificationRequestId(): string {
-  return `vreq_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+  return securePrefixedId("vreq")
 }
 
 type Row = {

@@ -7,6 +7,7 @@
 
 import { canMutateReputationPrivileged } from "@/lib/architecture/trust-authority"
 
+import { secureHex } from "../secure-id.ts"
 export type TrustDimension =
   | "identity"
   | "professional"
@@ -184,7 +185,7 @@ export function recordTrustEvidence(input: {
   }
 
   const event: TrustEvidenceEvent = {
-    id: `te_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+    id: `te_${Date.now().toString(36)}_${secureHex(5)}`,
     userId: input.userId,
     kind: input.kind,
     referenceId: input.referenceId,

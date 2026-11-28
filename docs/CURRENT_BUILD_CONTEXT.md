@@ -1,12 +1,21 @@
-# CURRENT BUILD CONTEXT — GreenHaven RUN461
+# CURRENT BUILD CONTEXT — GreenHaven RUN505
 
-## Latest implementation — 0.338.173 Reward Claim Response Integrity (27 November 2026)
+## Latest implementation — 0.338.177 Conversation inbox outage integrity (28 November 2026)
 
-RUN461 validates authoritative GHC claim RPC responses strictly, validates matured Daily Claim hold ownership and row integrity before claim attempts, and validates GHC membership-purchase RPC responses against the exact user/reference/tier/amount and returned active entitlement. Ambiguous responses are not surfaced as successful claims or purchases; safe recovery remains through existing database idempotency paths. Reward formulas, qualification, 48-hour maturity, settlement, ledger authority, membership/referral economics and SQL migrations are unchanged.
+**Current source version:** `0.338.177`
+**Current migration closeout:** RUN447 / RUN443 retained; no new migration introduced.
 
-**Current source version:** `0.338.173` (unaccepted working candidate; parent RUN460 / `0.338.172`).
-**Verification:** Full network/DB-independent static suite 63/63; RUN461 contract 21/21; RUN460 8/8; RUN450 17/17; Phase 11 reconciliation 32/32. Prebuild checks were attempted but stop because the `typescript` package is absent.
-**Acceptance:** Available Node.js 22.16.0 is below required 24.15.0 and dependencies are absent. Full static suite, supported-runtime typecheck, lint, production build and browser/device/Testnet acceptance remain outstanding. No database mutation, remote push, deployment or provider transaction occurred. RUN447 and RUN443 remain preserved historical evidence; the RUN385 programme remains documented in `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`. This is source-only verification scope and does not establish production readiness. Production remains NOT APPROVED.
+RUN504 corrects notification API outage semantics: unified and social notification count/list reads now return HTTP 503 when their durable stores fail instead of returning a successful empty/zero-shaped response. Social notification responses are explicitly private and non-cacheable. Existing clients retain their last known navigation attention count on transient server failures; authentication denial still clears attention for the signed-out/unauthorized state.
+
+Messaging presence now reports `durable: true` only when the database write actually succeeds. Development-only process-memory fallback can still support local preview behavior, but it is explicitly marked non-durable. Production continues to fail closed when the durable presence store is unavailable.
+
+No database migration, Pi authentication/payment, GHC ledger, withdrawal, membership, referral, rewards, or curation economics changed. No vote-to-mint or client-side financial authority was introduced.
+
+**Current source version:** `0.338.175` (source candidate; parent RUN503 / `0.338.174`).
+**Verification:** RUN504 focused contract 15/15; full `npm run verify:static` passes 63/63 suites. Release hygiene passes 17/17; project truth 11/11; migration inventory contains 246 synchronized SQL source files. Supported-runtime prebuild, dependency-backed typecheck, lint, production build and browser/device/Testnet acceptance remain outstanding because this workspace has Node.js 22.16.0 while the project requires `^24.15.0`, and dependencies are not installed. No migration was applied, no database was mutated, no Git push or Vercel deployment occurred, and no provider transaction was made. Production remains **NOT APPROVED**.
+
+See `docs/RUN504-NOTIFICATION-OUTAGE-PRESENCE-DURABILITY-2026-11-28.md`, `docs/UPGRADE-WORKLOG-0.338.175.md` and `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-28.md`.
+
 
 ---
 
@@ -86,3 +95,13 @@ RUN447 community role normalization, RUN446 marketplace spend signature repair, 
 RUN451 activates the dedicated Testnet Preview configuration flags for GHC activity rewards, registration bonus, curation, referral settlement, Pi-to-GHC purchases, tips, withdrawals, marketplace seller payouts, Pi A2U, Pi earnings payout execution and Paystack test transfers. Public client flags are aligned. Provider credentials remain external Vercel Preview secrets and are not embedded in the archive. Generic `.env.example` remains fail-closed. Registration bonus still depends on the corresponding campaign migration/RPC being present in the Preview database; mission GHC issuance remains blocked by the current Daily-Claim-only issuance policy. See `docs/RUN451-TESTNET-ECONOMY-ACTIVATION-2026-11-26.md`.
 
 Historical continuity: RUN447 community role normalization and RUN443 Testnet migration closeout remain preserved as prior-run evidence only. The coordinated RUN385 upgrade programme remains documented in `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`; none of those historical records implies a new live database action in RUN455.
+
+
+## RUN505 — Conversation inbox outage integrity
+
+Conversation list reads no longer hide failures in durable member lists, conversation rows, preferences, active memberships, unread-count RPCs, or missing production storage behind empty or partially populated results. See `docs/RUN505-CONVERSATION-INBOX-OUTAGE-INTEGRITY-2026-11-28.md`. No financial or migration semantics changed.
+
+
+## RUN506 — Direct-call control state and accessibility
+
+Direct-call microphone/camera state is reset when a new call ID becomes active. Toggle state is exposed via `aria-pressed`, and call-phase changes use a polite live region. No signaling, authorization, financial authority or migration behavior changed. This is a client-side UX/accessibility improvement only; live call transport and production acceptance remain operator gates.

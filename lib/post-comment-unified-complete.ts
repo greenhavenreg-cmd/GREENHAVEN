@@ -20,6 +20,7 @@
 
 import type { Post, PostComment } from './ghc-types'
 
+import { secureHex } from "./secure-id.ts"
 // ============================================================
 // TYPE DEFINITIONS (Non-duplicative)
 // ============================================================
@@ -113,7 +114,7 @@ export function createThreadedComment(
   threadDepth: number = 0
 ): EnhancedPostComment {
   return {
-    id: `comment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `comment_${Date.now()}_${secureHex(5)}`,
     authorName,
     authorId,
     authorPhoto,
@@ -477,7 +478,7 @@ export function createQuoteRepost(
   authorPhoto: string
 ): Post {
   return {
-    id: `post_quote_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `post_quote_${Date.now()}_${secureHex(5)}`,
     authorId,
     authorName,
     authorPhoto,

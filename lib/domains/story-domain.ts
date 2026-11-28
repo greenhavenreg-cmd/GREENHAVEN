@@ -7,6 +7,7 @@
  * and visibility rules. Reply opens Messaging (no separate story-chat system).
  */
 
+import { securePrefixedId } from "../secure-id.ts"
 import { runMutation, type MutationResult } from "./mutation-pipeline"
 import {
   canViewStory,
@@ -20,7 +21,7 @@ import { sanitizeStory } from "../ghc-data"
 export const STORY_TTL_MS = 24 * 60 * 60 * 1000
 
 function genId() {
-  return `story_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+  return securePrefixedId("story")
 }
 
 export function createStoryDomain(deps: {

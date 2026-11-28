@@ -16,6 +16,7 @@
 
 import type { Conversation, Message } from "./ghc-types"
 
+import { secureHex } from "./secure-id.ts"
 // Compatibility exports keep conversation list helpers on the canonical messaging path.
 // The implementations remain centralized in conversation-engine while consumers migrate.
 export {
@@ -121,7 +122,7 @@ export function prepareMessageForSending(
   if (!isValidMessage(text)) return null
 
   return {
-    id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    id: `msg_${Date.now()}_${secureHex(5)}`,
     senderId: userId,
     text: text.trim(),
     createdAt: Date.now(),
@@ -241,7 +242,7 @@ export function handleMessageReply(
   if (!isValidMessage(replyText)) return null
 
   return {
-    id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    id: `msg_${Date.now()}_${secureHex(5)}`,
     senderId: userId,
     text: replyText.trim(),
     createdAt: Date.now(),
@@ -264,7 +265,7 @@ export function handleMessageForwarding(
   if (!message.text) return null
 
   return {
-    id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    id: `msg_${Date.now()}_${secureHex(5)}`,
     senderId: userId,
     text: message.text,
     createdAt: Date.now(),
@@ -461,7 +462,7 @@ export function createVoiceNoteMessage(
       onProgress?.(100)
 
       resolve({
-        id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+        id: `msg_${Date.now()}_${secureHex(5)}`,
         senderId: userId,
         text: "🎤 Voice message",
         createdAt: Date.now(),

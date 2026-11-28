@@ -36,6 +36,7 @@ import type {
   UserPurchaseBalance,
 } from "@/lib/sdklite-types";
 
+import { secureHex } from "@/lib/secure-id"
 const COMMUNICATION_REQUEST_TYPE = '@pi:app:sdk:communication_information_request';
 
 function isInIframe(): boolean {
@@ -70,7 +71,7 @@ function requestParentCredentials(): Promise<{ accessToken: string; appId: strin
     return Promise.resolve(null);
   }
 
-  const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const requestId = `${Date.now()}-${secureHex(8)}`;
   const timeoutMs = PI_NETWORK_CONFIG.PARENT_CREDENTIAL_TIMEOUT_MS || 4000;
 
   return new Promise((resolve) => {

@@ -8,6 +8,7 @@ import { IdentityService } from "@/lib/identity/identity-service"
 import { promptDialog } from "@/lib/ui/global-interactions"
 import { FieldAgentTallyPanel } from "@/components/field/field-agent-tally-panel"
 
+import { secureHex } from "@/lib/secure-id"
 type QType = "short_text" | "long_text" | "single_choice" | "multiple_choice" | "dropdown" | "rating" | "number" | "date"
 type Question = { id: string; type: QType; label: string; required: boolean; options?: string[]; correctAnswer?: string; points?: number; showWhen?: { questionId: string; operator: "equals" | "not_equals" | "contains" | "greater_than" | "less_than" | "answered" | "not_answered"; value?: string | number } }
 type Project = { id: string; slug: string; title: string; description?: string; project_type: string; status: string; form_schema?: { questions?: Question[] }; created_at?: string; access_role?: "owner" | "editor" | "reviewer" | "field_agent"; membership_status?: "active" | "invited"; membership_id?: string | null }
@@ -25,7 +26,7 @@ const TYPES: Array<{ id: string; title: string; description: string }> = [
 const Q_TYPES: Array<{ id: QType; title: string }> = [
   { id: "short_text", title: "Short answer" }, { id: "long_text", title: "Paragraph" }, { id: "single_choice", title: "Multiple choice (one)" }, { id: "multiple_choice", title: "Checkboxes" }, { id: "dropdown", title: "Dropdown" }, { id: "rating", title: "Rating" }, { id: "number", title: "Number" }, { id: "date", title: "Date" },
 ]
-const makeId = () => `q_${Math.random().toString(36).slice(2, 11)}`
+const makeId = () => `q_${secureHex(5)}`
 function subResponseTotal(total: number | null) { return total === null ? "" : ` of ${total}` }
 function starterQuestions(type: string): Question[] {
   const rows: Array<[QType, string, boolean, string[]?]> = type === "election_observation" ? [

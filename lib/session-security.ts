@@ -24,6 +24,7 @@
  * - localStorage lock state is UX only; HttpOnly gh_session cookie is the API authority.
  */
 
+import { secureHex } from "./secure-id.ts"
 const STORAGE_PREFIX = "gh_session_sec_v1:"
 const POLICY_KEY = "gh_session_policy_v1:"
 /** Shared across tabs (localStorage) so lock is not tab-isolated */
@@ -135,15 +136,7 @@ function policyKey(userId: string): string {
 }
 
 function randomSalt(): string {
-  const bytes = new Uint8Array(16)
-  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-    crypto.getRandomValues(bytes)
-  } else {
-    for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256)
-  }
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
+  return secureHex(16)
 }
 
 async function sha256Hex(message: string): Promise<string> {

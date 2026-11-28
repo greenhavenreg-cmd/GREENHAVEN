@@ -8,6 +8,7 @@
  * Cannot be purchased with GHC.
  */
 
+import { securePrefixedId } from "../secure-id.ts"
 import { runMutation, type MutationResult } from "./mutation-pipeline"
 import { domainEvents } from "../realtime/event-bus"
 import { canMutateReputationPrivileged, isTrustProductionMode } from "@/lib/architecture/trust-authority"
@@ -78,7 +79,7 @@ export function tierFromScore(score: number): ReputationTier {
 }
 
 function genId() {
-  return `rep_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+  return securePrefixedId("rep")
 }
 
 function loadEvents(userId: string): ReputationEvent[] {

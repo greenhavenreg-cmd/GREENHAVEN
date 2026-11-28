@@ -2,6 +2,7 @@
  * GET  /api/social/stories — active non-expired stories for viewer
  * POST /api/social/stories — create (owner = session)
  */
+import { securePrefixedId } from "@/lib/secure-id"
 import { NextResponse } from "next/server"
 import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
 import { checkRateLimit } from "@/lib/server/economy/rate-limit"
@@ -15,7 +16,7 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 function genId(): string {
-  return `story_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+  return securePrefixedId("story")
 }
 
 type StoryRequestBody = {

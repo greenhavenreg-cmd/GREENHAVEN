@@ -52,6 +52,9 @@ import {
 } from "@/lib/domains/adapters/connection-connect-flow"
 import { FilterSummary } from "./filtering/filter-summary"
 import { matchesFilterQuery } from "@/lib/filtering/filter-utils"
+import { EventsDiscoveryScreen } from "@/components/ghc/events-discovery-screen"
+import { ServicesDirectoryScreen } from "@/components/ghc/services-directory-screen"
+import { navigateTo } from "@/lib/navigation/navigate"
 
 const DISCOVERY_CATEGORIES: { id: DiscoveryCategory; label: ExperienceMessageKey }[] = [
   { id: "people", label: "people" }, { id: "friends", label: "friends" },
@@ -524,6 +527,19 @@ export function DiscoveryGridScreen() {
     window.addEventListener("ghc:prefetch-tab", onPrefetch as EventListener)
     return () => window.removeEventListener("ghc:prefetch-tab", onPrefetch as EventListener)
   }, [])
+
+  if (category === "events") {
+    return <EventsDiscoveryScreen onBack={() => setCategory("people")} />
+  }
+
+  if (category === "services") {
+    return (
+      <ServicesDirectoryScreen
+        onBack={() => setCategory("people")}
+        onOpenMarketplace={(listingId) => navigateTo("marketplace", { listingId })}
+      />
+    )
+  }
 
   return (
     <div className="gh-discovery-shell gh-world-discovery flex h-full min-h-0 flex-col bg-background text-foreground contain-content" role="region" aria-label={t("discoveryIntroTitle")}>

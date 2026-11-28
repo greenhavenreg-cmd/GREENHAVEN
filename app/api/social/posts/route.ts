@@ -5,6 +5,7 @@
  * Media: accepts https URLs or compressed data:image/* URLs under size caps.
  * Rejects blob: and client ownership fields. Idempotent when client sends stable id.
  */
+import { securePrefixedId } from "@/lib/secure-id"
 import { NextResponse } from "next/server"
 import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
 import { checkRateLimit } from "@/lib/server/economy/rate-limit"
@@ -24,7 +25,7 @@ const MAX_DATA_URL_CHARS = 900_000
 const MAX_HTTPS_URL = 2000
 
 function genId(): string {
-  return `post_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+  return securePrefixedId("post")
 }
 
 const MEDIA_FACADE_PATH = /^\/api\/media\/(media_[a-z0-9]+_[a-z0-9]+)\/content\/?$/i

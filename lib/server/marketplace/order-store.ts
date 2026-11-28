@@ -4,6 +4,7 @@
  * Production refuses to treat process memory as source of truth.
  */
 
+import { securePrefixedId } from "../../secure-id.ts"
 import { readGhcServerEnv } from "@/lib/server/economy/env"
 import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
@@ -205,7 +206,7 @@ function rowToOrder(data: Record<string, unknown>): ServerMarketOrder {
 }
 
 export function genOrderId(): string {
-  return `mord_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
+  return securePrefixedId("mord")
 }
 
 /** Sync cache read — prefer loadOrder when durability matters */

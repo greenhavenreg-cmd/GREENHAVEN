@@ -16,6 +16,7 @@ import {
 } from "./call-types"
 import { canInitiateDirectCall, requiredMediaConstraints, type CallRelationship } from "./call-policy"
 
+import { secureHex } from "../secure-id.ts"
 export const DIRECT_CALL_EVENT = "ghc:direct-call"
 export const DIRECT_CALL_ACTION_EVENT = "ghc:direct-call-action"
 
@@ -24,10 +25,8 @@ type Signal = { id: number | string; senderId: string; kind: "offer" | "answer" 
 type ApiResult<T = Record<string, unknown>> = { ok: boolean; error?: string; message?: string } & Partial<T>
 
 function newCallId(): string {
-  const bytes = new Uint8Array(16)
-  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") crypto.getRandomValues(bytes)
-  else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256)
-  return `call_${Array.from(bytes, (v) => v.toString(16).padStart(2, "0")).join("")}`
+  // Fail closed (throws SECURE_RANDOM_UNAVAILABLE) rather than minting guessable call IDs.
+  return `call_${secureHex(16)}`
 }
 
 async function api<T extends Record<string, unknown> = Record<string, unknown>>(url: string, init?: RequestInit): Promise<ApiResult<T>> {

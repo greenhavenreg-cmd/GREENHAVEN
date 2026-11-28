@@ -6,6 +6,7 @@
  * UX: All / Unread / Communities filters, clear empty states.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, startTransition, memo } from "react"
+import { secureUUID } from "@/lib/secure-id"
 import { startDirectCallFromThread } from "@/lib/messaging/call-bridge"
 import { recordVoiceNote, isVoiceNoteSupported } from "@/lib/messaging/voice-note-recorder"
 import { useGHCMessaging, useGHC } from "@/contexts/ghc-context"
@@ -540,7 +541,7 @@ export function MessageScreen() {
     setContactShareBusy(true)
     const requestId = contactShareRequest?.conversationId === selected.id
       ? contactShareRequest.id
-      : (globalThis.crypto?.randomUUID?.() || `profile-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`)
+      : secureUUID()
     setContactShareRequest({ conversationId: selected.id, id: requestId })
     try {
       const response = await fetch(`/api/messaging/conversations/${encodeURIComponent(selected.id)}/contacts`, {
@@ -996,7 +997,7 @@ export function MessageScreen() {
                 <button type="button" onClick={() => { setConversationDetailsOpen(false); setSharedMediaOpen(true) }} className="rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-foreground hover:bg-muted"><Images size={16} className="mr-2 inline" />Shared media</button>
                 {!isCommunity ? <button type="button" onClick={() => { setConversationDetailsOpen(false); window.dispatchEvent(new CustomEvent("ghc:open-profile", { detail: { userId: selected.participantId, name: selected.participantName } })) }} className="rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-foreground hover:bg-muted">View profile</button> : null}
                 {!isCommunity ? <button type="button" disabled={contactShareBusy} onClick={() => void shareOwnContactInSelected()} className="rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50">{contactShareBusy ? "Sharing…" : "Share my profile"}</button> : null}
-                {!isCommunity && selected.conversationType !== "group" ? <button type="button" onClick={() => { setGroupTitle(`${selected.participantName || "Friends"} group`.slice(0, 80)); setGroupRequestId(globalThis.crypto?.randomUUID?.() || `group-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`); setGroupInviteIds([]); setGroupCreateOpen(true) }} className="rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-foreground hover:bg-muted">Create group from chat</button> : null}
+                {!isCommunity && selected.conversationType !== "group" ? <button type="button" onClick={() => { setGroupTitle(`${selected.participantName || "Friends"} group`.slice(0, 80)); setGroupRequestId(secureUUID()); setGroupInviteIds([]); setGroupCreateOpen(true) }} className="rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-foreground hover:bg-muted">Create group from chat</button> : null}
               </div>
               {groupCreateOpen ? (
                 <section className="rounded-2xl border border-emerald-300/60 bg-card p-3" aria-label="Create group from direct message">

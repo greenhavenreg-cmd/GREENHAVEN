@@ -18,6 +18,7 @@
 
 
 
+import { securePrefixedId } from "../secure-id.ts"
 import { runMutation, type MutationResult } from "./mutation-pipeline"
 import { MESSAGING_FREE_GUARANTEE } from "./messaging-premium"
 import { softDeleteMessage } from "../social-graph"
@@ -262,7 +263,7 @@ export function createMessagingDomain(deps: {
           // Offline: local "sending" only — offline-message-flush will retry.
           // Online: server-first — no permanent "sent" without durable API ok.
           const online = shouldAttemptDurableMessaging(i.offline)
-          const clientId = `msg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
+          const clientId = securePrefixedId("msg")
 
           if (online) {
             const res = await apiSendMessageWithRetry(
@@ -604,7 +605,7 @@ export function createMessagingDomain(deps: {
         },
         mutate: async (i) => {
           const now = Date.now()
-          let id = `conv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
+          let id = securePrefixedId("conv")
 
           // Private DMs: server-first durable conversation id (no local-only id when online).
           if (i.kind === "private" && i.participantId) {

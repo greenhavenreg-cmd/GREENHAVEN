@@ -12,6 +12,7 @@
  * Quality scoring is explainable and never claims guaranteed compatibility.
  */
 
+import { securePrefixedId } from "../secure-id.ts"
 import { runMutation, type MutationResult } from "./mutation-pipeline"
 import type {
   Candidate,
@@ -286,7 +287,7 @@ export function createMatchingDomain(deps: {
           }
           const myIntentions = i.intentions?.length ? i.intentions : openIntentions()
           const match: MatchEntry = {
-            id: `match_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+            id: securePrefixedId("match"),
             userId: i.userId,
             userName: i.userName,
             userPhoto: i.userPhoto || "/placeholder.svg?height=80&width=80",

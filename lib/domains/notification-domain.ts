@@ -15,6 +15,7 @@ import {
   type NotificationType,
 } from "../notifications.ts"
 
+import { secureUUID } from "../secure-id.ts"
 /** User-facing preference categories */
 export type NotificationCategory =
   | "messages"
@@ -68,9 +69,7 @@ function deviceId(): string {
   try {
     let id = localStorage.getItem(key)
     if (!id) {
-      id = typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `device_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`
+      id = secureUUID()
       localStorage.setItem(key, id)
     }
     return id

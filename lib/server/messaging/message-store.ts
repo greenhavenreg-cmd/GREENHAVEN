@@ -214,19 +214,22 @@ export async function listConversationsForUser(
   if (dbConfigured()) {
     const memQ = `gh_conversation_members?gh_user_id=eq.${encodeURIComponent(uid)}&left_at=is.null&select=conversation_id&limit=${limit}`
     const memRes = await rest<Array<{ conversation_id: string }>>(memQ)
-    if (!memRes.ok || !Array.isArray(memRes.data)) return []
+    if (!memRes.ok || !Array.isArray(memRes.data)) throw new Error("CONVERSATION_MEMBERS_UNAVAILABLE")
     {
       const ids = memRes.data.map((r) => r.conversation_id).filter(Boolean)
       if (ids.length === 0) return []
       const inList = ids.map(encodeURIComponent).join(",")
       const convQ = `gh_conversations?id=in.(${inList})&select=*&order=updated_at.desc`
       const convRes = await rest<Array<Record<string, unknown>>>(convQ)
-      if (!convRes.ok || !Array.isArray(convRes.data)) return []
+      if (!convRes.ok || !Array.isArray(convRes.data)) throw new Error("CONVERSATIONS_UNAVAILABLE")
       {
         const out: DurableConversation[] = []
         const memberRows = await rest<Array<{ conversation_id: string; gh_user_id: string; is_pinned?: boolean; is_archived?: boolean; muted_until?: string | null }>>(
           `gh_conversation_members?conversation_id=in.(${inList})&gh_user_id=eq.${encodeURIComponent(uid)}&left_at=is.null&select=conversation_id,gh_user_id,is_pinned,is_archived,muted_until`
         )
+        if (!memberRows.ok || !Array.isArray(memberRows.data)) {
+          throw new Error("CONVERSATION_PREFERENCES_UNAVAILABLE")
+        }
         const membersByConversation = new Map<string, string[]>()
         if (memberRows.ok && Array.isArray(memberRows.data)) {
           for (const member of memberRows.data) {
@@ -244,6 +247,9 @@ export async function listConversationsForUser(
           })
         }
         const allMemberRows = await rest<Array<{ conversation_id: string; gh_user_id: string }>>(`gh_conversation_members?conversation_id=in.(${inList})&left_at=is.null&select=conversation_id,gh_user_id`)
+        if (!allMemberRows.ok || !Array.isArray(allMemberRows.data)) {
+          throw new Error("CONVERSATION_MEMBERSHIP_UNAVAILABLE")
+        }
         if (allMemberRows.ok && Array.isArray(allMemberRows.data)) {
           membersByConversation.clear()
           for (const member of allMemberRows.data) {
@@ -259,6 +265,9 @@ export async function listConversationsForUser(
               body: JSON.stringify({ p_user_id: uid, p_conversation_ids: conversationIds }),
             })
           : { ok: true, status: 200, data: [] as Array<{ conversation_id: string; unread_count: number | string }> }
+        if (!unreadResult.ok || !Array.isArray(unreadResult.data)) {
+          throw new Error("CONVERSATION_UNREAD_COUNTS_UNAVAILABLE")
+        }
         const unreadCounts = new Map<string, number>()
         if (unreadResult.ok && Array.isArray(unreadResult.data)) {
           for (const item of unreadResult.data) unreadCounts.set(item.conversation_id, Math.max(0, Number(item.unread_count) || 0))
@@ -301,7 +310,7 @@ export async function listConversationsForUser(
     }
   }
 
-  if (isProd()) return []
+  if (isProd()) throw new Error("MESSAGING_STORE_UNAVAILABLE")
   const result: DurableConversation[] = []
   for (const [cid, set] of memMembers) {
     if (set.has(uid)) {
@@ -1303,12 +1312,14 @@ export async function touchMessagingPresence(input: { userId: string; conversati
     record.typing_conversation_id = null
     record.typing_until = null
   }
+  let durable = false
   if (dbConfigured()) {
     const saved = await rest("gh_user_presence", {
       method: "POST",
       prefer: "resolution=merge-duplicates,return=minimal",
       body: JSON.stringify(record),
     })
+    durable = saved.ok
     if (!saved.ok && isProd()) return { ok: false, error: "PRESENCE_UNAVAILABLE" }
   } else if (isProd()) {
     return { ok: false, error: "STORE_UNAVAILABLE" }
@@ -1321,7 +1332,7 @@ export async function touchMessagingPresence(input: { userId: string; conversati
     typingUntil: effectiveAction === "typing" ? now + 8_000 : effectiveAction === "stop_typing" ? undefined : previous?.typingUntil,
   })
   const presence = await getConversationPresence({ conversationId: cid, userId: uid })
-  return { ok: true, presence, durable: dbConfigured() }
+  return { ok: true, presence, durable }
 }
 
 /** Only active members of the same conversation can inspect each other's presence. */

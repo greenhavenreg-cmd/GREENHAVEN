@@ -2,6 +2,7 @@
  * GET  /api/communities — list public communities
  * POST /api/communities — create (owner = session user)
  */
+import { securePrefixedId } from "@/lib/secure-id"
 import { NextResponse } from "next/server"
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
 import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
@@ -16,7 +17,7 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 function genId() {
-  return `com_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+  return securePrefixedId("com")
 }
 
 export async function GET(request: Request) {

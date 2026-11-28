@@ -214,6 +214,16 @@ export function CommentReactions({
   onRemoveReaction,
 }: CommentReactionsProps) {
   const commonEmojis = ["👍", "❤️", "😂", "😮", "😢", "😡"]
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  useEffect(() => {
+    if (!pickerOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPickerOpen(false)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [pickerOpen])
 
   return (
     <div className="flex items-center gap-1 flex-wrap">
@@ -221,22 +231,42 @@ export function CommentReactions({
         <button type="button"
           key={emoji}
           onClick={() => onRemoveReaction?.(emoji)}
+          aria-label={`Remove your ${emoji} reaction (${users.length})`}
           className="px-2 py-1 bg-muted hover:bg-muted/80 rounded-full text-xs font-semibold flex items-center gap-1 transition-colors"
         >
           {emoji} {users.length}
         </button>
       ))}
       {onAddReaction && (
-        <button type="button"
-          onClick={() => {
-            const emoji = commonEmojis[Math.floor(Math.random() * commonEmojis.length)]
-            onAddReaction(emoji)
-          }}
-          className="gh-hit-44 w-6 h-6 flex items-center justify-center bg-muted hover:bg-muted/80 rounded-full text-xs transition-colors"
-          title="Add reaction"
-        >
-          <Smile size={14} />
-        </button>
+        <div className="relative inline-flex items-center gap-1">
+          <button type="button"
+            onClick={() => setPickerOpen((open) => !open)}
+            aria-label="Choose a reaction"
+            aria-expanded={pickerOpen}
+            aria-haspopup="true"
+            className="gh-hit-44 w-6 h-6 flex items-center justify-center bg-muted hover:bg-muted/80 rounded-full text-xs transition-colors"
+            title="Add reaction"
+          >
+            <Smile size={14} />
+          </button>
+          {pickerOpen && (
+            <div role="group" aria-label="Reactions" className="flex items-center gap-0.5 rounded-full border border-border bg-card px-1 py-0.5 shadow-sm">
+              {commonEmojis.map((emoji) => (
+                <button type="button"
+                  key={emoji}
+                  onClick={() => {
+                    setPickerOpen(false)
+                    onAddReaction(emoji)
+                  }}
+                  aria-label={`React with ${emoji}`}
+                  className="gh-hit-44 flex h-7 w-7 items-center justify-center rounded-full text-base transition-colors hover:bg-muted"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
@@ -360,10 +390,10 @@ export function EnhancedComment({
           )}
 
           {/* Reactions */}
-          {comment.reactions && Object.keys(comment.reactions).length > 0 && (
+          {(onAddReaction || (comment.reactions && Object.keys(comment.reactions).length > 0)) && (
             <div className="mt-2">
               <CommentReactions
-                reactions={comment.reactions}
+                reactions={comment.reactions || {}}
                 onAddReaction={(emoji) => onAddReaction?.(comment.id, emoji)}
                 onRemoveReaction={(emoji) => onRemoveReaction?.(comment.id, emoji)}
               />

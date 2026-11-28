@@ -1,3 +1,4 @@
+import { secureHex } from "./secure-id.ts"
 // Activity logging and basic analytics
 
 export type EventType =
@@ -63,7 +64,7 @@ class Analytics {
       const stored = localStorage.getItem(SESSION_ID_KEY)
       if (stored) return stored
 
-      const newId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const newId = `session_${Date.now()}_${secureHex(6)}`
       localStorage.setItem(SESSION_ID_KEY, newId)
       return newId
     } catch {

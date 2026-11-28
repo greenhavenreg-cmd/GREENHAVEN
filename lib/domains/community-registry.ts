@@ -1,4 +1,6 @@
+import { securePrefixedId } from "../secure-id.ts"
 import { isDemoDataAllowed } from "@/lib/demo-data-policy"
+import { secureHex } from "../secure-id.ts"
 /**
  * First-class Community registry — not only Conversation.
  * Chat remains a linked channel (conversationId); Board / events / members live here.
@@ -106,7 +108,7 @@ const DEFAULT_SETTINGS: CommunitySettings = {
 }
 
 function id(prefix: string) {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
+  return securePrefixedId(prefix)
 }
 
 export function seedCommunities(): GHCCommunity[] {
@@ -396,7 +398,7 @@ export function createCommunityRecord(input: {
     events: [],
     announcements: [],
     joinRequests: [],
-    inviteCode: Math.random().toString(36).slice(2, 8).toUpperCase(),
+    inviteCode: secureHex(4).toUpperCase(),
     settings: { ...DEFAULT_SETTINGS },
     mutedBy: [],
     isSample: false,

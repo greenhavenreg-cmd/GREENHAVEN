@@ -25,6 +25,11 @@ export function DirectCallSheet() {
   const [muted, setMuted] = useState(false)
   const [cameraOff, setCameraOff] = useState(false)
   const [mediaTick, setMediaTick] = useState(0)
+  // A new call must never inherit the previous call's local control state.
+  useEffect(() => {
+    setMuted(false)
+    setCameraOff(false)
+  }, [session?.callId])
   const remoteVideo = useRef<HTMLVideoElement>(null)
   const remoteAudio = useRef<HTMLAudioElement>(null)
   const localVideo = useRef<HTMLVideoElement>(null)
@@ -78,7 +83,7 @@ export function DirectCallSheet() {
           </div>
           <div className="text-center">
             <p className="text-xl font-bold">{session.peer.displayName || "GreenHaven member"}</p>
-            <p className="mt-1 text-sm text-white/70" role="status">{phaseLabel(session)}</p>
+            <p className="mt-1 text-sm text-white/70" role="status" aria-live="polite" aria-atomic="true">{phaseLabel(session)}</p>
             {session.errorMessage && <p className="mt-3 max-w-sm text-center text-xs leading-relaxed text-amber-200/90">{session.errorMessage}</p>}
             {session.phase === "in_call" && !session.signalingReady && <p className="mt-2 text-[11px] text-white/50">Reconnecting…</p>}
           </div>
@@ -92,8 +97,8 @@ export function DirectCallSheet() {
           <button type="button" className="inline-flex h-14 min-w-28 items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 text-sm font-semibold" onClick={() => void ctrl.acceptIncoming(session.callId)}><Phone size={19} /> Accept</button>
         </>}
         {!incoming && !terminal && <>
-          <button type="button" className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/15" aria-label={muted ? "Unmute microphone" : "Mute microphone"} onClick={() => { ctrl.toggleAudio(muted); setMuted((v) => !v) }}>{muted ? <MicOff size={22} /> : <Mic size={22} />}</button>
-          {session.kind === "video" && <button type="button" className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/15" aria-label={cameraOff ? "Turn camera on" : "Turn camera off"} onClick={() => { ctrl.toggleVideo(cameraOff); setCameraOff((v) => !v) }}>{cameraOff ? <VideoOff size={22} /> : <Video size={22} />}</button>}
+          <button type="button" className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/15" aria-label={muted ? "Unmute microphone" : "Mute microphone"} aria-pressed={muted} onClick={() => { ctrl.toggleAudio(muted); setMuted((v) => !v) }}>{muted ? <MicOff size={22} /> : <Mic size={22} />}</button>
+          {session.kind === "video" && <button type="button" className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/15" aria-label={cameraOff ? "Turn camera on" : "Turn camera off"} aria-pressed={cameraOff} onClick={() => { ctrl.toggleVideo(cameraOff); setCameraOff((v) => !v) }}>{cameraOff ? <VideoOff size={22} /> : <Video size={22} />}</button>}
           <button type="button" className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-red-600 shadow-lg shadow-red-900/40" aria-label="End call" onClick={() => void ctrl.hangup()}><PhoneOff size={26} /></button>
         </>}
         {terminal && <button type="button" className="inline-flex h-12 min-w-[140px] items-center justify-center gap-2 rounded-full bg-white px-6 text-sm font-bold text-zinc-900" onClick={() => ctrl.resetIdle()}><RefreshCw size={16} /> Done</button>}

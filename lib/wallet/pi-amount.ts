@@ -3,6 +3,8 @@
  * authority; these never mutate balances. 1 PI = 10_000_000 atomic units.
  * Integer/string math only — no float rounding on user input.
  */
+import { sanitizeAmountInput } from "./amount-input.ts"
+
 export const PI_ATOMIC_SCALE = 10_000_000
 export const PI_DECIMALS = 7
 
@@ -12,8 +14,13 @@ export type PiInputResult =
 
 /** Parse a typed PI amount exactly (no exponent, no sign, max 7 decimals). */
 export function parsePiInput(raw: string): PiInputResult {
-  const s = String(raw ?? "").trim().replace(/,/g, "")
-  if (!s) return { ok: false, code: "EMPTY" }
+  const typed = String(raw ?? "").trim()
+  if (!typed) return { ok: false, code: "EMPTY" }
+  // Anything other than digits, "." and "," is invalid (e.g. "1e3"); never sanitise it into a number.
+  if (!/^[\d.,]*$/.test(typed)) return { ok: false, code: "INVALID" }
+  // Share the GHC rule: a lone "," is a decimal separator ("1,5" is 1.5, never 15). Stripping commas
+  // turned comma-keypad input into a 10x-100x larger withdrawal amount at the final money-parse gate.
+  const s = sanitizeAmountInput(typed, 32)
   if (!/^\d*\.?\d*$/.test(s) || s === ".") return { ok: false, code: "INVALID" }
   const [whole = "", frac = ""] = s.split(".")
   if (frac.length > PI_DECIMALS) return { ok: false, code: "TOO_MANY_DECIMALS" }

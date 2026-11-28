@@ -5,6 +5,7 @@
 
 import type { Profile, Settings, Post, Conversation } from "./ghc-types"
 
+import { secureHex } from "./secure-id.ts"
 export interface BackupSnapshot {
   id: string
   timestamp: number
@@ -274,7 +275,7 @@ export class BackupRecoveryManager {
    * Generate unique backup ID
    */
   private generateBackupId(): string {
-    return `backup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    return `backup_${Date.now()}_${secureHex(5)}`
   }
 
   /**

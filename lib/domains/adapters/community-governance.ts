@@ -4,6 +4,7 @@
  * Moderation log / reports: session-memory with durable proposal (NOT APPLIED).
  */
 
+import { securePrefixedId } from "../../secure-id.ts"
 import type {
   CommunityCapability,
   CommunityGovernanceModel,
@@ -105,7 +106,7 @@ export function buildGovernanceModel(input: {
 // --- Governance store (session default; optional server mirror) ---
 
 function uid(prefix: string) {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+  return securePrefixedId(prefix)
 }
 
 export { getGovernanceDurability, governanceDurabilityLabel }

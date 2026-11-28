@@ -9,6 +9,7 @@
  * - No speculative Pi SDK or blockchain implementation.
  */
 
+import { securePrefixedId } from "../secure-id.ts"
 import { runMutation, type MutationResult } from "./mutation-pipeline"
 import { domainEvents } from "../realtime/event-bus"
 import type {
@@ -24,7 +25,7 @@ import type { DomainServices } from "./create-domains"
 const STORAGE_KEY = "ghc_payment_intents_v1"
 
 function genId() {
-  return `pay_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+  return securePrefixedId("pay")
 }
 
 function loadIntents(userId: string): PaymentIntent[] {

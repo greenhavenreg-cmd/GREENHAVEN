@@ -18,6 +18,7 @@
  *   purchase credit → server payment completion only (hydrate)
  */
 
+import { securePrefixedId } from "../secure-id.ts"
 import { runMutation, type MutationResult } from "./mutation-pipeline"
 import { domainEvents } from "../realtime/event-bus"
 import type {
@@ -248,7 +249,7 @@ export function createLocalEconomyRepository(): EconomyRepository {
 }
 
 function genId(prefix: string) {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+  return securePrefixedId(prefix)
 }
 
 export function createEconomyDomain(deps: {

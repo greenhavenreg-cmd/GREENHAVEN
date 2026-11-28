@@ -1,17 +1,38 @@
 # GreenHaven — Current Project Candidate
 
-**Package:** `gh-connect@0.338.173`  
-**Current source version:** `0.338.173`  
-**Candidate:** RUN461 — Reward Claim Response Integrity  
-**Candidate archive:** `GREENHAVEN-0.338.173-RUN461-REWARD-CLAIM-RESPONSE-INTEGRITY-2026-11-27.zip`  
+## RUN506 — Direct-call control state and accessibility
+
+Direct-call controls now reset microphone and camera toggle state when a new call session begins, preventing a previous call's local UI state from leaking into the next call. Microphone/camera toggles expose their pressed state to assistive technology, and call-phase updates are announced through a polite live region. This is a client-side control/accessibility repair; it does not alter call signaling, authorization, media transport or financial flows. See `docs/RUN506-DIRECT-CALL-CONTROL-STATE-2026-11-28.md`.
+
+
+## RUN505 — Conversation inbox outage integrity
+
+The authenticated messaging inbox now treats failures in membership, conversation, member-preference, and unread-count reads as request failures instead of silently returning an empty or partially populated inbox. Production without a configured durable messaging store fails closed. A genuinely empty inbox remains valid. See `docs/RUN505-CONVERSATION-INBOX-OUTAGE-INTEGRITY-2026-11-28.md`. No financial authority, Pi, GHC, curation settlement, or SQL migration behavior changed.
+
+
+**Package:** `gh-connect@0.338.177`
+**Current source version:** `0.338.177`
+**Candidate:** RUN506 — Direct-call control state and accessibility
+**Candidate archive:** `GREENHAVEN-0.338.176-RUN504-NOTIFICATION-PRESENCE-RELIABILITY-2026-11-28.zip`
 **Status:** Source candidate only.
 Production status: **NOT APPROVED**.
+
+## RUN504 — Notification and messaging reliability
+
+Unified and social notification count/list endpoints now return HTTP 503 when their durable stores are unavailable instead of presenting an empty list or zero unread count as a successful response. Social notification responses are private and non-cacheable. The app shell preserves last-known navigation attention counts through transient server errors. Messaging presence reports durability only when the database write succeeds; development-only in-memory fallback is explicitly non-durable, and production remains fail-closed.
+
+RUN503 Discover Events and Services integration remains included. Events and Services use authenticated durable directories, service selection opens the exact Marketplace listing, and RSVP changes only after durable server confirmation.
+
+No database migration, Pi payment, GHC ledger, withdrawal, membership, referral, reward formula or curation settlement change was made in RUN504.
+
+See `docs/RUN504-NOTIFICATION-OUTAGE-PRESENCE-DURABILITY-2026-11-28.md`, `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-28.md` and `docs/UPGRADE-WORKLOG-0.338.176.md`.
 
 ## RUN461 — Reward Claim Response Integrity
 
 RUN461 tightens the authoritative GHC reward claim and GHC membership purchase boundaries, including strict nested spend and active-entitlement response validation. A claim RPC response is accepted only when it explicitly reports success and includes a valid idempotency flag, bounded transaction ID and positive finite amount. Incomplete or malformed success responses are treated as unavailable/ambiguous and can be safely retried through the existing database idempotency path. Matured Daily Claim candidates are validated for owner, ID, amount, timestamp and metadata before claim RPC invocation. No reward formula, eligibility, 48-hour maturity, settlement, ledger authority or SQL migration changed.
 
 See `docs/RUN461-REWARD-CLAIM-RESPONSE-INTEGRITY-2026-11-27.md`, `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-27.md` and `docs/UPGRADE-WORKLOG-0.338.173.md`.
+
 
 ## RUN462 / RUN463 — production-grade UX and money-action hardening
 
@@ -68,3 +89,8 @@ The GHC membership purchase now reuses one spend reference per tier and period u
 ## Verification and release boundary
 
 The full network/DB-independent static suite passed 63/63 suites. RUN461 focused contract: 21/21. RUN460 referral hardening: 8/8. RUN450 economy journey: 17/17. Phase 11 wallet cross-feature reconciliation: 32/32. Prebuild checks stop because the `typescript` dependency is absent. The complete dependency-backed static suite, Node 24.15+ typecheck/lint/build, browser/device and live Testnet acceptance remain outstanding because the available runtime is Node 22.16.0 and dependencies are absent. No migrations, database writes, provider transactions, Git pushes or deployments were performed. Production remains NOT APPROVED.
+
+
+## RUN507 — Root bundle metadata reconciliation
+
+Corrected the stale root `LATEST-PROJECT-BUNDLE-README.md` pointer so it identifies the actual 0.338.177 / RUN506 source candidate and accurately states the remaining release gates. Documentation-only; no runtime or financial behavior changed. See `docs/RUN507-ROOT-METADATA-RECONCILIATION-2026-11-28.md`.

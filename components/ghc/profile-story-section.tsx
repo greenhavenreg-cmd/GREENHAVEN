@@ -1,6 +1,7 @@
 "use client"
 
 import { DurableImage } from "./durable-image"
+import { secureUUID } from "@/lib/secure-id"
 import { DurableVideo } from "./durable-video"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Download,
@@ -381,9 +382,7 @@ export default function ProfileStorySection({ scope = "profile", creatorHost = f
       if (pendingStoryRequestRef.current && pendingStoryRequestRef.current.signature !== requestSignature) {
         pendingStoryRequestRef.current = null
       }
-      const randomPart = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID().replace(/-/g, "")
-        : `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
+      const randomPart = secureUUID().replace(/-/g, "")
       const requestId = pendingStoryRequestRef.current?.id || `story_${now.toString(36)}_${randomPart}`
       pendingStoryRequestRef.current = { id: requestId, signature: requestSignature }
       const next: StoryItem = {

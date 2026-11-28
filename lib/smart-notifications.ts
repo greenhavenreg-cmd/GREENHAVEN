@@ -11,6 +11,7 @@ import { notificationSystem } from "./notifications"
 import { loadNotificationPreferences, type NotificationCategory } from "./domains/notification-domain"
 import { IdentityService } from "@/lib/identity/identity-service"
 
+import { secureHex } from "./secure-id.ts"
 export type NotificationType = "match" | "message" | "like" | "friend-request" | "system"
 export type NotificationPriority = "high" | "medium" | "low"
 
@@ -72,7 +73,7 @@ export const smartNotifications = {
   ): Notification => {
     const ownerUserId = ensureSmartNotificationOwner()
     const notification: Notification = {
-      id: `notif-${Date.now()}-${Math.random()}`,
+      id: `notif-${Date.now()}-${secureHex(5)}`,
       type,
       title,
       message,

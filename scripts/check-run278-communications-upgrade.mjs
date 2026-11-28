@@ -23,7 +23,7 @@ const checks = []
 const check = (label, ok) => { checks.push(Boolean(ok)); console.log(`${ok ? 'PASS' : 'FAIL'} ${label}`) }
 
 // Direct call transport and server authority (1–12).
-check('01 call IDs satisfy the database call_[32 hex] contract', /call_\$\{Array\.from\(bytes/.test(ctrl) && /call_\[a-f0-9\]\{32\}/.test(callStart))
+check('01 call IDs satisfy the database call_[32 hex] contract', /call_\$\{secureHex\(16\)\}/.test(ctrl) && /call_\[a-f0-9\]\{32\}/.test(callStart))
 check('02 outgoing calls request authenticated server-issued ICE configuration', /\/api\/messaging\/calls\/config/.test(ctrl) && /resolveAuthenticatedUser/.test(callConfig))
 check('03 TURN credentials are short-lived HMAC credentials, not client secrets', /createHmac\("sha1"/.test(callConfig) && /GH_CALL_TURN_SHARED_SECRET/.test(callConfig))
 check('04 calls remain fail-closed until TURN and operator flag are configured', /GH_CALLS_ENABLED === "true"/.test(callConfig) && /turnUrls\.length > 0/.test(callConfig))

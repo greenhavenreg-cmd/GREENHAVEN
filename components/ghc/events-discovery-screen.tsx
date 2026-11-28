@@ -37,6 +37,7 @@ export function EventsDiscoveryScreen({ onBack }: { onBack?: () => void }) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rsvpBusy, setRsvpBusy] = useState<string | null>(null)
+  const [rsvpError, setRsvpError] = useState<string | null>(null)
   const requestRef = useRef<AbortController | null>(null)
   const pageSize = 30
 
@@ -96,20 +97,21 @@ export function EventsDiscoveryScreen({ onBack }: { onBack?: () => void }) {
     finally { if (!controller.signal.aborted) setLoadingMore(false) }
   }, [hasMore, loadPage, loading, loadingMore, nextOffset])
 
-  const submitRsvp = useCallback(async (event: CommunityEventCard) => {
-    if (rsvpBusy || event.viewerRsvpStatus === "going") return
+  const submitRsvp = useCallback(async (event: CommunityEventCard, status: "going" | "maybe" | "declined") => {
+    if (rsvpBusy || event.viewerRsvpStatus === status) return
     setRsvpBusy(event.id)
+    setRsvpError(null)
     try {
       const response = await fetch(`/api/communities/${encodeURIComponent(event.communityId)}/platform`, {
         method: "POST", credentials: "include", cache: "no-store",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "event_rsvp", eventId: event.id, status: "going" }),
+        body: JSON.stringify({ action: "event_rsvp", eventId: event.id, status }),
       })
       const payload = await response.json().catch(() => null) as { ok?: boolean; durable?: boolean; error?: string } | null
       if (!response.ok || payload?.ok !== true || payload.durable !== true) throw new Error(payload?.error || "Your RSVP could not be saved")
-      setEvents((current) => current.map((item) => item.id === event.id ? { ...item, viewerRsvpStatus: "going" } : item))
+      setEvents((current) => current.map((item) => item.id === event.id ? { ...item, viewerRsvpStatus: status } : item))
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Your RSVP could not be saved")
+      setRsvpError(cause instanceof Error ? cause.message : "Your RSVP could not be saved")
     } finally { setRsvpBusy(null) }
   }, [rsvpBusy])
 
@@ -139,6 +141,7 @@ export function EventsDiscoveryScreen({ onBack }: { onBack?: () => void }) {
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
         {error ? <div role="alert" className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm"><span>{error}</span><button type="button" onClick={() => { requestRef.current?.abort(); const controller = new AbortController(); requestRef.current = controller; setError(null); setLoading(true); void loadPage(0, false, controller.signal).catch((cause) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Events could not be loaded") }).finally(() => { if (!controller.signal.aborted) setLoading(false) }) }} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3"><RefreshCw className="h-4 w-4" /> Retry</button></div> : null}
+        {rsvpError ? <p role="alert" className="mb-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">{rsvpError}</p> : null}
         {loading ? <div className="grid gap-3 sm:grid-cols-2"><div className="h-40 animate-pulse rounded-2xl bg-muted" /><div className="h-40 animate-pulse rounded-2xl bg-muted" /></div> : null}
         {!loading && events.length === 0 && !error ? <div className="mx-auto flex max-w-sm flex-col items-center py-16 text-center"><CalendarDays className="mb-3 h-9 w-9 text-muted-foreground" /><h2 className="text-sm font-semibold">No upcoming events found</h2><p className="mt-1 text-xs text-muted-foreground">Try another search or category. Events appear here when communities publish them.</p></div> : null}
         {!loading && events.length > 0 ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -152,7 +155,30 @@ export function EventsDiscoveryScreen({ onBack }: { onBack?: () => void }) {
               <button type="button" onClick={() => openCommunity(event.communityId)} className="flex min-h-9 items-center gap-2 text-left font-medium text-foreground underline-offset-4 hover:underline"><Users className="h-3.5 w-3.5" /> {event.communityName}</button>
             </div>
             <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
-              {event.viewerRsvpStatus === "going" ? <span className="inline-flex min-h-10 items-center rounded-xl bg-muted px-3 text-xs font-semibold">You're going</span> : <button type="button" onClick={() => void submitRsvp(event)} disabled={Boolean(rsvpBusy)} className="min-h-10 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground disabled:opacity-60">{rsvpBusy === event.id ? "Saving…" : "RSVP"}</button>}
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label={`Your RSVP for ${event.title}`}>
+                {([
+                  ["going", "Going"],
+                  ["maybe", "Maybe"],
+                  ["declined", "Can't go"],
+                ] as const).map(([status, label]) => {
+                  const selected = event.viewerRsvpStatus === status
+                  const saving = rsvpBusy === event.id
+                  return (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => void submitRsvp(event, status)}
+                      disabled={Boolean(rsvpBusy)}
+                      aria-pressed={selected}
+                      className={`min-h-10 rounded-xl border px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-60 ${
+                        selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground hover:bg-muted/60"
+                      }`}
+                    >
+                      {saving && !selected ? "Saving…" : label}
+                    </button>
+                  )
+                })}
+              </div>
               {event.virtualLink ? <a href={event.virtualLink} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-border px-3 text-xs font-medium">Join online <ExternalLink className="h-3 w-3" /></a> : null}
             </div>
           </article>)}

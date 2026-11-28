@@ -2,6 +2,7 @@
  * GET  /api/social/posts/[id]/comments
  * POST /api/social/posts/[id]/comments — author = session user
  */
+import { securePrefixedId } from "@/lib/secure-id"
 import { NextResponse } from "next/server"
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
 import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
@@ -22,7 +23,7 @@ export const dynamic = "force-dynamic"
 const POST_ID_SHAPE = /^[a-zA-Z0-9_-]{1,128}$/
 
 function genId(): string {
-  return `cmt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+  return securePrefixedId("cmt")
 }
 
 export async function GET(

@@ -66,17 +66,8 @@ export function createMatchingService(getCandidates?: () => Candidate[]): Matchi
     },
     async swipe(viewerId, targetId, action) {
       if (!viewerId || !targetId) return fail("Invalid swipe", "invalid")
-      if (action === "like" && Math.random() > 0.7) {
-        const match: MatchEntry = {
-          id: `match-${generateId()}`,
-          userId: targetId,
-          userName: "Match",
-          userPhoto: "/placeholder-user.jpg",
-          matchedAt: Date.now(),
-          online: true,
-        }
-        return ok({ matched: true, match })
-      }
+      // Matches come only from the server-side mutual-interest flow. This local
+      // service must never fabricate a match, so it always reports "not matched".
       return ok({ matched: false })
     },
     async getMatches(_userId) {

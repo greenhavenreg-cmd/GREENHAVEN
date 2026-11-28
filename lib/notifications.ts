@@ -2,6 +2,7 @@
 
 import { IdentityService } from "./identity/identity-service.ts"
 
+import { secureHex } from "./secure-id.ts"
 export type NotificationType =
   | "match"
   | "message"
@@ -138,7 +139,7 @@ export const notificationSystem = {
   ): Notification => {
     try {
       const notification: Notification = {
-        id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: `notif_${Date.now()}_${secureHex(5)}`,
         type,
         title,
         message,

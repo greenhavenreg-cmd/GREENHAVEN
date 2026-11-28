@@ -8,6 +8,7 @@ import { getProcessGhcStore } from "./store"
 import { buildCorrelationEnvelope } from "./correlation"
 import { supabaseRpc, supabaseRest } from "@/lib/server/supabase/rest-client"
 
+import { securePrefixedId } from "../../secure-id.ts"
 export type GhcNotifEventType =
   | "GHC_SENT"
   | "GHC_RECEIVED"
@@ -109,7 +110,7 @@ export async function recordGhcNotification(input: {
   if (existing) return { ok: true, idempotent: true, id: existing.id }
 
   const row: MemoryNotif = {
-    id: `mem_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id: securePrefixedId("mem"),
     userId,
     eventType: input.eventType,
     title: input.title,

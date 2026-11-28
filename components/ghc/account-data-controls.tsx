@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { secureUUID } from "@/lib/secure-id"
 import { confirmDialog, promptDialog } from "@/lib/ui/global-interactions"
 import { authenticatePasskeyStepUp } from "@/lib/auth/webauthn-client"
 import { Download, ShieldCheck, Trash2 } from "lucide-react"
@@ -94,9 +95,7 @@ export function AccountDataControls() {
     setBusy("deletion")
     setMessage(null)
     try {
-      const idempotencyKey = typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `delete-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+      const idempotencyKey = secureUUID()
       const response = await fetch("/api/account/lifecycle", {
         method: "POST",
         credentials: "include",

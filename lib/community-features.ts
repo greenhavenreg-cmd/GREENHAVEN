@@ -1,4 +1,5 @@
 import { isDemoDataAllowed } from "@/lib/demo-data-policy"
+import { secureHex } from "./secure-id.ts"
 // Community Features for Groups - Optional extensions to Chat
 // All features are opt-in and compatible with existing groups
 
@@ -158,7 +159,7 @@ export function createAnnouncement(
   priority: AnnouncementPriority = "normal"
 ): Announcement {
   return {
-    id: `ann_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `ann_${Date.now()}_${secureHex(5)}`,
     groupId,
     authorId,
     authorName,
@@ -181,7 +182,7 @@ export function createPoll(
   durationMs: number = 86400000 // 24 hours
 ): Poll {
   return {
-    id: `poll_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `poll_${Date.now()}_${secureHex(5)}`,
     groupId,
     authorId,
     authorName,
@@ -212,7 +213,7 @@ export function createScheduledEvent(
   isVirtual: boolean = true
 ): ScheduledEvent {
   return {
-    id: `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `evt_${Date.now()}_${secureHex(5)}`,
     groupId,
     authorId,
     authorName,
@@ -239,7 +240,7 @@ export function createPinnedResource(
   content?: string
 ): PinnedResource {
   return {
-    id: `res_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `res_${Date.now()}_${secureHex(5)}`,
     groupId,
     title,
     description,
@@ -259,7 +260,7 @@ export function createWelcomeMessage(
   imageUrl?: string
 ): WelcomeMessage {
   return {
-    id: `wm_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `wm_${Date.now()}_${secureHex(5)}`,
     groupId,
     message,
     imageUrl,
@@ -274,7 +275,7 @@ export function createCommunityGuidelines(
   updatedBy: string
 ): CommunityGuidelines {
   return {
-    id: `cg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `cg_${Date.now()}_${secureHex(5)}`,
     groupId,
     title,
     sections: [],

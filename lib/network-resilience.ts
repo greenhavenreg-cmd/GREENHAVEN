@@ -1,3 +1,4 @@
+import { secureHex } from "./secure-id.ts"
 // Network resilience, retry logic, and offline support
 
 export interface RetryConfig {
@@ -110,7 +111,7 @@ export class OfflineQueue {
    * Add an action to the queue
    */
   addAction(action: Omit<QueuedAction, 'id' | 'timestamp' | 'retries'>): string {
-    const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    const id = `${Date.now()}-${secureHex(6)}`
     const queuedAction: QueuedAction = {
       ...action,
       id,
