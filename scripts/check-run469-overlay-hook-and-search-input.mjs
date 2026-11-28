@@ -43,7 +43,7 @@ const hook = read("hooks/use-dialog-a11y.ts")
 assert(/data-dialog-dismiss/.test(hook) && /data-dialog-initial-focus/.test(hook), "hook honours dismiss-backdrop and initial-focus markers")
 for (const [file, label, needle] of [
   ["components/ghc/media-lightbox.tsx", "media lightbox", /useDialogA11y<HTMLDivElement>\(open && items\.length > 0,/],
-  ["components/ghc/post-reward/post-reward-panel.tsx", "post-reward panel", /useDialogA11y<HTMLElement>\(open, \(\) => setOpen\(false\)\)/],
+  ["components/ghc/post-reward/post-reward-panel.tsx", "post-reward panel", /useDialogA11y<HTMLElement>\(open, (?:\(\) => setOpen\(false\)|closePanel)\)/],
   ["components/ghc/unified-compose.tsx", "unified composer", /useDialogA11y<HTMLDivElement>\(open, uploadProgress \|\| isPublishing \? undefined/],
   ["components/ghc/comment-sheet.tsx", "comment sheet", /useDialogA11y<HTMLDivElement>\(open, onClose\)/],
   ["components/ghc/notification-bell.tsx", "notification bell", /useDialogA11y<HTMLDivElement>\(open,/],
@@ -51,6 +51,9 @@ for (const [file, label, needle] of [
 ]) {
   const src = read(file)
   assert(needle.test(src), `${label} uses the shared dialog hook`)
+  if (label === "post-reward panel") {
+    assert(/const closePanel = useCallback\(\(\) => \{[\s\S]{0,500}setOpen\(false\)/.test(src), "post-reward close callback closes the panel and preserves focus restoration")
+  }
   assert(!/e\.key === "Escape"|event\.key === "Escape"/.test(src.replace(/onKeyDown=\{[^\n]*Escape[^\n]*\}/g, "")), `${label} has no private Escape handler`)
 }
 assert(/useDialogA11y<HTMLDivElement>\(successDialogOpen,/.test(read("components/ghc/premium-membership-screen.tsx")), "membership success sheet uses the shared dialog hook")
