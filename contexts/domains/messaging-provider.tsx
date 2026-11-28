@@ -8,6 +8,7 @@
 import React, { createContext, useContext, useMemo, type ReactNode } from "react"
 import { useGHCMessaging } from "@/contexts/ghc-context"
 import type { Conversation } from "@/lib/ghc-types"
+import { messagesAttentionCount } from "@/lib/messaging/unread-attention"
 
 export interface MessagingProviderValue {
   conversations: Conversation[]
@@ -21,10 +22,7 @@ export function MessagingProvider({ children }: { children: ReactNode }) {
   const { conversations: raw } = useGHCMessaging()
   const value = useMemo<MessagingProviderValue>(() => {
     const conversations = Array.isArray(raw) ? raw : []
-    const unreadCount = conversations.reduce(
-      (n, c) => n + (typeof c.unreadCount === "number" ? c.unreadCount : c.unread ? 1 : 0),
-      0
-    )
+    const unreadCount = messagesAttentionCount(conversations)
     return {
       conversations,
       inboxCount: conversations.length,

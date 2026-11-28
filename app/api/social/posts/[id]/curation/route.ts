@@ -46,7 +46,7 @@ export async function POST(
 
   const { id } = await ctx.params
   const postId = String(id || "").trim()
-  if (!postId || postId.length > 128) {
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(postId)) {
     return NextResponse.json({ ok: false, error: "INVALID_ID" }, { status: 400 })
   }
 
@@ -231,9 +231,7 @@ export async function POST(
     void (async () => {
       const authorId = await lookupPostAuthor(postId)
       if (!authorId || authorId === auth.userId) return
-      const isUp = choice === "upvote"
-      const isDown = choice === "downvote"
-      if (choice === "neutral") return
+      const isUp = finalChoice === "upvote"
       await emitSocialNotification({
         recipientUserId: authorId,
         actorUserId: auth.userId,
@@ -244,10 +242,10 @@ export async function POST(
         body: isUp
           ? "Someone upvoted your post"
           : "Someone downvoted your post",
-        dedupeKey: `curation:${auth.userId}:${postId}:${choice}`,
-        metadata: { postId, choice, publicOnly: true, category: "social" },
+        dedupeKey: `curation:${auth.userId}:${postId}:${finalChoice}`,
+        metadata: { postId, choice: finalChoice, publicOnly: true, category: "social" },
       })
-    })()
+    })().catch(() => undefined)
   }
 
   // Stage 4: optional balance-funded redistribution (flagged; no mint)
@@ -257,28 +255,34 @@ export async function POST(
     finalChoice === "upvote" &&
     rewardPercentage > 0
   ) {
-    const authorId = await lookupPostAuthor(postId)
-    if (authorId && authorId !== auth.userId) {
-      const amount = Math.min(1, Math.max(0, (Number(rewardPercentage) / 100) * 0.1))
-      if (amount > 0) {
-        const red = await redistributeCurationReward({
-          voterId: auth.userId,
-          authorId,
-          postId,
-          amount,
-          referenceId: `curation_redist_${postId}_${auth.userId}`,
-        })
-        redistribute = {
-          attempted: true,
-          ok: red.ok,
-          credited: red.credited,
-          amount: red.amount,
-          reason: red.reason || red.error,
-          availableBalanceAfter: (red as { availableBalanceAfter?: number }).availableBalanceAfter,
-          requiredBalance: (red as { requiredBalance?: number }).requiredBalance,
-          contentRewardRecorded: (red as { contentRewardRecorded?: boolean }).contentRewardRecorded,
+    try {
+      const authorId = await lookupPostAuthor(postId)
+      if (authorId && authorId !== auth.userId) {
+        const amount = Math.min(1, Math.max(0, (Number(rewardPercentage) / 100) * 0.1))
+        if (amount > 0) {
+          const red = await redistributeCurationReward({
+            voterId: auth.userId,
+            authorId,
+            postId,
+            amount,
+            referenceId: `curation_redist_${postId}_${auth.userId}`,
+          })
+          redistribute = {
+            attempted: true,
+            ok: red.ok,
+            credited: red.credited,
+            amount: red.amount,
+            reason: red.reason || red.error,
+            availableBalanceAfter: (red as { availableBalanceAfter?: number }).availableBalanceAfter,
+            requiredBalance: (red as { requiredBalance?: number }).requiredBalance,
+            contentRewardRecorded: (red as { contentRewardRecorded?: boolean }).contentRewardRecorded,
+          }
         }
       }
+    } catch (err) {
+      // The vote is already durable; report the funding step as not completed instead of failing the vote.
+      console.error("[curation] redistribution step failed", err instanceof Error ? err.message.slice(0, 120) : "unknown")
+      redistribute = { attempted: true, ok: false, credited: false, reason: "REDISTRIBUTE_UNAVAILABLE" }
     }
   }
 

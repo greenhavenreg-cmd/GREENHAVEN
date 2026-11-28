@@ -107,7 +107,7 @@ function FeaturedGroupCardContent({
         )}
 
         {/* Footer with button */}
-        <button
+        <button type="button"
           onClick={onJoin}
           disabled={isJoined}
           className={`w-full rounded-full px-4 py-2.5 text-sm font-bold transition active:scale-95 ${

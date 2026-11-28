@@ -59,6 +59,7 @@ const SERVICE_CONTEXT: Readonly<Record<string, string>> = {
   "pi-payments": "Pi SDK authentication, payment intent lifecycle, server verification, receipts, and idempotent settlement",
   "rewards": "eligibility, one-time claims, verified earning evidence, reward ledger, and abuse controls",
   "membership": "tier entitlements, access enforcement, renewal concurrency, expiry, and payment reconciliation",
+  "impact-history": "authenticated contribution history, recorded-only ledger projection, donor privacy, exact PI amount presentation, and non-withdrawable accounting",
   "charity": "verified charitable organizations, governance, restricted funds, donor consent, and impact accountability",
   "causes": "cause verification, eligibility criteria, evidence standards, and transparent progress updates",
   "donations": "donor authorization, payment confirmation, restricted-fund accounting, receipts, and refunds",

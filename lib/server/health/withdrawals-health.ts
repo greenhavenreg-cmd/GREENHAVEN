@@ -131,7 +131,7 @@ async function probeSupabaseConnectivity(): Promise<WithdrawalsHealthComponent> 
   try {
     const { result, latencyMs } = await timed(async () => {
       // Minimal PostgREST root probe — does not return table data.
-      const res = await fetch("" /* health root */, {
+      const res = await fetch(`${base}/rest/v1/`, {
         method: "GET",
         headers: {
           apikey: env.supabaseServiceRoleKey!,

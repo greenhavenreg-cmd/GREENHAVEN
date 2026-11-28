@@ -351,7 +351,7 @@ export function WalletBalanceCard({
                 type="button"
                 onClick={() => void refreshPi()}
                 disabled={piLoading}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/80 backdrop-blur transition hover:bg-white/15 active:scale-95 disabled:opacity-60"
+                className="gh-hit-44 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/80 backdrop-blur transition hover:bg-white/15 active:scale-95 disabled:opacity-60"
                 aria-label="Refresh PI balance"
                 aria-busy={piLoading}
               >
@@ -361,7 +361,7 @@ export function WalletBalanceCard({
             <button
               type="button"
               onClick={onToggleVisible}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/80 backdrop-blur transition hover:bg-white/15 active:scale-95"
+              className="gh-hit-44 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/80 backdrop-blur transition hover:bg-white/15 active:scale-95"
               aria-label={balanceVisible ? "Hide balances" : "Show balances"}
               aria-pressed={!balanceVisible}
             >
@@ -463,7 +463,7 @@ export function WalletBalanceCard({
         <dl className="mt-4 grid grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/10 bg-white/[0.05] backdrop-blur">
           {stats.map((row) => (
             <div key={row.label} className="min-w-0 px-3 py-2.5" title={row.full} aria-label={row.full}>
-              <dt className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/45">{row.label}</dt>
+              <dt className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">{row.label}</dt>
               <dd className="mt-0.5 truncate text-[13px] font-black tabular-nums text-white">{row.value}</dd>
             </div>
           ))}

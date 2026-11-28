@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Loader2, Sparkles, Zap, Store, Users, Wand2, RefreshCw, ShieldCheck, X } from "lucide-react"
 import { ASSET_POLICY } from "@/lib/asset-separation"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 type CatalogItem = {
   purpose: string
@@ -49,6 +50,7 @@ export function GhcUtilityPanel({
   const [busy, setBusy] = useState<string | null>(null)
   const [targetId, setTargetId] = useState("")
   const [confirmItem, setConfirmItem] = useState<CatalogItem | null>(null)
+  const confirmRef = useDialogA11y<HTMLElement>(Boolean(confirmItem), busy ? undefined : () => setConfirmItem(null))
   const requestKeys = useRef(new Map<string, string>())
 
   const needsTarget = (purpose: string) => ["boost_post", "boost_profile", "boost_listing", "feed_spotlight"].includes(purpose)
@@ -169,7 +171,7 @@ export function GhcUtilityPanel({
           {ASSET_POLICY.dualRailCopy}
         </p>
         </div>
-        <button type="button" onClick={() => void load()} disabled={loading || !!busy} aria-label="Refresh GHC utility catalog" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-card text-muted-foreground hover:bg-muted disabled:opacity-50">
+        <button type="button" onClick={() => void load()} disabled={loading || !!busy} aria-label="Refresh GHC utility catalog" className="gh-hit-44 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-card text-muted-foreground hover:bg-muted disabled:opacity-50">
           <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
@@ -273,7 +275,7 @@ export function GhcUtilityPanel({
 
       {confirmItem ? (
         <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" role="presentation">
-          <section role="dialog" aria-modal="true" aria-labelledby="ghc-utility-confirm-title" className="w-full max-w-md rounded-t-3xl border border-border bg-card p-5 shadow-2xl sm:rounded-3xl">
+          <section ref={confirmRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="ghc-utility-confirm-title" className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-border bg-card p-5 shadow-2xl sm:rounded-3xl">
             <div className="flex items-start gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700"><ShieldCheck size={19} /></span>
               <div className="min-w-0 flex-1">

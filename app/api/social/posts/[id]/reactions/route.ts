@@ -93,7 +93,7 @@ export async function POST(
         dedupeKey: `reaction:${auth.userId}:${postId}:${reaction}`,
         metadata: { postId, reaction, category: "social" },
       })
-    })()
+    })().catch(() => undefined)
   }
   let reactionCounts: Record<string, number> | undefined
   let viewerReactions: string[] | undefined

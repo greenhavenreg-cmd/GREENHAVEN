@@ -9,14 +9,14 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 const NO_STORE = { "Cache-Control": "no-store, private", Vary: "Cookie, Authorization" }
 
-/** Read-only prelaunch impact summary. The charity service stays gated until release. */
+/** Read-only impact history. Donation and charity-management workflows remain separately gated. */
 export async function GET(request: Request) {
-  const access = getEcosystemServiceAccess("charity")
+  const access = getEcosystemServiceAccess("impact-history")
   if (!access.allowed) return NextResponse.json({ ok: false, error: access.reason }, { status: 404, headers: NO_STORE })
 
   const auth = await resolveAuthenticatedUser(request.headers)
   if (!auth) return NextResponse.json({ ok: false, error: "AUTH_REQUIRED" }, { status: 401, headers: NO_STORE })
-  const rate = await checkDurableRateLimit(`ecosystem-charity-summary:${auth.userId}`, 60, 60_000, { onUnavailable: "deny" })
+  const rate = await checkDurableRateLimit(`ecosystem-impact-history:${auth.userId}`, 60, 60_000, { onUnavailable: "deny" })
   if (!rate.ok) return NextResponse.json({ ok: false, error: durableRateLimitCode(rate) }, {
     status: durableRateLimitStatus(rate),
     headers: { ...NO_STORE, "Retry-After": String(rate.retryAfterSec) },

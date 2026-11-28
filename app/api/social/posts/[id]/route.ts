@@ -87,7 +87,7 @@ export async function DELETE(
   if (__rateLimited) return __rateLimited
   const { id } = await ctx.params
   const postId = String(id || "").trim()
-  if (!postId) {
+  if (!/^[a-zA-Z0-9_-]{1,180}$/.test(postId)) {
     return NextResponse.json({ ok: false, error: "INVALID_ID" }, { status: 400 })
   }
 
@@ -112,6 +112,10 @@ export async function DELETE(
   }
   if (data?.error === "NOT_FOUND") {
     return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 })
+  }
+  // Any other explicit rejection (or a missing/ambiguous answer) must never be reported as a delete.
+  if (data?.ok === false || (data?.ok !== true && data?.error)) {
+    return NextResponse.json({ ok: false, error: String(data?.error || "DELETE_FAILED") }, { status: 400 })
   }
   // GHPV cleanup runs inside gh_post_soft_delete (20261020). Do not expose a client cleanup RPC.
   return NextResponse.json({

@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Check, Copy, Download, Share2, X, RefreshCw } from "lucide-react"
 import { coordinatedRecoverPayment } from "@/lib/payments/coordinated-recovery"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 export type PiPaymentDetailRecord = {
   id: string
@@ -97,6 +98,7 @@ export function PiPaymentDetail({ intent, finding, onClose }: { intent: PiPaymen
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [intent, onClose])
+  const dialogRef = useDialogA11y<HTMLDivElement>(Boolean(intent), onClose)
   if (!intent) return null
 
   const copyReceipt = async () => {
@@ -154,12 +156,12 @@ export function PiPaymentDetail({ intent, finding, onClose }: { intent: PiPaymen
   const paid = ["COMPLETED", "FULFILLED", "REFUNDED"].includes(status)
   const failed = ["FAILED", "CANCELLED", "INCOMPLETE"].includes(status)
   return (
-    <div className="fixed inset-0 z-[96] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="pi-payment-detail-title">
+    <div className="fixed inset-0 z-[96] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="pi-payment-detail-title">
       <button type="button" className="absolute inset-0" aria-label="Close payment details" onClick={onClose} />
       <section className="relative z-[1] flex max-h-[92dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-3xl border border-border bg-card shadow-2xl sm:rounded-3xl">
         <header className="flex items-center gap-3 border-b border-border px-4 py-4">
           <div className="min-w-0 flex-1"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pi payment record</p><h2 id="pi-payment-detail-title" className="truncate text-lg font-bold">Transaction details</h2></div>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded-full p-2 hover:bg-muted"><X size={19}/></button>
+          <button type="button" onClick={onClose} aria-label="Close" className="-m-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-muted"><X size={19}/></button>
         </header>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
           <div className="rounded-2xl border border-border bg-muted/30 p-4">

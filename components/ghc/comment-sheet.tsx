@@ -15,6 +15,7 @@ import { buildCommentTree, countThread, filterBlockedCommentThreads } from "@/li
 import { LazyImage } from "./lazy-image"
 import { downloadMedia } from "@/lib/media/download-media"
 import { ReportChooser } from "./report-chooser"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 import { isOwnAuthor, canEditComment, canDeleteComment } from "@/lib/ownership"
 
 interface CommentSheetProps {
@@ -63,8 +64,8 @@ export function CommentSheet({ post, open, onClose }: CommentSheetProps) {
   const [mediaPreview, setMediaPreview] = useState<{ url: string; alt: string; kind: "image" | "video" } | null>(null)
   const [reloadVersion, setReloadVersion] = useState(0)
   const listRef = useRef<HTMLDivElement | null>(null)
-  const dialogRef = useRef<HTMLDivElement | null>(null)
-  const mediaPreviewRef = useRef<HTMLDivElement | null>(null)
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, onClose)
+  const mediaPreviewRef = useDialogA11y<HTMLDivElement>(Boolean(mediaPreview), () => setMediaPreview(null))
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
 
   const isPostOwner = isOwnAuthor(post?.authorId, post?.authorName, profile)
@@ -183,83 +184,16 @@ useEffect(() => {
   }, [open, onClose])
 
   useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return
-      e.preventDefault()
-      if (mediaPreview) setMediaPreview(null)
-      else onClose()
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [open, onClose, mediaPreview])
-
-  useEffect(() => {
     if (!mediaPreview) return
-    const previousOverflow = document.body.style.overflow
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    document.body.style.overflow = "hidden"
     const frame = window.requestAnimationFrame(() => {
-      document.querySelector<HTMLButtonElement>("[data-comment-media-preview-close]")?.focus()
+      document.querySelector<HTMLButtonElement>("[data-comment-media-preview-close]")?.focus({ preventScroll: true })
     })
-    const onTab = (event: KeyboardEvent) => {
-      if (event.key !== "Tab") return
-      const root = mediaPreviewRef.current
-      if (!root) return
-      const focusable = Array.from<HTMLElement>(root.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), video[controls], [tabindex]:not([tabindex="-1"])'
-      )).filter((element) => element.getClientRects().length > 0)
-      if (!focusable.length) { event.preventDefault(); return }
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (event.shiftKey && (document.activeElement === first || !root.contains(document.activeElement))) {
-        event.preventDefault(); last.focus()
-      } else if (!event.shiftKey && (document.activeElement === last || !root.contains(document.activeElement))) {
-        event.preventDefault(); first.focus()
-      }
-    }
-    window.addEventListener("keydown", onTab)
-    return () => {
-      window.removeEventListener("keydown", onTab)
-      document.body.style.overflow = previousOverflow
-      window.cancelAnimationFrame(frame)
-      previousFocus?.focus()
-    }
+    return () => window.cancelAnimationFrame(frame)
   }, [mediaPreview])
 
   useEffect(() => {
     if (open) setVisibleCount(40)
   }, [open, post?.id])
-
-  // Keep the modal interaction contained and return focus to its opener.
-  useEffect(() => {
-    if (!open) return
-    const previousOverflow = document.body.style.overflow
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    document.body.style.overflow = "hidden"
-    const onTab = (event: KeyboardEvent) => {
-      if (event.key !== "Tab" || mediaPreview) return
-      const root = dialogRef.current
-      if (!root) return
-      const focusable = Array.from<HTMLElement>(root.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
-      )).filter((element) => element.getClientRects().length > 0)
-      if (!focusable.length) { event.preventDefault(); root.focus(); return }
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (event.shiftKey && (document.activeElement === first || !root.contains(document.activeElement))) {
-        event.preventDefault(); last.focus()
-      } else if (!event.shiftKey && (document.activeElement === last || !root.contains(document.activeElement))) {
-        event.preventDefault(); first.focus()
-      }
-    }
-    window.addEventListener("keydown", onTab)
-    return () => {
-      window.removeEventListener("keydown", onTab)
-      document.body.style.overflow = previousOverflow
-      previousFocus?.focus()
-    }
-  }, [open, mediaPreview])
 
   // Focus composer when opening
   useEffect(() => {
@@ -431,21 +365,21 @@ useEffect(() => {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-bold text-foreground">{c.authorName}</span>
                 {isCommentOwner(c) && (
-                  <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
+                  <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
                     You
                   </span>
                 )}
                 <span className="text-[10px] text-muted-foreground">{timeAgo(c.createdAt)}</span>
                 {c.isEdited && <span className="text-[10px] text-muted-foreground">(edited)</span>}
                 {c.isPinned && (
-                  <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">
+                  <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
                     Pinned
                   </span>
                 )}
               </div>
               {editingId === c.id ? (
                 <div className="mt-1 space-y-2">
-                  <textarea
+                  <textarea aria-label="Edit comment"
                     value={editText}
                     onChange={(e) => setEditText(e.target.value.slice(0, 1000))}
                     className="w-full resize-none rounded-lg border border-border/70 bg-white p-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -571,8 +505,9 @@ useEffect(() => {
                 targetId={c.id}
                 onSubmit={async (reason) => {
                   try {
+                    // reportContent shows its own thank-you or failure toast and never throws on a rejected
+                    // report; a second success toast here would contradict a failure.
                     await reportContent("comment", c.id, reason)
-                    addToast("Report submitted for review", "success")
                   } catch {
                     addToast("Could not submit report. Please try again.", "error")
                   }
@@ -800,7 +735,7 @@ useEffect(() => {
             <button
               type="button"
               disabled={mediaBusy || pendingMedia.length >= 4}
-              className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-stone-200 text-stone-500 disabled:opacity-40"
+              className="gh-hit-44 mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-stone-200 text-stone-500 disabled:opacity-40"
               aria-label="Attach media to comment"
               onClick={() => {
                 const input = document.createElement("input")
@@ -888,7 +823,7 @@ useEffect(() => {
         </div>
       </div>
       {mediaPreview ? (
-        <div ref={mediaPreviewRef} className="fixed inset-0 z-[230] flex items-center justify-center bg-black/95 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Comment attachment preview" onMouseDown={(event) => { if (event.target === event.currentTarget) setMediaPreview(null) }}>
+        <div ref={mediaPreviewRef} tabIndex={-1} className="fixed inset-0 z-[230] flex items-center justify-center bg-black/95 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Comment attachment preview" onMouseDown={(event) => { if (event.target === event.currentTarget) setMediaPreview(null) }}>
           <button type="button" data-comment-media-preview-close onClick={() => setMediaPreview(null)} className="absolute right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label="Close attachment preview"><X size={22} /></button>
           <div className="flex max-h-full max-w-full flex-col items-center justify-center gap-3">
             {mediaPreview.kind === "image" ? (

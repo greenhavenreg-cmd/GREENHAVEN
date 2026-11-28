@@ -736,22 +736,9 @@ export function createMessagingDomain(deps: {
           toggleConversationPin(conv)
           deps.patchConversation?.(i.conversationId, { isPinned: i.pinned } as any)
           if (shouldAttemptDurableMessaging(false)) {
-            try {
-              const { IdentityService } = await import("@/lib/identity/identity-service")
-              await fetch(
-                `/api/messaging/conversations/${encodeURIComponent(i.conversationId)}/prefs`,
-                {
-                  method: "PATCH",
-                  headers: {
-                    "Content-Type": "application/json",
-                    ...IdentityService.getAuthHeaders(),
-                  },
-                  body: JSON.stringify({ isPinned: i.pinned }),
-                }
-              )
-            } catch {
-              /* local prefs already applied */
-            }
+            await persistConversationPrefs(i.conversationId, { isPinned: i.pinned }, () => {
+              deps.patchConversation?.(i.conversationId, { isPinned: Boolean(conv.isPinned) } as any)
+            })
           }
           return { conversationId: i.conversationId, isPinned: i.pinned }
         },
@@ -772,22 +759,9 @@ export function createMessagingDomain(deps: {
           toggleConversationArchive(conv)
           deps.patchConversation?.(i.conversationId, { isArchived: i.archived } as any)
           if (shouldAttemptDurableMessaging(false)) {
-            try {
-              const { IdentityService } = await import("@/lib/identity/identity-service")
-              await fetch(
-                `/api/messaging/conversations/${encodeURIComponent(i.conversationId)}/prefs`,
-                {
-                  method: "PATCH",
-                  headers: {
-                    "Content-Type": "application/json",
-                    ...IdentityService.getAuthHeaders(),
-                  },
-                  body: JSON.stringify({ isArchived: i.archived }),
-                }
-              )
-            } catch {
-              /* local prefs already applied */
-            }
+            await persistConversationPrefs(i.conversationId, { isArchived: i.archived }, () => {
+              deps.patchConversation?.(i.conversationId, { isArchived: Boolean(conv.isArchived) } as any)
+            })
           }
           return { conversationId: i.conversationId, isArchived: i.archived }
         },
@@ -809,25 +783,12 @@ export function createMessagingDomain(deps: {
           toggleConversationMute(conv, i.muteHours)
           deps.patchConversation?.(i.conversationId, { isMuted: i.muted } as any)
           if (shouldAttemptDurableMessaging(false)) {
-            try {
-              const { IdentityService } = await import("@/lib/identity/identity-service")
-              const mutedUntil = i.muted
-                ? Date.now() + (Number(i.muteHours) || 24) * 60 * 60 * 1000
-                : null
-              await fetch(
-                `/api/messaging/conversations/${encodeURIComponent(i.conversationId)}/prefs`,
-                {
-                  method: "PATCH",
-                  headers: {
-                    "Content-Type": "application/json",
-                    ...IdentityService.getAuthHeaders(),
-                  },
-                  body: JSON.stringify({ mutedUntil }),
-                }
-              )
-            } catch {
-              /* local prefs already applied */
-            }
+            const mutedUntil = i.muted
+              ? Date.now() + (Number(i.muteHours) || 24) * 60 * 60 * 1000
+              : null
+            await persistConversationPrefs(i.conversationId, { mutedUntil }, () => {
+              deps.patchConversation?.(i.conversationId, { isMuted: Boolean(conv.isMuted) } as any)
+            })
           }
           return { conversationId: i.conversationId, isMuted: i.muted }
         },
@@ -837,3 +798,38 @@ export function createMessagingDomain(deps: {
 }
 
 export type MessagingDomain = ReturnType<typeof createMessagingDomain>
+
+/**
+ * Persists a per-member conversation preference (pin, archive, mute).
+ *
+ * The local change is applied first so the list reacts instantly. When the server answers and rejects
+ * the write (validation, rate limit, store outage) the local change is rolled back and the mutation
+ * fails, so the user is never told a setting was saved when it was not. A network failure (offline,
+ * timeout) keeps the local-first behaviour: the preference stays applied on this device.
+ */
+async function persistConversationPrefs(
+  conversationId: string,
+  body: Record<string, unknown>,
+  rollback: () => void,
+): Promise<void> {
+  const { IdentityService } = await import("@/lib/identity/identity-service")
+  let response: Response
+  try {
+    response = await fetch(`/api/messaging/conversations/${encodeURIComponent(conversationId)}/prefs`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...IdentityService.getAuthHeaders() },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000),
+    })
+  } catch {
+    return
+  }
+  if (response.ok) return
+  rollback()
+  throw new Error(
+    response.status === 429 ? "Too many changes. Try again in a moment."
+      : response.status === 401 || response.status === 403 ? "Sign in again to change this conversation."
+      : "Could not save this conversation setting. Please try again.",
+  )
+}

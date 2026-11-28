@@ -13,6 +13,7 @@ import { useEffect, useState, useCallback, useRef } from "react"
 import { createPortal } from "react-dom"
 import { X, ChevronLeft, ChevronRight, Download, Share2, MoreHorizontal } from "lucide-react"
 import { onCloseTransientUI } from "@/lib/transient-ui"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 import { isMediaFacadeUrl, resolveDisplayMediaUrl } from "@/lib/media/resolve-display-url"
 import { downloadMedia, shareMediaUrl } from "@/lib/media/download-media"
 import { DurableVideo } from "./durable-video"
@@ -71,9 +72,8 @@ export function MediaLightbox({
   }, [])
   const [busy, setBusy] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
-  const dialogRef = useRef<HTMLDivElement>(null)
+  const dialogRef = useDialogA11y<HTMLDivElement>(open && items.length > 0, () => { if (toolsOpen) setToolsOpen(false); else onClose() })
   const closeButtonRef = useRef<HTMLButtonElement>(null)
-  const previousFocusRef = useRef<HTMLElement | null>(null)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFired = useRef(false)
 
@@ -118,46 +118,26 @@ export function MediaLightbox({
 
   useEffect(() => {
     if (!open) return
-    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    closeButtonRef.current?.focus()
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = "hidden"
+    closeButtonRef.current?.focus({ preventScroll: true })
+    // Escape, Tab containment, scroll lock and focus restore come from useDialogA11y.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (toolsOpen) setToolsOpen(false)
-        else onClose()
-      }
+      // Arrows seek inside a focused video/audio control or move sliders and text cursors; only the
+      // gallery itself should react to them.
+      const target = e.target as HTMLElement | null
+      const ownsArrows = Boolean(
+        target && (target.isContentEditable || target.closest('input, textarea, select, video, audio, [role="slider"], [role="textbox"]')),
+      )
+      if (ownsArrows || e.altKey || e.ctrlKey || e.metaKey) return
       if (e.key === "ArrowLeft") goPrev()
       if (e.key === "ArrowRight") goNext()
-      if (e.key === "Tab") {
-        const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        )
-        if (!focusable?.length) {
-          e.preventDefault()
-          dialogRef.current?.focus()
-          return
-        }
-        const first = focusable[0]
-        const last = focusable[focusable.length - 1]
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault()
-          last.focus()
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault()
-          first.focus()
-        }
-      }
     }
     window.addEventListener("keydown", onKey)
     const off = onCloseTransientUI(() => onClose())
     return () => {
-      document.body.style.overflow = prevOverflow
       window.removeEventListener("keydown", onKey)
       off()
-      if (previousFocusRef.current?.isConnected) previousFocusRef.current.focus()
     }
-  }, [open, onClose, goPrev, goNext, toolsOpen])
+  }, [open, onClose, goPrev, goNext])
 
   const clearLongPress = () => {
     if (longPressTimer.current) {

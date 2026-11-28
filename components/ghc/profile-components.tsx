@@ -13,6 +13,7 @@ import { LocationPicker } from "./location-picker"
 import { GhIdentityQr } from "./gh-identity-qr"
 import { getOrCreateGreenHavenId } from "@/lib/domains/greenhaven-id"
 import { parseLegacyLocation, legacyCityCountry, type StructuredLocation, type LocationPrivacyLevel } from "@/lib/geography"
+import { plural } from "@/lib/ui/plural"
 
 // Calculate profile completion percentage from real fields only
 // Fields: displayName (valid), bio, age/birthDate, city+country, education, profession, ≥1 interest, profile photo (not placeholder), cover photo (not placeholder), verification
@@ -470,7 +471,7 @@ export function ModeButtons({ selectedMode, onModeChange }: { selectedMode: stri
   return (
     <div className="flex gap-3">
       {modes.map((mode) => (
-        <button
+        <button type="button"
           key={mode.value}
           onClick={() => onModeChange(mode.value)}
           className={`flex-1 h-12 rounded-full flex items-center justify-center text-2xl transition active:scale-90 ${
@@ -492,13 +493,14 @@ export function InterestsPills({ interests, onEdit }: { interests: string[]; onE
   return (
     <div className="flex flex-wrap gap-2">
       {interests.map((interest) => (
-        <button
+        <button type="button"
           key={interest}
           onClick={() => onEdit(interests.filter((i) => i !== interest))}
-          className="bg-pink-100 hover:bg-pink-200 text-pink-700 px-3 py-1 rounded-full text-sm font-semibold transition active:scale-90 flex items-center gap-2"
+          aria-label={`Remove interest ${interest}`}
+          className="bg-pink-100 hover:bg-pink-200 text-pink-700 px-3 py-1 min-h-9 rounded-full text-sm font-semibold transition active:scale-90 flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-600"
         >
           {interest}
-          <X size={14} />
+          <X size={14} aria-hidden />
         </button>
       ))}
     </div>
@@ -527,7 +529,7 @@ export function ResponsiveButton({
   }
 
   return (
-    <button onClick={onClick} disabled={disabled} className={`${baseStyles} ${variantStyles[variant]} ${className}`}>
+    <button type="button" onClick={onClick} disabled={disabled} className={`${baseStyles} ${variantStyles[variant]} ${className}`}>
       {children}
     </button>
   )
@@ -536,7 +538,7 @@ export function ResponsiveButton({
 // Preview Public Profile Toggle
 export function PreviewPublicProfileToggle({ isEnabled, onToggle }: { isEnabled: boolean; onToggle: (enabled: boolean) => void }) {
   return (
-    <button
+    <button type="button"
       onClick={() => onToggle(!isEnabled)}
       className="flex items-center gap-3 w-full p-4 bg-muted/40 hover:bg-muted rounded-lg border border-border/70 transition active:scale-95"
     >
@@ -699,7 +701,7 @@ export function EditProfileModal({
     <div className="fixed inset-0 z-50 flex items-end">
       <div className="fixed inset-0 bg-black/50" onClick={() => { if (!isSaving) onClose() }} aria-hidden="true" />
       <div
-        className="relative w-full bg-card rounded-t-3xl px-5 py-5 max-h-[85vh] overflow-y-auto space-y-4 sm:px-6"
+        className="relative w-full bg-card rounded-t-3xl px-5 py-5 max-h-[85dvh] overflow-y-auto space-y-4 sm:px-6"
         aria-busy={isSaving}
         onKeyDownCapture={(event) => {
           if (isSaving && event.key === "Escape") event.stopPropagation()
@@ -748,7 +750,7 @@ export function EditProfileModal({
         {/* Name */}
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-foreground">{t("displayName")}</label>
-          <input
+          <input aria-label="Display name"
             type="text"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
@@ -761,7 +763,7 @@ export function EditProfileModal({
         {/* Bio */}
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-foreground">{t("bio")}</label>
-          <textarea
+          <textarea aria-label="Bio"
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             className="w-full resize-none rounded-lg border border-border/70 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
@@ -776,7 +778,7 @@ export function EditProfileModal({
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t("aboutDetails")}</p>
           <div>
             <label className="mb-1 block text-xs font-semibold text-muted-foreground">{t("profession")}</label>
-            <input
+            <input aria-label="e.g. Software Engineer"
               type="text"
               value={profession}
               onChange={(e) => setProfession(e.target.value)}
@@ -787,7 +789,7 @@ export function EditProfileModal({
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-muted-foreground">{t("education")}</label>
-            <input
+            <input aria-label="e.g. University of Lagos"
               type="text"
               value={education}
               onChange={(e) => setEducation(e.target.value)}
@@ -815,7 +817,7 @@ export function EditProfileModal({
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-muted-foreground">Hometown</label>
-            <input
+            <input aria-label="Where you're from"
               type="text"
               value={hometown}
               onChange={(e) => setHometown(e.target.value)}
@@ -826,7 +828,7 @@ export function EditProfileModal({
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-muted-foreground">Birthday</label>
-            <input
+            <input aria-label="e.g. 26 February 1995"
               type="text"
               value={bornDate}
               onChange={(e) => setBornDate(e.target.value)}
@@ -874,7 +876,7 @@ export function EditProfileModal({
             ))}
           </div>
           <div className="mb-2 flex gap-2">
-            <input
+            <input aria-label="Custom interest"
               type="text"
               value={newInterest}
               onChange={(e) => setNewInterest(e.target.value)}
@@ -903,10 +905,11 @@ export function EditProfileModal({
                   key={interest}
                   type="button"
                   onClick={() => setInterests(interests.filter((i) => i !== interest))}
-                  className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 ring-1 ring-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-200"
+                  aria-label={`Remove interest ${interest}`}
+                  className="flex min-h-9 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 ring-1 ring-emerald-200/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-200"
                 >
                   {interest}
-                  <X size={12} />
+                  <X size={12} aria-hidden />
                 </button>
               ))}
             </div>
@@ -996,14 +999,14 @@ export function SocialLinksSection({
             </span>
             <span className="text-sm font-semibold text-foreground capitalize flex-1">{platform}</span>
             {socialLinks?.[platform] ? (
-              <button
+              <button type="button"
                 onClick={() => onRemoveLink?.(platform)}
                 className="text-xs px-2 py-1 rounded bg-red-100 hover:bg-red-200 text-red-700 transition"
               >
                 Remove
               </button>
             ) : (
-              <button
+              <button type="button"
                 onClick={() => onAddLink?.(platform, "")}
                 className="text-xs px-2 py-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 transition"
               >
@@ -1079,13 +1082,13 @@ export function PrivacyControlsSection({
 export function SavedPostsSection({ savedCount = 0, onViewSaved }: { savedCount?: number; onViewSaved?: () => void }) {
   return (
     <div className="px-4 py-4 border-t border-border/70">
-      <button
+      <button type="button"
         onClick={onViewSaved}
         className="w-full flex items-center justify-between p-4 bg-muted/40 hover:bg-muted rounded-lg border border-border/70 transition active:scale-95"
       >
         <div className="text-left">
           <p className="font-semibold text-foreground">Saved Posts</p>
-          <p className="text-sm text-muted-foreground">{savedCount} posts saved</p>
+          <p className="text-sm text-muted-foreground">{plural(savedCount, "post")} saved</p>
         </div>
         <span className="text-2xl">💾</span>
       </button>
@@ -1137,7 +1140,7 @@ export function ExpandableBio({ bio = "" }: { bio?: string }) {
         {displayBio}
       </p>
       {isLong && (
-        <button
+        <button type="button"
           onClick={() => setExpanded(!expanded)}
           className="mt-2 rounded-full px-2 py-1 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-expanded={expanded}

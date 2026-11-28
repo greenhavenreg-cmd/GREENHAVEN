@@ -44,7 +44,7 @@ export function FilterPanel({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {typeof resultCount === "number" ? <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-bold tabular-nums text-muted-foreground" aria-live="polite">{resultCount} results</span> : null}
+          {typeof resultCount === "number" ? <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-bold tabular-nums text-muted-foreground" aria-live="polite">{resultCount} {resultCount === 1 ? "result" : "results"}</span> : null}
           <button
             type="button"
             className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full border border-border/70 bg-background px-2.5 text-[10px] font-bold text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:gap-1.5 sm:px-3"

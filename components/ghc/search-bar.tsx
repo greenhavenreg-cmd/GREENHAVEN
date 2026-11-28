@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useId, useState } from "react"
 import { Search, X, Sliders } from "lucide-react"
 
 export function SearchBar({
@@ -18,6 +18,8 @@ export function SearchBar({
 }) {
   const [searchQuery, setSearchQuery] = useState("")
   const [isFocused, setIsFocused] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(-1)
+  const listId = useId()
 
   const suggestions = (suggestionTerms.length
     ? suggestionTerms
@@ -44,7 +46,11 @@ export function SearchBar({
     ),
   ].slice(0, 6)
 
+  const listOpen = isFocused && visibleSearches.length > 0
+  const optionId = (index: number) => `${listId}-opt-${index}`
+
   const submitSearch = (value: string) => {
+    setActiveIndex(-1)
     const nextValue = value.trim()
     setSearchQuery(nextValue)
     onSearch(nextValue)
@@ -71,23 +77,37 @@ export function SearchBar({
             value={searchQuery}
             onChange={(event) => {
               setSearchQuery(event.target.value)
+              setActiveIndex(-1)
               onSearch(event.target.value)
             }}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                setIsFocused(false)
+              if (event.nativeEvent.isComposing || event.keyCode === 229) return
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                if (visibleSearches.length === 0) return
+                event.preventDefault()
+                setIsFocused(true)
+                const step = event.key === "ArrowDown" ? 1 : -1
+                setActiveIndex((index) => index < 0 ? (step > 0 ? 0 : visibleSearches.length - 1) : (index + step + visibleSearches.length) % visibleSearches.length)
                 return
               }
-              if (
-                event.key === "Enter" &&
-                !event.nativeEvent.isComposing &&
-                event.keyCode !== 229
-              ) {
-                submitSearch(searchQuery)
+              if (event.key === "Escape") {
+                if (listOpen) event.stopPropagation()
+                setIsFocused(false)
+                setActiveIndex(-1)
+                return
+              }
+              if (event.key === "Enter") {
+                submitSearch(listOpen && activeIndex >= 0 ? visibleSearches[activeIndex] ?? searchQuery : searchQuery)
               }
             }}
+            role="combobox"
+            aria-expanded={listOpen}
+            aria-controls={listId}
+            aria-autocomplete="list"
+            aria-activedescendant={listOpen && activeIndex >= 0 ? optionId(activeIndex) : undefined}
+            enterKeyHint="search"
             className="h-10 w-full bg-transparent pl-10 pr-9 text-sm text-foreground outline-none placeholder:text-muted-foreground sm:h-11"
             aria-label="Search people, interests, or cities"
             autoComplete="off"
@@ -96,7 +116,7 @@ export function SearchBar({
             <button
               type="button"
               onClick={() => submitSearch("")}
-              className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="gh-hit-44 absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               aria-label="Clear search"
             >
               <X size={15} />
@@ -128,8 +148,9 @@ export function SearchBar({
           ))}
         </div>
       )}
-      {isFocused && visibleSearches.length > 0 && (
+      {listOpen && (
         <div
+          id={listId}
           className="absolute left-3 right-3 top-full z-50 mt-1 rounded-2xl border border-border/60 bg-popover p-2 text-popover-foreground shadow-xl sm:left-4 sm:right-4"
           role="listbox"
           aria-label="Search suggestions"
@@ -140,16 +161,20 @@ export function SearchBar({
               : "Suggested searches"}
           </p>
           <div className="flex max-h-36 flex-wrap gap-1.5 overflow-y-auto overscroll-contain">
-            {visibleSearches.map((search) => (
+            {visibleSearches.map((search, index) => (
               <button
                 key={search}
+                id={optionId(index)}
                 type="button"
+                tabIndex={-1}
                 onPointerDown={(event) => event.preventDefault()}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => submitSearch(search)}
                 role="option"
-                aria-selected="false"
-                className="rounded-full bg-muted/40 px-3 py-1.5 text-[11px] font-semibold text-foreground/90 transition hover:bg-emerald-50 hover:text-emerald-700"
+                aria-selected={index === activeIndex}
+                className={`min-h-9 rounded-full px-3 py-1.5 text-[11px] font-semibold transition hover:bg-emerald-50 hover:text-emerald-700 ${
+                  index === activeIndex ? "bg-emerald-100 text-emerald-800 ring-2 ring-emerald-500/60" : "bg-muted/40 text-foreground/90"
+                }`}
               >
                 {search}
               </button>

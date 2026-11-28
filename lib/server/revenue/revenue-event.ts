@@ -119,11 +119,10 @@ export async function appendVerifiedCompanyRevenueEvent(
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return { ok: false, error: "REVENUE_STORE_UNAVAILABLE" }
 
   try {
-    const baseUrl = env.supabaseUrl.endsWith("/") ? env.supabaseUrl.slice(0, -1) : env.supabaseUrl
     const hasAttribution = Boolean(input.payingUserId?.trim()) || input.cashbackEligible === true || Boolean(input.relatedSourceEventId?.trim())
     if (input.cashbackEligible === true && !input.payingUserId?.trim()) return { ok: false, error: "CASHBACK_ATTRIBUTION_REQUIRED" }
-    const endpoint = `rpc/${hasAttribution ? "gh_company_revenue_event_append_attributed" : "gh_company_revenue_event_append"}`
-    const body = JSON.stringify({
+    const rpcName = hasAttribution ? "gh_company_revenue_event_append_attributed" : "gh_company_revenue_event_append"
+    const body: Record<string, unknown> = {
       p_idempotency_key: input.idempotencyKey.trim(),
       p_source_provider: input.sourceProvider,
       p_source_event_id: input.sourceEventId.trim(),
@@ -137,25 +136,15 @@ export async function appendVerifiedCompanyRevenueEvent(
       p_verified_at: input.verifiedAt,
       ...(hasAttribution ? { p_paying_user_id: input.payingUserId?.trim() || null, p_related_source_event_id: input.relatedSourceEventId?.trim() || null, p_cashback_eligible: input.cashbackEligible === true } : {}),
       p_metadata: safeMetadata(input.metadata),
-    })
+    }
 
     // A unique-key race can occur when two workers record the same verified event
     // concurrently. Retry once so the RPC can return the canonical idempotent row.
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: env.supabaseServiceRoleKey,
-          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-        },
-        body,
-        cache: "no-store",
-        // Bound upstream latency so reconciliation can fail visibly and be retried;
-        // do not leave a serverless payment request hanging indefinitely.
-        signal: AbortSignal.timeout(5_000),
-      })
-      const data = await response.json().catch(() => null) as CompanyRevenueAppendResult | null
+      // Shared REST client: resolves the project URL, sends service headers and bounds latency so
+      // reconciliation can fail visibly and be retried instead of hanging a serverless payment request.
+      const response = await supabaseRpc<CompanyRevenueAppendResult>(rpcName, body, { timeoutMs: 5_000 })
+      const data = (response.ok ? response.data : (response.body as CompanyRevenueAppendResult | null)) ?? null
       if (response.ok && data?.ok === true) {
         return { ok: true, duplicate: Boolean(data.duplicate), eventId: boundedText(data.eventId, 80) || undefined }
       }

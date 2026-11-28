@@ -36,11 +36,11 @@ export function PaymentRecoveryBanner() {
       const data = await res.json().catch(() => ({}))
       if (res.ok && data?.ok && Array.isArray(data.items)) {
         setItems(data.items.slice(0, 5))
-      } else {
-        setItems([])
       }
+      // A failed refresh keeps the last confirmed items: an unreadable status is not "nothing to recover",
+      // and hiding a pending payment on a transient error could strand it.
     } catch {
-      setItems([])
+      /* keep the last confirmed items */
     } finally {
       setLoading(false)
     }

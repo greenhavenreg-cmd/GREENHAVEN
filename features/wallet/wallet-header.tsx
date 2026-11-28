@@ -22,7 +22,7 @@ export function WalletHeader({
       <button
         type="button"
         onClick={onBack}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground transition hover:bg-muted active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="gh-hit-44 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground transition hover:bg-muted active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         aria-label="Back"
       >
         <ArrowLeft size={19} strokeWidth={2.25} />

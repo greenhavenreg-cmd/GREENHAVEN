@@ -247,7 +247,7 @@ export function PostActionBar({
                     }`}
                   >
                     <span className="block leading-none">{w}%</span>
-                    <span className={`mt-0.5 block text-[8px] font-semibold uppercase tracking-wide ${weight === w ? "text-violet-100" : "text-muted-foreground"}`}>{WEIGHT_NAMES[w]}</span>
+                    <span className={`mt-0.5 block text-[10px] font-semibold uppercase tracking-wide ${weight === w ? "text-violet-100" : "text-muted-foreground"}`}>{WEIGHT_NAMES[w]}</span>
                   </button>
                 ))}
               </div>

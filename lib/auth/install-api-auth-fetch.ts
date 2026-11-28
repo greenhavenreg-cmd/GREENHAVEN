@@ -26,6 +26,29 @@ function resolveUrl(input: RequestInfo | URL): URL | null {
   }
 }
 
+/** Same-origin API paths that legitimately stay open (streams, uploads, exports, call signalling). */
+const LONG_LIVED_API_PREFIXES = ["/api/realtime/", "/api/media", "/api/messaging/calls", "/api/account/export", "/api/research/projects"]
+/** Safety-net ceiling so a stalled request can never leave a screen or money action spinning forever. */
+const DEFAULT_API_TIMEOUT_MS = 45_000
+
+/**
+ * Returns request options carrying a timeout signal, or null when the request must be left alone
+ * (long-lived path, or the caller already owns cancellation).
+ */
+function timeoutOptions(
+  pathname: string,
+  input: RequestInfo | URL,
+  init?: RequestInit
+): { init: RequestInit; clear: () => void } | null {
+  if (LONG_LIVED_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return null
+  if (init?.signal) return null
+  // Request objects own their signal; only plain URL/string calls get the default ceiling.
+  if (typeof input === "object" && !(input instanceof URL)) return null
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), DEFAULT_API_TIMEOUT_MS)
+  return { init: { ...init, signal: controller.signal }, clear: () => clearTimeout(timer) }
+}
+
 function bearerHeader(): string | null {
   try {
     const value = IdentityService.getAuthHeaders().Authorization
@@ -58,10 +81,15 @@ if (typeof window !== "undefined" && !window.__ghApiAuthFetchInstalled) {
         const regional = regionalHeaders(null)
         if (!headers.has("X-GH-Locale")) headers.set("X-GH-Locale", regional["X-GH-Locale"])
         if (!headers.has("X-GH-Timezone")) headers.set("X-GH-Timezone", regional["X-GH-Timezone"])
-        if (typeof input === "object" && !(input instanceof URL)) {
-          return nativeFetch(new Request(input as Request, { ...init, headers }))
-        }
-        return nativeFetch(input, { ...init, headers })
+        const bounded = timeoutOptions(url.pathname, input, init)
+        const merged: RequestInit = { ...(bounded?.init ?? init), headers }
+        const pending =
+          typeof input === "object" && !(input instanceof URL)
+            ? nativeFetch(new Request(input as Request, merged))
+            : nativeFetch(input, merged)
+        if (!bounded) return pending
+        // Stop the timer as soon as the response headers arrive (or the request fails).
+        return pending.finally(bounded.clear)
       }
     } catch {
       /* fall through to the untouched request */

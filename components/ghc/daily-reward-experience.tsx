@@ -32,6 +32,7 @@ import { IdentityService } from "@/lib/identity/identity-service"
 import type { Profile } from "@/lib/ghc-types"
 import { useDailyClaimStatus } from "./use-daily-claim-status"
 import { postDailyClaim } from "@/lib/rewards/claim-daily-client"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 function resolveUserId(profile?: Profile | null): string {
   const fromIdentity = IdentityService.getCurrentUserId()
@@ -94,7 +95,7 @@ function StreakProgressStrip({
             >
               {done ? <Check size={14} strokeWidth={3} /> : isBonus ? "🎁" : d}
             </div>
-            <span className="truncate text-[9px] font-semibold text-muted-foreground">
+            <span className="truncate text-[10px] font-semibold text-muted-foreground">
               {track[d]}
             </span>
           </div>
@@ -289,7 +290,7 @@ export function DailyRewardFeedCard({
           ) : (
             <GhcCoinIcon size={26} />
           )}
-          <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-amber-400 px-1.5 text-[9px] font-black leading-4 text-amber-950">
+          <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-amber-400 px-1.5 text-[10px] font-black leading-4 text-amber-950">
             {daily.displayCycleDay}/7
           </span>
         </button>
@@ -468,10 +469,11 @@ export function DailyRewardSheet({
     onClose()
   }, [userId, onClose])
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, onClose)
   if (!open) return null
 
   return (
-    <div
+    <div ref={dialogRef} tabIndex={-1}
       className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center"
       role="dialog"
       aria-modal="true"
@@ -501,7 +503,7 @@ export function DailyRewardSheet({
           <button
             type="button"
             onClick={handleDismiss}
-            className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
+            className="gh-hit-44 flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
             aria-label="Close"
           >
             <X size={18} />

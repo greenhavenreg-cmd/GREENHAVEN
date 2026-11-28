@@ -77,8 +77,17 @@ export async function POST(request: Request) {
     )
   }
 
+  // The client sends one stable reference per purchase attempt so retries are idempotent in the
+  // durable ledger. Bound its shape: it becomes a ledger key and must not carry arbitrary input.
+  const suppliedReference = String(body.referenceId || "").trim()
+  if (suppliedReference && !/^[A-Za-z0-9:_.-]{8,128}$/.test(suppliedReference)) {
+    return NextResponse.json(
+      { ok: false, error: "INVALID_REFERENCE", message: "Purchase reference is invalid. No GHC was charged." },
+      { status: 400, headers: { "Cache-Control": "no-store" } },
+    )
+  }
   const referenceId =
-    String(body.referenceId || "").trim() ||
+    suppliedReference ||
     `msg_premium_${productId}_${auth.userId}_${Date.now()}`
 
   const spendInput = {

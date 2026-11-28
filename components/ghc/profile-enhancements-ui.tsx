@@ -14,7 +14,7 @@ export function ProfileAnalyticsCard({ analytics }: { analytics: any }) {
 
   return (
     <div className="px-4 py-4 border-t border-border/70">
-      <button
+      <button type="button"
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg hover:shadow-md transition"
       >
@@ -81,7 +81,7 @@ export function FollowerInsightsCard({ insights }: { insights: any }) {
 
   return (
     <div className="px-4 py-4 border-t border-border/70">
-      <button
+      <button type="button"
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between p-3 bg-gradient-to-r from-pink-50 to-rose-50 rounded-lg hover:shadow-md transition"
       >
@@ -178,7 +178,7 @@ export function EnhancedAchievementsGrid({ profile, completionPercentage }: { pr
       </div>
 
       {Object.values(ACHIEVEMENTS).length > 4 && (
-        <button
+        <button type="button"
           onClick={() => setExpanded(!expanded)}
           className="w-full text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 active:scale-95 py-2 transition"
         >
@@ -209,7 +209,7 @@ export function SkillsSection({
 
   return (
     <div className="px-4 py-4 border-t border-border/70">
-      <button
+      <button type="button"
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition"
       >
@@ -235,7 +235,7 @@ export function SkillsSection({
                     <p className="text-xs text-muted-foreground">{endorsements?.[skill] || 0} endorsements</p>
                   </div>
                   {onSkillRemove && (
-                    <button
+                    <button type="button"
                       onClick={() => onSkillRemove(skill)}
                       className="text-xs px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded transition"
                     >
@@ -249,7 +249,7 @@ export function SkillsSection({
 
           {onSkillAdd && (
             <div className="flex gap-2">
-              <input
+              <input aria-label="Add a skill..."
                 type="text"
                 value={newSkill}
                 onChange={(e) => setNewSkill(e.target.value)}
@@ -262,7 +262,7 @@ export function SkillsSection({
                 placeholder="Add a skill..."
                 className="flex-1 px-3 py-2 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <button
+              <button type="button"
                 onClick={() => {
                   if (newSkill.trim()) {
                     onSkillAdd(newSkill)
@@ -336,7 +336,7 @@ export function EnhancedSocialLinksSection({
                       View
                     </a>
                     {onRemoveLink && (
-                      <button
+                      <button type="button"
                         onClick={() => onRemoveLink(platform)}
                         className="text-xs font-semibold px-3 py-1.5 rounded bg-red-100 hover:bg-red-200 text-red-700 transition active:scale-95"
                         title={`Remove ${config.name}`}
@@ -347,7 +347,7 @@ export function EnhancedSocialLinksSection({
                   </>
                 ) : (
                   onAddLink && (
-                    <button
+                    <button type="button"
                       onClick={() => onAddLink(platform)}
                       className="text-xs font-semibold px-3 py-1.5 rounded bg-purple-100 hover:bg-purple-200 text-purple-700 transition active:scale-95"
                       title={`Add ${config.name}`}
@@ -389,7 +389,7 @@ export function PinnedPostsSection({
           {posts.filter(p => pinnedPostIds.includes(p.id)).slice(0, 3).map(post => (
             <div key={post.id} className="p-2 bg-blue-50 rounded-lg border border-blue-200 flex justify-between items-center">
               <span className="text-sm text-foreground/90 truncate">{post.content?.substring(0, 40)}...</span>
-              <button
+              <button type="button"
                 onClick={() => onTogglePinned?.(post.id)}
                 className="text-xs px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition"
               >
@@ -401,7 +401,7 @@ export function PinnedPostsSection({
       ) : (
         <p className="text-sm text-muted-foreground mb-3">No pinned posts yet. Pin your best content!</p>
       )}
-      <button
+      <button type="button"
         onClick={() => onTogglePinned?.("")}
         className="w-full px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg font-semibold transition"
       >
@@ -443,13 +443,13 @@ export function EnhancedQRProfileShare({
         <p className="text-xs text-muted-foreground mb-3">Scan to view {displayName}'s profile</p>
 
         <div className="flex gap-2 justify-center">
-          <button
+          <button type="button"
             onClick={handleCopy}
             className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-semibold transition active:scale-90"
           >
             {copied ? "Copied!" : "Copy Link"}
           </button>
-          <button
+          <button type="button"
             onClick={() => {
               if (navigator.share) {
                 navigator.share({ title: displayName, url: profileUrl })

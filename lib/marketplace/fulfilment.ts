@@ -38,6 +38,7 @@ export function parseMarketplaceFulfilmentInput(input: unknown, now = Date.now()
   if (rawEta && (!Number.isFinite(estimatedDeliveryAt) || estimatedDeliveryAt! < now - 86_400_000 || estimatedDeliveryAt! > now + 366 * 86_400_000)) {
     return { ok: false, error: "INVALID_ESTIMATED_DELIVERY" }
   }
+  if (action === "dispute" && note.length < 8) return { ok: false, error: "DISPUTE_REASON_REQUIRED" }
   if (action === "seller_fulfill") {
     if (!method) return { ok: false, error: "FULFILMENT_METHOD_REQUIRED" }
     if (method === "shipping" && (carrier.length < 2 || trackingNumber.length < 3)) return { ok: false, error: "SHIPPING_DETAILS_REQUIRED" }

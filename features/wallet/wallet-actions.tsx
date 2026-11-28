@@ -54,7 +54,7 @@ export function WalletPrimaryActions({
           label: "History",
           hint: "Pi ledger",
           icon: <Clock3 size={20} strokeWidth={2.25} />,
-          onClick: onActivity || onAdd || (() => {}),
+          onClick: onActivity || onAdd,
           tone: "slate",
           primary: false,
         },
@@ -92,7 +92,7 @@ export function WalletPrimaryActions({
           label: "History",
           hint: "All activity",
           icon: <Clock3 size={20} strokeWidth={2.25} />,
-          onClick: onActivity || onAdd || (() => {}),
+          onClick: onActivity || onAdd,
           tone: "slate",
           primary: false,
         },
@@ -124,7 +124,7 @@ export function WalletPrimaryActions({
             <button
               key={a.id}
               type="button"
-              disabled={disabled}
+              disabled={disabled || !a.onClick}
               onClick={a.onClick}
               className={`group flex min-h-[4.25rem] items-center gap-3 rounded-2xl px-3.5 py-3 text-left transition active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
                 primary
@@ -148,7 +148,7 @@ export function WalletPrimaryActions({
             <button
               key={a.id}
               type="button"
-              disabled={disabled}
+              disabled={disabled || !a.onClick}
               onClick={a.onClick}
               className="group flex min-h-[5.25rem] flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-2 transition active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               aria-label={`${a.label}: ${a.hint}`}

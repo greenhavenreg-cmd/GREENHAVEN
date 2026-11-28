@@ -15,7 +15,7 @@ const checks = [
   ['recovery retries idempotent journal append using the original completed intent', /recordPlatformCommission\(\{[\s\S]*?paymentIntentId: priorIntent\.id/.test(route) && /idempotent: true, recovered: true/.test(route)],
   ['interrupted order state is repaired through allowed transitions and failures stay retryable', /transitionOrder\(order\.id, "payment_verified", auth\.userId, "pi_recovery"\)/.test(route) && /ORDER_STATE_RECONCILIATION_PENDING/.test(route) && /const verifiedTransition = await transitionOrder/.test(route)],
   ['reconciliation responses disable caching', /"Cache-Control": "no-store"/.test(route)],
-  ['revenue journal upstream calls have a bounded timeout', /signal: AbortSignal\.timeout\(5_000\)/.test(revenue) && /cache: "no-store"/.test(revenue)],
+  ['revenue journal upstream calls have a bounded timeout', /supabaseRpc<CompanyRevenueAppendResult>\(rpcName, body, \{ timeoutMs: 5_000 \}\)/.test(revenue) && /signal: fetchInit\.signal \?\? AbortSignal\.timeout\(timeoutMs \?\? 15_000\)/.test(readFileSync("lib/server/supabase/rest-client.ts", "utf8")) && /cache: "no-store"/.test(readFileSync("lib/server/supabase/rest-client.ts", "utf8"))],
   ['contract is registered in full static verification', suite.includes('check-marketplace-revenue-reconciliation.mjs')],
   ['release version is synchronized', /^\d+\.\d+\.\d+$/.test(packageJson.version) && read('lib/app-release.ts').includes(`APP_RELEASE_VERSION = "${packageJson.version}"`)],
 ]

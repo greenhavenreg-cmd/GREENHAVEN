@@ -33,6 +33,7 @@ import {
 } from "@/lib/domains/ghc-receive-payload"
 import { encodeQrSvg } from "@/lib/qr-lite"
 import { collectSendRecipients, type SendRecipient } from "./send-ghc-flow"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 function formatGhc(n: number): string {
   if (!Number.isFinite(n)) return "₲ 0.00"
@@ -247,12 +248,13 @@ export function ReceiveGhcFlow({
     }
   }
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, onClose)
   if (!open) return null
 
   return (
     <div
       className="fixed inset-0 z-[220] flex items-end justify-center bg-black/45 sm:items-center sm:p-4"
-      role="dialog"
+      ref={dialogRef} tabIndex={-1} role="dialog"
       aria-modal="true"
       aria-label="Receive GHC"
     >
@@ -261,7 +263,7 @@ export function ReceiveGhcFlow({
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
           <button
             type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
+            className="gh-hit-44 flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
             aria-label="Back"
             onClick={() => {
               if (mode === "lookup") setMode("receive")
@@ -280,7 +282,7 @@ export function ReceiveGhcFlow({
                 : "Resolve a GreenHaven ID, then continue to Send"}
             </p>
           </div>
-          <button type="button" className="rounded-full p-2 hover:bg-muted" aria-label="Close" onClick={onClose}>
+          <button type="button" className="-m-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-muted" aria-label="Close" onClick={onClose}>
             <X size={16} />
           </button>
         </div>

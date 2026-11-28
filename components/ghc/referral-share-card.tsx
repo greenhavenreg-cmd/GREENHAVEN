@@ -411,7 +411,7 @@ export function ReferralShareCard({
           </p>
         ) : (
           <div className="mt-2 flex gap-2">
-            <input
+            <input aria-label="Code, GH-ID, or @PiUserXXXXXXXX"
               type="text"
               value={referrerGhId}
               onChange={(e) => setReferrerGhId(e.target.value)}

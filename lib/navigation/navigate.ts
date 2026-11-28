@@ -155,7 +155,7 @@ export function navigateTo(raw: string, options: NavigateOptions = {}): boolean 
  * Open a registry service by id. ACTIVE/BETA run destination; others no-op
  * (UI should show Coming Soon landing instead of calling this).
  *
- * ACTIVE deep-links (12 live modules):
+ * ACTIVE deep-links (13 live modules):
  * - community → Communities
  * - gh-chat → Messages
  * - connections → Matches + connection-requests inbox
@@ -221,6 +221,9 @@ export function openService(serviceId: string): boolean {
       // ACTIVE "Orders" opens the orders bucket; generic marketplace opens browse.
       if (service.id === "orders") {
         return navigateTo("marketplace", { marketplaceBucket: "orders" })
+      }
+      if (service.id === "seller-centre") {
+        return navigateTo("marketplace", { marketplaceBucket: "mine" })
       }
       return navigateTo("marketplace", { marketplaceBucket: "browse" })
     }

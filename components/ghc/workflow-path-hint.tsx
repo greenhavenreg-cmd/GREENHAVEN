@@ -6,7 +6,7 @@ export function WorkflowPathHint({ kind }: { kind: WorkflowPathKind }) {
   const steps = getWorkflowPath(kind)
   return (
     <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2" aria-label="Suggested next steps">
-      <p className="mb-1.5 text-[9px] font-bold uppercase tracking-[0.1em] text-muted-foreground">A simple way forward</p>
+      <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">A simple way forward</p>
       <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
         {steps.map((step, index) => (
           <li key={step.label} className="flex min-w-0 items-center gap-1 text-[10px] font-semibold text-foreground/85">

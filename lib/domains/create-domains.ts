@@ -238,7 +238,7 @@ export function createDomainServices(
             } else if (t === "mute" || t === "unmute") {
               await socialMute(target, t === "mute")
             } else if (t === "restrict" || t === "unrestrict") {
-              await fetch("/api/social/restricts", {
+              const restrictRes = await fetch("/api/social/restricts", {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
@@ -246,7 +246,16 @@ export function createDomainServices(
                   targetUserId: target,
                   restrict: t === "restrict",
                 }),
+                signal: AbortSignal.timeout(10_000),
               })
+              // A rejected write must not look saved: the local graph was already updated, so tell the user.
+              if (!restrictRes.ok) {
+                const { emitGhcAppEvent, GHC_APP_EVENTS } = await import("@/lib/ghc-app-events")
+                emitGhcAppEvent(GHC_APP_EVENTS.TOAST, {
+                  message: t === "restrict" ? "Couldn't save the restriction. It may not apply on other devices." : "Couldn't save the change. Please try again.",
+                  type: "error",
+                })
+              }
             }
           } catch {
             /* offline / studio */

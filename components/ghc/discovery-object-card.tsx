@@ -19,6 +19,7 @@ import type { ConnectionIntentId } from "@/lib/connection-intents"
 import { formatReasonsForUi } from "@/lib/domains/adapters/discovery-adapter"
 import { ACTION_LABELS, actionAriaLabel } from "@/lib/action-language"
 import { WorkflowPathHint } from "@/components/ghc/workflow-path-hint"
+import { plural } from "@/lib/ui/plural"
 
 export function DiscoveryObjectCard({
   candidate,
@@ -63,7 +64,7 @@ export function DiscoveryObjectCard({
           <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{candidate.purpose || candidate.subtitle}</p>
         ) : null}
         <p className="mt-1 text-[11px] text-muted-foreground">
-          {candidate.memberCount != null ? `${candidate.memberCount} members` : ""}
+          {candidate.memberCount != null ? plural(candidate.memberCount, "member") : ""}
           {candidate.region ? ` · ${candidate.region}` : ""}
           {candidate.privacy ? ` · ${candidate.privacy}` : ""}
         </p>

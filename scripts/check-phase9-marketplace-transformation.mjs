@@ -17,7 +17,7 @@ const prebuild = pkg.scripts?.['prebuild:checks'] || ""
 const verify = pkg.scripts?.["verify:static"] || ""
 const checks = [
   ["payment rail is derived from server-created order currency", /getMarketplaceOrderCurrency\(created\.order\)/.test(screen)],
-  ["single-purchase idempotency key is unique per intent and retained across uncertain retry", /idempotencyKeyRef\.current \|\| `buy_\$\{nonce\}`/.test(screen) && /idempotencyKeyRef\.current = null/.test(screen)],
+  ["single-purchase idempotency key is unique per intent, account-scoped and retained across uncertain retry", /idempotencyKeyRef\.current\?\.namespace === checkoutNamespace/.test(screen) && /idempotencyKeyRef\.current = \{ namespace: checkoutNamespace, key: idempotencyKey \}/.test(screen) && /idempotencyKeyRef\.current\?\.namespace === checkoutNamespace\) idempotencyKeyRef\.current = null/.test(screen)],
   ["single-item Pi checkout uses authoritative order currency", /if \(authoritativeCurrency === "PI"\)/.test(screen)],
   ["single-item GHC checkout is only reached after authoritative currency validation", /if \(!authoritativeCurrency\)[\s\S]*?socialPayMarketplaceOrder\(orderId, "ghc"\)/.test(screen)],
   ["cart order reservations retain authoritative currency", /currency: MarketplaceCurrency \| null/.test(screen) && /created\.push\(\{ id, item, currency \}\)/.test(screen)],

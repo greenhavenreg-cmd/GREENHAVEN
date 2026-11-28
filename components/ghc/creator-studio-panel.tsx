@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { IdentityService } from "@/lib/identity/identity-service"
 import { BarChart3, RefreshCw, Sparkles, Wallet } from "lucide-react"
 import { UnifiedActivityCenter } from "./unified-activity-center"
 import { hasUnscopedLegacyPostDrafts, listPostDrafts, removePostDraft } from "@/lib/creator/post-drafts"
@@ -29,34 +30,64 @@ export function CreatorStudioPanel({ onClose }: { onClose?: () => void }) {
   const [tipsEnabled, setTipsEnabled] = useState(false)
   const [msg, setMsg] = useState("")
   const [busy, setBusy] = useState(false)
+  const [identityId, setIdentityId] = useState(() => IdentityService.getCurrentUserId())
+  const loadControllerRef = useRef<AbortController | null>(null)
 
   const load = useCallback(async () => {
+    const ownerAtStart = identityId
+    if (!ownerAtStart || IdentityService.getCurrentUserId() !== ownerAtStart) return
+    loadControllerRef.current?.abort()
+    const controller = new AbortController()
+    loadControllerRef.current = controller
     setLoading(true)
     try {
+      const requestOptions = { credentials: "include" as const, cache: "no-store" as const, signal: controller.signal }
       const [creatorRes, economyRes] = await Promise.all([
-        fetch("/api/social/creator", { credentials: "include", cache: "no-store" }),
-        fetch("/api/social/economy/status", { credentials: "include", cache: "no-store" }),
+        fetch("/api/social/creator", requestOptions),
+        fetch("/api/social/economy/status", requestOptions),
       ])
       const [data, economyData] = await Promise.all([creatorRes.json().catch(() => ({})), economyRes.json().catch(() => ({}))])
-      if (data?.ok) {
-        setDataQuality(data.dataQuality || null)
-        if (data.dataQuality?.sources?.creatorProfile !== false) {
+      if (controller.signal.aborted || IdentityService.getCurrentUserId() !== ownerAtStart) return
+      if (creatorRes.ok && data?.ok === true && data.durable === true) {
+        const sources = data.dataQuality?.sources || {}
+        setDataQuality(data.dataQuality || { complete: false })
+        if (sources.creatorProfile === true) {
           setCreator(data.creator || {})
           setTipsEnabled(Boolean(data.creator?.tipsEnabled))
+        } else {
+          setCreator({}); setTipsEnabled(false)
         }
-        if (data.dataQuality?.sources?.publishedPosts !== false) setPosts(Array.isArray(data.posts) ? data.posts : [])
-        if (data.dataQuality?.sources?.reputation !== false) setRep(data.reputation || null)
-        setCreatorEconomy(data.creatorEconomy?.ok === true ? data.creatorEconomy : null)
+        setPosts(sources.publishedPosts === true && Array.isArray(data.posts) ? data.posts : [])
+        setRep(sources.reputation === true ? data.reputation || null : null)
+        setCreatorEconomy(sources.creatorEconomy === true && data.creatorEconomy?.ok === true ? data.creatorEconomy : null)
       } else {
-        setDataQuality({ complete: false })
+        setDataQuality({ complete: false, sources: { creatorProfile: false, publishedPosts: false, creatorEconomy: false, reputation: false } })
+        setCreator({}); setPosts([]); setRep(null); setCreatorEconomy(null); setTipsEnabled(false)
       }
-      setEconomy(economyData?.ok ? economyData : null)
-    } catch { /* fail-soft; never invent creator/economy state */ }
-    finally { setLoading(false) }
-  }, [])
+      setEconomy(economyRes.ok && economyData?.ok === true ? economyData : null)
+    } catch {
+      if (!controller.signal.aborted && IdentityService.getCurrentUserId() === ownerAtStart) {
+        setDataQuality({ complete: false, sources: { creatorProfile: false, publishedPosts: false, creatorEconomy: false, reputation: false } })
+        setCreator({}); setPosts([]); setRep(null); setCreatorEconomy(null); setEconomy(null); setTipsEnabled(false)
+      }
+    } finally {
+      if (loadControllerRef.current === controller) loadControllerRef.current = null
+      if (!controller.signal.aborted && IdentityService.getCurrentUserId() === ownerAtStart) setLoading(false)
+    }
+  }, [identityId])
 
   const refreshDrafts = useCallback(() => { setDrafts(listPostDrafts()); setHasLegacyDrafts(hasUnscopedLegacyPostDrafts()) }, [])
-  useEffect(() => { void load(); refreshDrafts() }, [load, refreshDrafts])
+  useEffect(() => IdentityService.subscribe((identity) => setIdentityId(identity.userId || "")), [])
+  useEffect(() => {
+    loadControllerRef.current?.abort()
+    loadControllerRef.current = null
+    setCreator({}); setPosts([]); setDrafts([]); setRep(null); setEconomy(null); setCreatorEconomy(null)
+    setDataQuality(null); setTipsEnabled(false); setMsg(""); setBusy(false)
+    refreshDrafts()
+    if (identityId) void load()
+    else setLoading(false)
+    return () => { loadControllerRef.current?.abort(); loadControllerRef.current = null }
+  }, [identityId, load, refreshDrafts])
   useEffect(() => {
     const refresh = () => { refreshDrafts(); void load() }
     window.addEventListener("ghc:curation-updated", refresh)
@@ -86,18 +117,24 @@ export function CreatorStudioPanel({ onClose }: { onClose?: () => void }) {
   }), { views: 0, qualified: 0, likes: 0, comments: 0, shares: 0, up: 0, down: 0, communities: 0 }), [filteredPosts])
 
   const enableStudio = async () => {
+    const ownerAtStart = identityId
+    if (!ownerAtStart || IdentityService.getCurrentUserId() !== ownerAtStart || dataQuality?.sources?.creatorProfile !== true) return
     setBusy(true); setMsg("")
     try {
       const res = await fetch("/api/social/creator", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipsEnabled }) })
       const data = await res.json()
+      if (IdentityService.getCurrentUserId() !== ownerAtStart) return
       if (data?.ok) { setMsg("Creator Studio updated."); await load() } else setMsg(String(data?.error || "Update failed"))
-    } catch { setMsg("Network error") } finally { setBusy(false) }
+    } catch { if (IdentityService.getCurrentUserId() === ownerAtStart) setMsg("Network error") }
+    finally { if (IdentityService.getCurrentUserId() === ownerAtStart) setBusy(false) }
   }
 
   const engagementTotal = totals.likes + totals.comments + totals.shares
   const engagementRate = totals.views > 0 ? (engagementTotal / totals.views) * 100 : 0
-  const nextBestAction = filteredPosts.length === 0
-    ? "Publish your first useful post to start building measurable creator performance."
+  const nextBestAction = dataQuality?.sources?.publishedPosts !== true
+    ? "Creator performance is unavailable until your published-post records can be verified."
+    : filteredPosts.length === 0
+      ? "Publish your first useful post to start building measurable creator performance."
     : totals.qualified === 0
       ? "Improve the opening, clarity and usefulness of your next post to earn qualified attention."
       : totals.comments === 0
@@ -115,7 +152,7 @@ export function CreatorStudioPanel({ onClose }: { onClose?: () => void }) {
   return <div className="space-y-4 p-4">
     <div className="flex items-center justify-between gap-2">
       <div><h2 className="text-lg font-bold text-foreground">Creator Studio</h2><p className="text-xs text-muted-foreground">Content, curation, reputation and wallet-backed creator activity</p></div>
-      <div className="flex gap-1"><button type="button" onClick={() => void load()} disabled={loading} className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted disabled:opacity-50" aria-label="Refresh Creator Studio"><RefreshCw size={16} className={loading ? "animate-spin" : ""}/></button>{onClose ? <button type="button" onClick={onClose} className="rounded-full px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted">Close</button> : null}</div>
+      <div className="flex gap-1"><button type="button" onClick={() => void load()} disabled={loading} className="gh-hit-44 flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted disabled:opacity-50" aria-label="Refresh Creator Studio"><RefreshCw size={16} className={loading ? "animate-spin" : ""}/></button>{onClose ? <button type="button" onClick={onClose} className="rounded-full px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted">Close</button> : null}</div>
     </div>
 
     {loading ? <p className="text-sm text-muted-foreground">Loading verified creator state…</p> : <>
@@ -127,14 +164,14 @@ export function CreatorStudioPanel({ onClose }: { onClose?: () => void }) {
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <div className="rounded-2xl border border-border bg-card p-3"><BarChart3 size={16}/><p className="mt-2 text-lg font-bold">{filteredPosts.length}</p><p className="text-[10px] text-muted-foreground">Published posts</p></div>
-        <div className="rounded-2xl border border-border bg-card p-3"><Sparkles size={16}/><p className="mt-2 text-lg font-bold">{totals.qualified.toLocaleString()}</p><p className="text-[10px] text-muted-foreground">Qualified views</p></div>
-        <div className="rounded-2xl border border-border bg-card p-3"><p className="text-sm font-bold">↑ {totals.up} / ↓ {totals.down}</p><p className="mt-3 text-[10px] text-muted-foreground">Curation signals</p></div>
+        <div className="rounded-2xl border border-border bg-card p-3"><BarChart3 size={16}/><p className="mt-2 text-lg font-bold">{dataQuality?.sources?.publishedPosts !== true ? "—" : filteredPosts.length}</p><p className="text-[10px] text-muted-foreground">Published posts</p></div>
+        <div className="rounded-2xl border border-border bg-card p-3"><Sparkles size={16}/><p className="mt-2 text-lg font-bold">{dataQuality?.sources?.publishedPosts !== true ? "—" : totals.qualified.toLocaleString()}</p><p className="text-[10px] text-muted-foreground">Qualified views</p></div>
+        <div className="rounded-2xl border border-border bg-card p-3"><p className="text-sm font-bold">↑ {dataQuality?.sources?.publishedPosts !== true ? "—" : `${totals.up} / ↓ ${totals.down}`}</p><p className="mt-3 text-[10px] text-muted-foreground">Curation signals</p></div>
         <div className="rounded-2xl border border-border bg-card p-3"><Wallet size={16}/><p className="mt-2 text-lg font-bold">{economy ? fmt(economy.available ?? economy.balance) : "—"}</p><p className="text-[10px] text-muted-foreground">Available GHC</p></div>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-2xl border border-border bg-card p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Engagement rate</p><p className="mt-1 text-xl font-bold">{engagementRate.toFixed(1)}%</p><p className="mt-1 text-[10px] text-muted-foreground">Interactions ÷ recorded views</p></div>
-        <div className="rounded-2xl border border-border bg-card p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Meaningful actions</p><p className="mt-1 text-xl font-bold">{engagementTotal.toLocaleString()}</p><p className="mt-1 text-[10px] text-muted-foreground">Likes, comments and shares</p></div>
+        <div className="rounded-2xl border border-border bg-card p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Engagement rate</p><p className="mt-1 text-xl font-bold">{dataQuality?.sources?.publishedPosts !== true ? "—" : `${engagementRate.toFixed(1)}%`}</p><p className="mt-1 text-[10px] text-muted-foreground">Interactions ÷ recorded views</p></div>
+        <div className="rounded-2xl border border-border bg-card p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Meaningful actions</p><p className="mt-1 text-xl font-bold">{dataQuality?.sources?.publishedPosts !== true ? "—" : engagementTotal.toLocaleString()}</p><p className="mt-1 text-[10px] text-muted-foreground">Likes, comments and shares</p></div>
       </div>
       <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.06] p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Next best action</p><p className="mt-1 text-sm font-semibold leading-5 text-foreground">{nextBestAction}</p><p className="mt-1 text-[10px] leading-4 text-muted-foreground">Guidance is based only on the performance records shown here; it does not predict rewards or earnings.</p></div>
 
@@ -146,9 +183,9 @@ export function CreatorStudioPanel({ onClose }: { onClose?: () => void }) {
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-        <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Creator status</p><p className="text-sm font-semibold">{creator.exists ? "Enabled" : "Not enabled yet"}</p></div>{rep ? <div className="text-right"><p className="text-xs font-bold">L{rep.level} · {rep.levelName}</p><p className="text-[10px] text-muted-foreground">{n(rep.totalPoints).toLocaleString()} reputation points</p></div> : null}</div>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={tipsEnabled} onChange={(e) => setTipsEnabled(e.target.checked)}/>Allow creator tips</label>
-        <button type="button" disabled={busy} onClick={() => void enableStudio()} className="inline-flex min-h-10 items-center justify-center rounded-full bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50">{creator.exists ? "Save settings" : "Enable Creator Studio"}</button>
+        <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Creator status</p><p className="text-sm font-semibold">{dataQuality?.sources?.creatorProfile !== true ? "Unavailable" : creator.exists ? "Enabled" : "Not enabled yet"}</p></div>{rep ? <div className="text-right"><p className="text-xs font-bold">L{Number.isSafeInteger(rep.level) ? rep.level : "—"} · {rep.levelName || "Level unavailable"}</p><p className="text-[10px] text-muted-foreground">{Number.isSafeInteger(rep.totalPoints) ? Number(rep.totalPoints).toLocaleString() : "—"} reputation points</p></div> : null}</div>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={tipsEnabled} disabled={dataQuality?.sources?.creatorProfile !== true || busy} onChange={(e) => setTipsEnabled(e.target.checked)}/>Allow creator tips</label>
+        <button type="button" disabled={busy || dataQuality?.sources?.creatorProfile !== true} onClick={() => void enableStudio()} className="inline-flex min-h-10 items-center justify-center rounded-full bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50">{creator.exists ? "Save settings" : "Enable Creator Studio"}</button>
         {msg ? <p className="text-xs text-muted-foreground">{msg}</p> : null}
       </div>
 
@@ -167,8 +204,8 @@ export function CreatorStudioPanel({ onClose }: { onClose?: () => void }) {
       </section>
 
       <div className="rounded-2xl border border-border bg-card p-4">
-        <div className="mb-3 flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Content performance</p><p className="text-[10px] text-muted-foreground">{totals.comments} comments · {totals.shares} shares</p></div>
-        {dataQuality?.sources?.publishedPosts === false ? <p className="text-sm text-muted-foreground">Content performance is temporarily unavailable. Refresh to try again.</p> : filteredPosts.length === 0 ? <p className="text-sm text-muted-foreground">No published posts yet.</p> : <ul className="max-h-80 space-y-2 overflow-y-auto">{filteredPosts.map((p) => <li key={p.id}><button type="button" onClick={() => openPost(p.id)} className="w-full rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-left text-xs hover:bg-muted/60"><div className="flex items-start justify-between gap-2"><p className="line-clamp-2 font-medium text-foreground">{p.content || "(media post)"}</p>{p.community_name ? <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] font-bold text-emerald-700">{p.community_name}</span> : null}</div><p className="mt-1 tabular-nums text-muted-foreground">views {p.view_count ?? 0} · qualified {p.qualified_view_count ?? 0} · likes {p.like_count ?? 0} · comments {p.comment_count ?? 0} · shares {p.share_count ?? 0} · ↑{p.upvote_count ?? 0}/↓{p.downvote_count ?? 0}</p></button></li>)}</ul>}
+        <div className="mb-3 flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Content performance</p><p className="text-[10px] text-muted-foreground">{dataQuality?.sources?.publishedPosts === true ? `${totals.comments} comments · ${totals.shares} shares` : "Records unavailable"}</p></div>
+        {dataQuality?.sources?.publishedPosts !== true ? <p className="text-sm text-muted-foreground">Content performance is temporarily unavailable. Refresh to try again.</p> : filteredPosts.length === 0 ? <p className="text-sm text-muted-foreground">No published posts yet.</p> : <ul className="max-h-80 space-y-2 overflow-y-auto">{filteredPosts.map((p) => <li key={p.id}><button type="button" onClick={() => openPost(p.id)} className="w-full rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-left text-xs hover:bg-muted/60"><div className="flex items-start justify-between gap-2"><p className="line-clamp-2 font-medium text-foreground">{p.content || "(media post)"}</p>{p.community_name ? <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{p.community_name}</span> : null}</div><p className="mt-1 tabular-nums text-muted-foreground">views {p.view_count ?? 0} · qualified {p.qualified_view_count ?? 0} · likes {p.like_count ?? 0} · comments {p.comment_count ?? 0} · shares {p.share_count ?? 0} · ↑{p.upvote_count ?? 0}/↓{p.downvote_count ?? 0}</p></button></li>)}</ul>}
       </div>
 
       <UnifiedActivityCenter limit={12} />

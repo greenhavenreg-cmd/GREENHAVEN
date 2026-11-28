@@ -382,18 +382,22 @@ export function ProfileScreen({
     Array<{ id: string; title: string; price: number; currency: string; media?: string[]; status?: string; location?: string }>
   >([])
   const [profileListingsLoading, setProfileListingsLoading] = useState(false)
+  const [profileListingsFailed, setProfileListingsFailed] = useState(false)
+  const [profileListingsRetry, setProfileListingsRetry] = useState(0)
 
   useEffect(() => {
     if (profileSectionTab !== "listings") return
     let cancelled = false
     setProfileListingsLoading(true)
+    setProfileListingsFailed(false)
     ;(async () => {
       try {
         const { socialFetchMarketplaceListings } = await import("@/lib/social/client")
         const remote = await socialFetchMarketplaceListings({ scope: "mine", limit: 24 })
         if (cancelled) return
         if (!remote.ok) {
-          setProfileListings([])
+          // A failed load must never read as "no listings"; keep the last known list.
+          setProfileListingsFailed(true)
           return
         }
         setProfileListings(
@@ -410,7 +414,7 @@ export function ProfileScreen({
             .filter((l) => l.id)
         )
       } catch {
-        if (!cancelled) setProfileListings([])
+        if (!cancelled) setProfileListingsFailed(true)
       } finally {
         if (!cancelled) setProfileListingsLoading(false)
       }
@@ -418,7 +422,12 @@ export function ProfileScreen({
     return () => {
       cancelled = true
     }
-  }, [profileSectionTab])
+  }, [profileSectionTab, profileListingsRetry])
+  // Never show one account's listings to another after an account switch.
+  useEffect(() => {
+    setProfileListings([])
+    setProfileListingsFailed(false)
+  }, [meId])
   const [dashboardPageOpen, setDashboardPageOpen] = useState(false)
 
   useEffect(() => {
@@ -480,8 +489,10 @@ export function ProfileScreen({
     const onMembership = () => {
       // Soft re-check after activate
       void fetch("/api/membership/status", { credentials: "include", cache: "no-store" })
-        .then((r) => r.json())
+        // A 503/error body must not be read as "free" and wipe a VIP badge the member really holds.
+        .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
+          if (!data) return
           const tier = String(data?.entitlement?.tier || data?.tier || "free").toLowerCase()
           setMembershipTierLabel(tier === "vip" || tier === "vvip" ? tier.toUpperCase() : null)
         })
@@ -762,7 +773,7 @@ export function ProfileScreen({
           <button
             type="button"
             onClick={() => onOpenWallet?.()}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300"
+            className="gh-hit-44 flex h-9 w-9 items-center justify-center rounded-full text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300"
             aria-label={msg("wallet")}
           >
             <Wallet size={18} />
@@ -770,7 +781,7 @@ export function ProfileScreen({
           <button
             type="button"
             onClick={onSettings}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted"
+            className="gh-hit-44 flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted"
             aria-label="Settings"
           >
             <SettingsIcon size={18} />
@@ -825,7 +836,7 @@ export function ProfileScreen({
                 </div>
               )}
               </button>
-              <button type="button" onClick={() => setPhotoSheet("photo")} className="absolute bottom-0.5 right-0.5 flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-[var(--gh-green)] text-white shadow-md" aria-label="Change profile photo"><Camera size={14} /></button>
+              <button type="button" onClick={() => setPhotoSheet("photo")} className="gh-hit-44 absolute bottom-0.5 right-0.5 flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-[var(--gh-green)] text-white shadow-md" aria-label="Change profile photo"><Camera size={14} /></button>
             </div>
 
             <div className="mb-1 flex gap-2">
@@ -1033,6 +1044,21 @@ export function ProfileScreen({
                 Sell
               </button>
             </div>
+            {profileListingsFailed && !profileListingsLoading ? (
+              <div role="alert" className="mb-3 rounded-[1.25rem] border border-amber-300/70 bg-amber-50/70 px-3.5 py-3 dark:border-amber-900/60 dark:bg-amber-950/20">
+                <p className="text-[12px] font-semibold text-foreground">Your listings could not be loaded.</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                  {profileListings.length ? "Showing the last loaded list; it may be out of date." : "This does not mean you have none."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setProfileListingsRetry((tick) => tick + 1)}
+                  className="gh-hit-44 mt-2 min-h-9 rounded-full border border-border bg-background px-3.5 text-[11px] font-bold text-foreground hover:bg-muted"
+                >
+                  Try again
+                </button>
+              </div>
+            ) : null}
             {profileListingsLoading ? (
               <div className="rounded-2xl border border-border/50 p-6 text-center text-sm text-muted-foreground">
                 Loading listings…
@@ -1069,7 +1095,7 @@ export function ProfileScreen({
                   </button>
                 ))}
               </div>
-            ) : (
+            ) : profileListingsFailed ? null : (
               <div className="rounded-[1.25rem] border border-border/60 bg-card p-4 text-center shadow-sm">
                 <p className="text-[13px] font-bold text-foreground">No listings yet</p>
                 <p className="mt-1 text-[12px] text-muted-foreground">Sell goods or services with Pi or GHC.</p>
@@ -1101,7 +1127,7 @@ export function ProfileScreen({
                 imgs.forEach((src, i) => {
                   if (!src) return
                   cells.push(
-                    <button key={`${post.id}-img-${i}`} type="button" className="aspect-square overflow-hidden rounded-xl bg-muted" onClick={() => setLibraryOpen(true)}>
+                    <button key={`${post.id}-img-${i}`} type="button" aria-label="Open photo library" className="aspect-square overflow-hidden rounded-xl bg-muted" onClick={() => setLibraryOpen(true)}>
                       <LazyImage src={src} alt="" className="h-full w-full object-cover" />
                     </button>
                   )
@@ -1264,7 +1290,7 @@ export function ProfileScreen({
                   <p className="flex items-center gap-1.5 text-[12px] font-bold text-foreground"><Sparkles size={14} aria-hidden /> Turn your profile into results</p>
                   <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">Use your identity to build relationships, participate in communities and reach relevant opportunities across GreenHaven.</p>
                 </div>
-                <span className="shrink-0 rounded-full bg-emerald-600/10 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Action hub</span>
+                <span className="shrink-0 rounded-full bg-emerald-600/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Action hub</span>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {[
@@ -1389,7 +1415,7 @@ export function ProfileScreen({
               <button
                 type="button"
                 onClick={() => setPhotoSheet(null)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+                className="gh-hit-44 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
                 aria-label="Close"
               >
                 <X size={16} />

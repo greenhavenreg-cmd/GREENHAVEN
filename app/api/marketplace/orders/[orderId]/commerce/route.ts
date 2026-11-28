@@ -3,6 +3,7 @@ import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
 import { loadOrder, updateCommerceOrder, updateOrderFulfilment, type MarketplaceFulfilmentAction } from "@/lib/server/marketplace/order-store"
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
 import { parseMarketplaceFulfilmentInput } from "@/lib/marketplace/fulfilment"
+import { returnGuideFor } from "@/lib/marketplace/returns"
 import { enforceUserMutationRateLimit } from "@/lib/server/security/user-rate-limit"
 import { createUnifiedNotification } from "@/lib/server/notifications/unified"
 
@@ -30,6 +31,25 @@ export async function POST(request: Request, ctx: { params: Promise<{ orderId: s
   const input = parseMarketplaceFulfilmentInput(parsed.value)
   if (!input.ok) return NextResponse.json({ ok: false, error: input.error }, { status: 400, headers: { "Cache-Control": "no-store" } })
 
+  // The standard dispute lane is available before delivery, or for seven days
+  // after a server-recorded delivery while the order remains unconfirmed.
+  // Completed orders have a separate seller-support conversation, not a
+  // reversible buyer dispute. This check is server-side; the UI is not authority.
+  if (input.value.action === "dispute") {
+    const guide = returnGuideFor({
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      deliveryStatus: order.deliveryStatus,
+      deliveredAt: order.deliveredAt,
+    })
+    if (!guide.canOpenDispute) {
+      return NextResponse.json(
+        { ok: false, error: "DISPUTE_WINDOW_CLOSED", message: guide.headline },
+        { status: 409, headers: { "Cache-Control": "no-store" } },
+      )
+    }
+  }
+
   let result: CommerceResult
   if (FULFILMENT_ACTIONS.has(input.value.action)) {
     result = await updateOrderFulfilment(orderId, auth.userId, input.value.action as MarketplaceFulfilmentAction, {
@@ -41,7 +61,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ orderId: s
   }
   if (!result.ok) {
     const status = ["FORBIDDEN", "SELLER_ONLY", "BUYER_ONLY"].includes(result.error) ? 403
-      : ["PAYMENT_REQUIRED", "INVALID_STATE", "PAID_OR_STARTED", "DISPATCH_REQUIRED", "DELIVERY_NOT_CONFIRMED", "SHIPPING_DETAILS_REQUIRED"].includes(result.error) ? 409 : 400
+      : ["PAYMENT_REQUIRED", "INVALID_STATE", "PAID_OR_STARTED", "DISPATCH_REQUIRED", "DELIVERY_NOT_CONFIRMED", "SHIPPING_DETAILS_REQUIRED", "DISPUTE_WINDOW_CLOSED"].includes(result.error) ? 409 : 400
     return NextResponse.json({ ok: false, error: result.error }, { status, headers: { "Cache-Control": "no-store" } })
   }
   const updatedOrder = result.order

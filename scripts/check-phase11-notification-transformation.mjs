@@ -22,12 +22,12 @@ const checks = [
   ['notification preferences merge nested channel defaults safely', domain.includes('typeof accountSaved?.inApp === "boolean"') && domain.includes('typeof deviceSaved?.push === "boolean"')],
   ['settings toggles update domain notification preferences', settings.includes('saveNotificationPreferences(next, owner)') && settings.includes('const owner = notificationIdentityId') && settings.includes('IdentityService.subscribe') && settings.includes('for (const category of t.categories)')],
   ['optional profile and product updates default off', domain.includes('prefs.profile_views = { inApp: false, push: false }') && domain.includes('prefs.product_updates = { inApp: false, push: false }')],
-  ['mark-all success toast follows server responses', bell.indexOf('const failed = results.some') < bell.indexOf('All notifications marked read')],
-  ['notification deletion copy is honest about device scope', bell.includes('Notification hidden on this device') && notificationActions.includes('label: "Dismiss"') && notificationActions.includes('Hide this notification on this device')],
+  ['mark-all success toast follows server responses', bell.indexOf('const failed = results.some') < bell.indexOf('t("allNotificationsMarkedRead")')],
+  ['notification deletion copy is honest about device scope', bell.includes('t("hiddenOnDevice")') && read('lib/i18n/social.ts').includes('Notification hidden on this device') && notificationActions.includes('label: "Dismiss"') && notificationActions.includes('Hide this notification on this device')],
   ['priority scoring is deterministic and explainable', priority.includes('NotificationPriorityAssessment') && priority.includes('reason:')],
   ['security notices remain in-app by default', domain.includes('prefs.system = { inApp: true, push: false }')],
-  ['notification dialog traps keyboard focus and handles Escape', bell.includes('e.key !== "Tab"') && bell.includes('e.key === "Escape"') && bell.includes('focusable[0]') && bell.includes('last.focus()')],
-  ['notification dialog restores focus after close', bell.includes('previousFocusRef.current?.focus?.()') && bell.includes('requestAnimationFrame')],
+  ['notification dialog traps keyboard focus and handles Escape', bell.includes('useDialogA11y<HTMLDivElement>(open,') && bell.includes('ref={dialogRef}') && bell.includes('notification-escape') && bell.includes('data-dialog-initial-focus')],
+  ['notification dialog restores focus after close', bell.includes('useDialogA11y') && read('hooks/use-dialog-a11y.ts').includes('opener.focus')],
 ]
 for (const [label, ok] of checks) {
   assert.ok(ok, label)

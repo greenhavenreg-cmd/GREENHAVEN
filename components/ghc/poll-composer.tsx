@@ -8,6 +8,7 @@
 import { useMemo, useState } from "react"
 import { X, Plus, Trash2, BarChart3, Clock, Users } from "lucide-react"
 import { useGHC } from "@/contexts/ghc-context"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 const DURATIONS = [
   { id: "1d", label: "1 day", hours: 24 },
@@ -47,6 +48,7 @@ export function PollComposer({
     return q && opts.length >= 2 && !busy
   }, [question, options, busy])
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, () => onOpenChange(false))
   if (!open) return null
 
   const setOption = (i: number, v: string) => {
@@ -171,7 +173,7 @@ export function PollComposer({
   }
 
   return (
-    <div className="fixed inset-0 z-[90] flex flex-col bg-background" role="dialog" aria-modal="true" aria-label="Create poll">
+    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-[90] flex flex-col bg-background" role="dialog" aria-modal="true" aria-label="Create poll">
       <header className="flex items-center justify-between border-b border-border px-3 py-2.5">
         <button type="button" onClick={() => onOpenChange(false)} className="rounded-full p-2 hover:bg-muted" aria-label="Close">
           <X size={20} />
@@ -204,7 +206,7 @@ export function PollComposer({
           <ul className="space-y-2">
             {options.map((o, i) => (
               <li key={i} className="flex gap-2">
-                <input
+                <input aria-label={`Option ${i + 1}`}
                   value={o}
                   onChange={(e) => setOption(i, e.target.value.slice(0, 80))}
                   placeholder={`Option ${i + 1}`}

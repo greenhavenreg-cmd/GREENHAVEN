@@ -214,6 +214,8 @@ export function RewardsCentreScreen({
   const [tick, setTick] = useState<number>(0)
   const [claimedFlash, setClaimedFlash] = useState<string | null>(null)
   const [claimingId, setClaimingId] = useState<string | null>(null)
+  // Synchronous single-flight guard: `claimingId` only updates after a render.
+  const claimInFlightRef = useRef(false)
   const [serverRewardTransactions, setServerRewardTransactions] = useState<ServerRewardTransaction[] | null>(null)
   const [serverHistoryStatus, setServerHistoryStatus] = useState<"loading" | "ready" | "loading_more" | "unavailable">("loading")
   const [serverHistoryPageCursor, setServerHistoryPageCursor] = useState<string | null>(null)
@@ -223,6 +225,7 @@ export function RewardsCentreScreen({
   const [isOffline, setIsOffline] = useState(false)
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
   const [achievementsHydrating, setAchievementsHydrating] = useState(true)
+  const [achievementsLoadFailed, setAchievementsLoadFailed] = useState(false)
   const [achievementRefreshTick, setAchievementRefreshTick] = useState(0)
   const [verifyingMissionId, setVerifyingMissionId] = useState<string | null>(null)
   /** Durable unlocks from /api/profile/achievements (merged with local domain) */
@@ -574,10 +577,12 @@ export function RewardsCentreScreen({
     serverAchievementsOwnerRef.current = null
     setServerAchievements([])
     setAchievementsHydrating(true)
+    setAchievementsLoadFailed(false)
     void fetchServerAchievements()
       .then((r) => {
         if (cancelled) return
         if (!r.ok) {
+          setAchievementsLoadFailed(true)
           setAchievementsHydrating(false)
           return
         }
@@ -594,6 +599,7 @@ export function RewardsCentreScreen({
         if (!cancelled) {
           serverAchievementsOwnerRef.current = null
           setServerAchievements([])
+          setAchievementsLoadFailed(true)
         }
       })
       .finally(() => {
@@ -758,11 +764,12 @@ export function RewardsCentreScreen({
 
 const claimPendingReward = useCallback(
     async (rewardId: string) => {
-      if (claimingId) return
+      if (claimingId || claimInFlightRef.current) return
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         ghc.addToast?.("You are offline. Claims need a connection so the ledger can confirm.", "info")
         return
       }
+      claimInFlightRef.current = true
       setClaimingId(rewardId)
       setStatusMsg("Claiming…")
       try {
@@ -811,6 +818,7 @@ const claimPendingReward = useCallback(
       } catch (e) {
         ghc.addToast?.(e instanceof Error ? e.message : "Claim failed", "error")
       } finally {
+        claimInFlightRef.current = false
         setClaimingId(null)
         // Never leave the Rewards Centre stuck on a stale "Claiming…" label
         // after an error, timeout, or successful server confirmation.
@@ -827,7 +835,7 @@ const claimPendingReward = useCallback(
         <button
           type="button"
           onClick={onBack}
-          className="flex h-9 w-9 items-center justify-center rounded-full text-foreground transition hover:bg-muted active:scale-95"
+          className="gh-hit-44 flex h-9 w-9 items-center justify-center rounded-full text-foreground transition hover:bg-muted active:scale-95"
           aria-label="Back"
         >
           <ArrowLeft size={17} strokeWidth={2.25} />
@@ -893,7 +901,7 @@ const claimPendingReward = useCallback(
             <div className="min-w-0">
               <p id="rewards-balance-summary-title" className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">Rewards at a glance</p>
               <p className="mt-1 text-[11px] text-muted-foreground">Pending and locked are not spendable.</p>
-              <p className="mt-1 text-[9px] font-semibold" role="status" aria-live="polite">
+              <p className="mt-1 text-[10px] font-semibold" role="status" aria-live="polite">
                 {displayEconomy.status === "ready" ? (
                   <span className="text-emerald-700 dark:text-emerald-300">● Wallet-confirmed snapshot{displayEconomy.source === "wallet" ? "" : " (social fallback)"}</span>
                 ) : displayEconomy.status === "stale" ? (
@@ -927,14 +935,14 @@ const claimPendingReward = useCallback(
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2" aria-label="Reward claim stages">
             <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/60 px-2.5 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
-              <p className="text-[9px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">Locally marked claim-ready</p>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">Locally marked claim-ready</p>
               <p className="mt-0.5 text-sm font-black tabular-nums text-foreground">{snapshot.rewards.filter((row) => row.validationStatus === "eligible" || row.validationStatus === "approved").length}</p>
-              <p className="text-[9px] text-muted-foreground">Needs server claim</p>
+              <p className="text-[10px] text-muted-foreground">Needs server claim</p>
             </div>
             <div className="rounded-xl border border-amber-200/70 bg-amber-50/60 px-2.5 py-2 dark:border-amber-900/60 dark:bg-amber-950/20">
-              <p className="text-[9px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">Under review / maturity</p>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">Under review / maturity</p>
               <p className="mt-0.5 text-sm font-black tabular-nums text-foreground">{snapshot.rewards.filter((row) => row.validationStatus === "pending_validation").length}</p>
-              <p className="text-[9px] text-muted-foreground">In review</p>
+              <p className="text-[10px] text-muted-foreground">In review</p>
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2.5">
@@ -1152,7 +1160,9 @@ const claimPendingReward = useCallback(
           {tab === "achievements"
             ? achievementsHydrating
               ? "Loading achievements…"
-              : `${snapshot.achievements.length} achievement${snapshot.achievements.length === 1 ? "" : "s"}`
+              : achievementsLoadFailed
+                ? "Achievements could not be loaded"
+                : `${snapshot.achievements.length} achievement${snapshot.achievements.length === 1 ? "" : "s"}`
             : null}
           {snapshot.pending.length > 0
             ? ` · ${snapshot.pending.length} reward item${snapshot.pending.length === 1 ? "" : "s"} to review`
@@ -1264,7 +1274,7 @@ const claimPendingReward = useCallback(
                 activeCount={Number(Boolean(historyQuery.trim())) + Number(historyStatus !== "all") + Number(Boolean(historyFrom)) + Number(Boolean(historyTo))}
                 persistentContent={<label className="flex min-w-0 items-center gap-2 rounded-xl border border-border bg-background px-3">
                   <Search size={15} className="shrink-0 text-muted-foreground" aria-hidden="true" />
-                  <input id="rewards-history-search" type="search" value={historyQuery} onChange={(event) => setHistoryQuery(event.target.value)} placeholder="Search reason, activity or reference" className="h-10 min-w-0 flex-1 bg-transparent text-[12px] outline-none placeholder:text-muted-foreground/70" />
+                  <input id="rewards-history-search" type="search" enterKeyHint="search" value={historyQuery} onChange={(event) => setHistoryQuery(event.target.value)} placeholder="Search reason, activity or reference" className="h-10 min-w-0 flex-1 bg-transparent text-[12px] outline-none placeholder:text-muted-foreground/70" />
                   {historyQuery ? <button type="button" onClick={() => setHistoryQuery("")} className="rounded-full p-1 text-muted-foreground hover:bg-muted" aria-label="Clear search"><X size={14} /></button> : null}
                 </label>}
               >
@@ -1297,7 +1307,7 @@ const claimPendingReward = useCallback(
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-start justify-between gap-2"><p className="min-w-0 flex-1 text-[12px] font-bold text-foreground">{row.reason}</p><span className="shrink-0 text-[12px] font-black tabular-nums text-emerald-700 dark:text-emerald-300">+{formatGhc(row.amount)}</span></div>
                         <p className="mt-1 text-[10px] text-muted-foreground">{row.sourceEvent} · {formatWhen(row.createdAt)}</p>
-                        <div className="mt-2 flex flex-wrap items-center gap-2"><span className={`rounded-full px-2 py-0.5 text-[9px] font-bold capitalize ${row.status === "posted" ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200" : row.status === "pending" ? "bg-amber-50 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200" : "bg-muted text-muted-foreground"}`}>{row.status}</span>{row.referenceId ? <span className="max-w-full truncate text-[9px] text-muted-foreground">Ref: {row.referenceId}</span> : null}</div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2"><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ${row.status === "posted" ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200" : row.status === "pending" ? "bg-amber-50 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200" : "bg-muted text-muted-foreground"}`}>{row.status}</span>{row.referenceId ? <span className="max-w-full truncate text-[10px] text-muted-foreground">Ref: {row.referenceId}</span> : null}</div>
                       </div>
                     </div>
                   </article>
@@ -1404,7 +1414,20 @@ const claimPendingReward = useCallback(
               <p className="px-1 text-[11px] text-muted-foreground">
                 Achievements are milestones — separate from GHC balance.
               </p>
-              {snapshot.achievements.length === 0 ? (
+              {achievementsLoadFailed && !achievementsHydrating ? (
+                <div role="alert" className="rounded-[1.25rem] border border-amber-300/70 bg-amber-50/70 px-3.5 py-3 dark:border-amber-900/60 dark:bg-amber-950/20">
+                  <p className="text-[12px] font-semibold text-foreground">Your achievements could not be loaded.</p>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">This does not mean none are unlocked. Your balance is unaffected.</p>
+                  <button
+                    type="button"
+                    onClick={() => setAchievementRefreshTick((tick) => tick + 1)}
+                    className="gh-hit-44 mt-2 min-h-9 rounded-full border border-border bg-background px-3.5 text-[11px] font-bold text-foreground hover:bg-muted"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : null}
+              {snapshot.achievements.length === 0 && !(achievementsLoadFailed && !achievementsHydrating) ? (
                 <Empty
                   title="No achievements unlocked"
                   body="Complete missions to unlock."
@@ -1474,7 +1497,7 @@ function ChallengeCardView({
             <div className="flex flex-wrap items-center gap-1.5">
               <p className="text-[14px] font-semibold text-foreground">{challenge.title}</p>
               {card.recommended && status !== "completed" && (
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 dark:ring-emerald-900/40">
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 dark:ring-emerald-900/40">
                   For you
                 </span>
               )}

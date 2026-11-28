@@ -14,9 +14,9 @@ const EVENT_COLUMNS = "id,community_id,title,description,starts_at,ends_at,statu
 
 /**
  * GET /api/ecosystem/events
- * Prepared Events discovery API. It remains inaccessible while the registry
- * marks Events as Coming Soon. Once released, it returns only events from
- * public communities or communities where the viewer has active membership.
+ * Authenticated Events discovery API. The service registry is checked before
+ * auth or data access; only public-community events or events in communities
+ * where the viewer has active membership are returned.
  */
 export async function GET(request: Request) {
   const access = getEcosystemServiceAccess("events")

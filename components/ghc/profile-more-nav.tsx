@@ -37,7 +37,7 @@ function NavGrid({ items }: { items: NavItem[] }) {
           </span>
           <span className="text-[10px] font-bold leading-tight text-foreground">{item.label}</span>
           {item.hint ? (
-            <span className="text-[9px] leading-tight text-muted-foreground">{item.hint}</span>
+            <span className="text-[10px] leading-tight text-muted-foreground">{item.hint}</span>
           ) : null}
         </button>
       ))}
@@ -158,7 +158,7 @@ export function ProfileMoreNav({
           <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
             Personal services
           </p>
-          <p className="text-[9px] font-medium text-muted-foreground">GHC · not Pi balance</p>
+          <p className="text-[10px] font-medium text-muted-foreground">GHC · not Pi balance</p>
         </div>
         <NavGrid items={personal} />
       </div>

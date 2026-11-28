@@ -14,6 +14,8 @@ import { nonDurableWriteResponse, nonDurableReadResponse } from "@/lib/server/pr
 import { getServerProfile } from "@/lib/server/identity/profile-store"
 import { hydratePublicProfileIdentity } from "@/lib/server/identity/public-profile-hydration"
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
+import { canViewSocialPost } from "@/lib/server/social/post-visibility"
+import { supabaseRest, supabaseRpc } from "@/lib/server/supabase/rest-client"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -97,7 +99,14 @@ export async function POST(request: Request) {
   const parsedBody = await readBoundedJson(request, 12 * 1024 * 1024)
   if (!parsedBody.ok) return NextResponse.json({ ok: false, error: parsedBody.error }, { status: parsedBody.error === "REQUEST_TOO_LARGE" ? 413 : 400, headers: { "Cache-Control": "no-store" } })
   const body = parsedBody.value
+  // Cheap shape checks first, before any media/database work.
+  if (body.content != null && typeof body.content !== "string") {
+    return NextResponse.json({ ok: false, error: "INVALID_CONTENT" }, { status: 400, headers: { "Cache-Control": "no-store" } })
+  }
   const content = String(body.content || "").trim()
+  if (content.length > 5000) {
+    return NextResponse.json({ ok: false, error: "CONTENT_TOO_LONG" }, { status: 400, headers: { "Cache-Control": "no-store" } })
+  }
   const suppliedImages = Array.isArray(body.images) ? body.images : []
   if (suppliedImages.length > 10) return NextResponse.json({ ok: false, error: "TOO_MANY_IMAGES" }, { status: 400, headers: { "Cache-Control": "no-store" } })
   const rawImages = suppliedImages.map(String)
@@ -215,6 +224,9 @@ export async function POST(request: Request) {
   // Community posts: require active membership (session user) — never trust client role claims
   const communityId =
     body.communityId != null ? String(body.communityId).trim() : ""
+  if (communityId && !/^[a-zA-Z0-9_-]{1,180}$/.test(communityId)) {
+    return NextResponse.json({ ok: false, error: "INVALID_COMMUNITY" }, { status: 400, headers: { "Cache-Control": "no-store" } })
+  }
   if (communityId) {
     if (!socialDbConfigured()) {
       return NextResponse.json(
@@ -265,10 +277,10 @@ export async function POST(request: Request) {
     pdf,
     pdfName: body.pdfName ? String(body.pdfName).slice(0, 200) : null,
     visibility,
-    listingId: body.listingId ? String(body.listingId) : null,
-    listingKind: body.listingKind ? String(body.listingKind) : null,
+    listingId: body.listingId ? String(body.listingId).slice(0, 180) : null,
+    listingKind: body.listingKind ? String(body.listingKind).slice(0, 40) : null,
     communityId: communityId || null,
-    communityName: body.communityName ? String(body.communityName) : null,
+    communityName: body.communityName ? String(body.communityName).slice(0, 120) : null,
     contentType,
     createdAt: Date.now(),
     ...(quoteOf ? { quoteOf } : {}),
@@ -307,70 +319,61 @@ export async function POST(request: Request) {
   // media ownership, readiness and deleted state in one database transaction. On failure,
   // hide the just-created post rather than leave an unauthorized half-published attachment.
   if (durableMediaIds.length > 0) {
-    const { readGhcServerEnv } = await import("@/lib/server/economy/env")
-    const env = readGhcServerEnv()
-    let attached = false
-    if (env.supabaseUrl && env.supabaseServiceRoleKey) {
-      try {
-        const response = await fetch(`${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/gh_post_media_attach`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", apikey: env.supabaseServiceRoleKey, Authorization: `Bearer ${env.supabaseServiceRoleKey}` },
-          body: JSON.stringify({ p_actor_id: auth.userId, p_post_id: id, p_media_ids: durableMediaIds }),
-          cache: "no-store",
-        })
-        const result = await response.json().catch(() => null) as { ok?: boolean } | null
-        attached = response.ok && result?.ok === true
-      } catch { attached = false }
-    }
+    const attach = await supabaseRpc<{ ok?: boolean }>(
+      "gh_post_media_attach",
+      { p_actor_id: auth.userId, p_post_id: id, p_media_ids: durableMediaIds },
+      { timeoutMs: 12_000 },
+    )
+    const attached = attach.ok && attach.data?.ok === true
     if (!attached) {
-      if (env.supabaseUrl && env.supabaseServiceRoleKey) {
-        await fetch(`${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_posts?id=eq.${encodeURIComponent(id)}&author_id=eq.${encodeURIComponent(auth.userId)}`, {
+      // Hide the just-created post so an unauthorized half-published attachment is never
+      // visible. The hide result is verified: a failed rollback is reported, never swallowed.
+      const hide = await supabaseRest(
+        `gh_posts?id=eq.${encodeURIComponent(id)}&author_id=eq.${encodeURIComponent(auth.userId)}`,
+        {
           method: "PATCH",
-          headers: { "Content-Type": "application/json", apikey: env.supabaseServiceRoleKey, Authorization: `Bearer ${env.supabaseServiceRoleKey}`, Prefer: "return=minimal" },
+          headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
           body: JSON.stringify({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
-          cache: "no-store",
-        }).catch(() => undefined)
-      }
-      return NextResponse.json({ ok: false, error: "MEDIA_ATTACH_FAILED", message: "The post was not published because media authorization could not be persisted." }, { status: 503 })
+          timeoutMs: 8_000,
+        },
+      )
+      if (!hide.ok) console.error("[social/posts] media attach rollback failed", { postId: id, status: hide.status, error: hide.error })
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "MEDIA_ATTACH_FAILED",
+          message: "The post was not published because media authorization could not be persisted.",
+          ...(hide.ok ? {} : { cleanupPending: true }),
+        },
+        { status: 503 },
+      )
     }
   }
 
-  // Best-effort attach quote_of_post_id when migration 56 is applied
+  // Attach quote_of_post_id. Only a quote the author is allowed to see is attached; a private
+  // or blocked original must not become reachable through the quoting post. The post itself is
+  // already durable, so a failed quote link is reported (quoteAttached:false) instead of silently lost.
+  let quoteAttached: boolean | undefined
   if (quoteOf) {
-    try {
-      const { readGhcServerEnv } = await import("@/lib/server/economy/env")
-      const env = readGhcServerEnv()
-      if (env.supabaseUrl && env.supabaseServiceRoleKey) {
-        // Verify original exists and is not deleted
-        const check = await fetch(
-          `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_posts?id=eq.${encodeURIComponent(quoteOf)}&deleted_at=is.null&select=id&limit=1`,
+    quoteAttached = false
+    if ((await canViewSocialPost(auth.userId, quoteOf)) === true) {
+      const original = await supabaseRest<unknown[]>(
+        `gh_posts?id=eq.${encodeURIComponent(quoteOf)}&deleted_at=is.null&select=id&limit=1`,
+        { timeoutMs: 8_000 },
+      )
+      if (original.ok && Array.isArray(original.data) && original.data.length > 0) {
+        const link = await supabaseRest(
+          `gh_posts?id=eq.${encodeURIComponent(id)}&author_id=eq.${encodeURIComponent(auth.userId)}`,
           {
-            headers: {
-              apikey: env.supabaseServiceRoleKey,
-              Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-            },
-            cache: "no-store",
-          }
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+            body: JSON.stringify({ quote_of_post_id: quoteOf }),
+            timeoutMs: 8_000,
+          },
         )
-        const found = (await check.json().catch(() => [])) as unknown[]
-        if (Array.isArray(found) && found.length > 0) {
-          await fetch(
-            `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_posts?id=eq.${encodeURIComponent(id)}`,
-            {
-              method: "PATCH",
-              headers: {
-                apikey: env.supabaseServiceRoleKey,
-                Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ quote_of_post_id: quoteOf }),
-              cache: "no-store",
-            }
-          )
-        }
+        quoteAttached = link.ok
+        if (!link.ok) console.error("[social/posts] quote link failed", { postId: id, status: link.status, error: link.error })
       }
-    } catch {
-      /* column may not exist until migration 56 */
     }
   }
 
@@ -388,5 +391,5 @@ export async function POST(request: Request) {
     }).catch(() => null)
   }
 
-  return NextResponse.json({ ok: true, durable: true, post: row })
+  return NextResponse.json({ ok: true, durable: true, post: row, ...(quoteAttached === undefined ? {} : { quoteAttached }) })
 }

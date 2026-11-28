@@ -1,5 +1,6 @@
 "use client"
 
+import { fetchWithTimeout } from "@/lib/client/fetch-timeout"
 import { buildWithdrawalAuthorizationChecklist, withdrawalNotReadyMessage } from "@/lib/wallet/withdrawal-authorization-checklist"
 
 import { releaseReservedPi, emitWalletBalanceRefresh } from "@/lib/wallet/release-reserved-pi"
@@ -26,6 +27,8 @@ import {
   parsePiInput,
   piInputMessage,
 } from "@/lib/wallet/pi-amount"
+import { sanitizeAmountInput } from "@/lib/wallet/amount-input"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 type LimitHints = { availableAtomic?: number; minPayoutAtomic?: number; maxSinglePayoutAtomic?: number }
 
@@ -141,6 +144,11 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
   // One idempotency key per withdrawal intent: network retries of the same amount reuse it, so a
   // retry can never create a second payout request. Cleared only after the server accepts it.
   const intentRef = useRef<{ amountAtomic: number; key: string } | null>(null)
+  // Synchronous single-flight guards: state flags only update after a render, so two taps in the
+  // same frame could both pass a `submitting` check. Refs close that window for money actions.
+  const submitInFlightRef = useRef(false)
+  const pinInFlightRef = useRef(false)
+  const releaseInFlightRef = useRef(false)
   const [authLoading, setAuthLoading] = useState(false)
   const [authorizing, setAuthorizing] = useState(false)
   const [quoting, setQuoting] = useState(false)
@@ -296,10 +304,11 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
     const sessionAtOpen = sessionIdRef.current
     ;(async () => {
       try {
-        const res = await fetch("/api/identity/withdrawal-pin", {
+        const res = await fetchWithTimeout("/api/identity/withdrawal-pin", {
           credentials: "include",
           cache: "no-store",
           headers: { Accept: "application/json" },
+          timeoutMs: 15_000,
         })
         if (sessionAtOpen !== sessionIdRef.current) return
         const body = (await res.json().catch(() => null)) as { ok?: boolean; configured?: boolean; error?: string } | null
@@ -510,8 +519,8 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
     // Check the server-side Testnet payout worker before asking for a PIN.
     // This prevents users entering a PIN for a rail whose executor/secrets are absent.
     try {
-      const readiness = await fetch("/api/economy/earnings/withdrawals/readiness", {
-        credentials: "include", cache: "no-store", headers: { Accept: "application/json" },
+      const readiness = await fetchWithTimeout("/api/economy/earnings/withdrawals/readiness", {
+        credentials: "include", cache: "no-store", headers: { Accept: "application/json" }, timeoutMs: 15_000,
       })
       const state = await readiness.json().catch(() => null) as { ok?: boolean; ready?: boolean; error?: string } | null
       if (!readiness.ok || state?.ready !== true) {
@@ -540,6 +549,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
   }
 
   const verifyPinAndReview = async () => {
+    if (pinBusy || pinInFlightRef.current) return
     if (!/^\d{6}$/.test(pinConfirmInput)) {
       setMsg("Re-enter all six digits of your withdrawal PIN.")
       return
@@ -567,11 +577,13 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
       pinIntent = { amountAtomic, key: `sheet-payout:${nonce}` }
       intentRef.current = pinIntent
     }
+    pinInFlightRef.current = true
     setPinBusy(true)
     setMsg(null)
     try {
-      const vRes = await fetch("/api/identity/withdrawal-pin", {
+      const vRes = await fetchWithTimeout("/api/identity/withdrawal-pin", {
         method: "POST",
+        timeoutMs: 20_000,
         credentials: "include",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({ action: "verify", pin: pinConfirmInput, bindKey: pinIntent.key }),
@@ -601,12 +613,13 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
     } catch {
       setMsg("Could not verify your PIN. Nothing was changed; please try again.")
     } finally {
+      pinInFlightRef.current = false
       setPinBusy(false)
     }
   }
 
   const onSubmit = async () => {
-    if (submitting) return
+    if (submitting || submitInFlightRef.current) return
     if (needsConsent || auth?.authorizationActive !== true) {
       setMsg("Authorize your Pi wallet first. No withdrawal was started.")
       setWithdrawalStep("amount")
@@ -633,6 +646,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
       setMsg("Amount too small.")
       return
     }
+    submitInFlightRef.current = true
     setSubmitting(true)
     setMsg(null)
     try {
@@ -725,14 +739,17 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
     } catch {
       setMsg("The withdrawal outcome could not be confirmed because the connection failed. A request may already exist; do not submit another withdrawal yet. Check Wallet → History and retry the status refresh. Your funds remain protected until the server reconciles the request.")
     } finally {
+      submitInFlightRef.current = false
       setSubmitting(false)
     }
   }
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, onClose)
   if (!open) return null
 
   const onReturnReserved = async () => {
-    if (releasingReserved) return
+    if (releasingReserved || releaseInFlightRef.current) return
+    releaseInFlightRef.current = true
     setReleasingReserved(true)
     setReleaseNote(null)
     try {
@@ -749,6 +766,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
     } catch {
       setReleaseNote("Could not reach the server to return reserved π. Try again.")
     } finally {
+      releaseInFlightRef.current = false
       setReleasingReserved(false)
     }
   }
@@ -756,7 +774,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
   return (
     <div
       className="fixed inset-0 z-[240] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4"
-      role="dialog"
+      ref={dialogRef} tabIndex={-1} role="dialog"
       aria-modal="true"
       aria-label="Withdraw Pi"
       data-pi-withdraw-sheet
@@ -793,7 +811,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+            className="gh-hit-44 inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
             aria-label="Close withdraw"
           >
             <X className="h-5 w-5" />
@@ -801,7 +819,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
         </div>
 
         <div className="shrink-0 border-b border-border/40 px-4 py-2.5">
-          <ol className="grid grid-cols-4 gap-1 text-center text-[9px] font-bold uppercase tracking-wide" aria-label="Withdrawal steps">
+          <ol className="grid grid-cols-4 gap-1 text-center text-[10px] font-bold uppercase tracking-wide" aria-label="Withdrawal steps">
             {[{ id: "amount", label: "Amount" }, { id: "pin", label: "PIN" }, { id: "pin-confirm", label: "Confirm PIN" }, { id: "review", label: "Review" }].map((item, index) => {
               const order = ["amount", "pin", "pin-confirm", "review"].indexOf(withdrawalStep)
               const active = order === index
@@ -838,11 +856,9 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
               value={amountStr}
               onChange={(e) => {
                 amountTouchedRef.current = true
-                // Allow only digits and one decimal point — avoid mobile form quirks from type=number.
-                const raw = e.target.value.replace(/[^\d.]/g, "")
-                const parts = raw.split(".")
-                const cleaned =
-                  parts.length <= 1 ? raw : `${parts[0]}.${parts.slice(1).join("").slice(0, 7)}`
+                // Digits and one decimal separator only. "," from comma-decimal keypads is read as the
+                // decimal point (never dropped, which turned 1,5 into 15). Avoids type=number quirks.
+                const cleaned = sanitizeAmountInput(e.target.value, 7)
                 setAmountStr(cleaned)
                 setQuote(null)
                 setPinProofValue("")
@@ -1037,7 +1053,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
                   ) : (
                     <div className="relative">
                       <input id="withdrawal-pin" type={showPin ? "text" : "password"} inputMode="numeric" minLength={6} maxLength={6} required autoComplete="off" autoCapitalize="off" spellCheck={false} enterKeyHint="done" value={pinInput} onChange={(e) => setPinInput(e.target.value.replace(/\D/g, "").slice(0, 6))} className="w-full rounded-2xl border border-border/70 bg-background py-3 pl-4 pr-12 text-base font-semibold tracking-[0.35em] text-foreground outline-none focus:border-violet-500" placeholder="••••••" aria-label="Enter withdrawal PIN" aria-describedby={pinStatusError ? "withdraw-pin-hint withdraw-pin-status-error" : "withdraw-pin-hint"} pattern="[0-9]{6}" aria-invalid={pinInput.length > 0 && pinInput.length !== 6} />
-                      <button type="button" onClick={() => setShowPin((v) => !v)} className="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted" aria-label={showPin ? "Hide PIN" : "Show PIN"} aria-controls="withdrawal-pin" aria-pressed={showPin}>{showPin ? <EyeOff size={17} /> : <Eye size={17} />}</button>
+                      <button type="button" onClick={() => setShowPin((v) => !v)} className="gh-hit-44 absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted" aria-label={showPin ? "Hide PIN" : "Show PIN"} aria-controls="withdrawal-pin" aria-pressed={showPin}>{showPin ? <EyeOff size={17} /> : <Eye size={17} />}</button>
                     </div>
                   )}
                   {pinConfigured === true ? <PinRecoveryPanel onPinReset={() => { setPinInput(""); setPinConfirmInput(""); setPinProofValue(""); setMsg("PIN reset. Set a new PIN in Wallet Security before continuing.") }} /> : null}
@@ -1050,7 +1066,7 @@ export function PiWithdrawSheet({ open, onClose, availablePi, linkedUsername, on
                   </div>
                   <div className="relative">
                     <input id="withdrawal-pin-confirm" type={showPin ? "text" : "password"} inputMode="numeric" minLength={6} maxLength={6} required autoComplete="off" autoCapitalize="off" spellCheck={false} enterKeyHint="done" value={pinConfirmInput} onChange={(e) => setPinConfirmInput(e.target.value.replace(/\D/g, "").slice(0, 6))} className="w-full rounded-2xl border border-border/70 bg-background py-3 pl-4 pr-12 text-base font-semibold tracking-[0.35em] text-foreground outline-none focus:border-violet-500" placeholder="••••••" aria-label="Confirm withdrawal PIN" pattern="[0-9]{6}" aria-invalid={pinConfirmInput.length > 0 && pinConfirmInput.length !== 6} />
-                    <button type="button" onClick={() => setShowPin((v) => !v)} className="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted" aria-label={showPin ? "Hide PIN" : "Show PIN"} aria-controls="withdrawal-pin-confirm" aria-pressed={showPin}>{showPin ? <EyeOff size={17} /> : <Eye size={17} />}</button>
+                    <button type="button" onClick={() => setShowPin((v) => !v)} className="gh-hit-44 absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted" aria-label={showPin ? "Hide PIN" : "Show PIN"} aria-controls="withdrawal-pin-confirm" aria-pressed={showPin}>{showPin ? <EyeOff size={17} /> : <Eye size={17} />}</button>
                   </div>
                 </>
               ) : (

@@ -17,9 +17,9 @@ const checks = [
   ['profile photo editing is a separate explicit camera action', profile.includes('aria-label="Change profile photo"') && profile.includes('setPhotoSheet("photo")')],
   ['cover editing is a separate explicit action', profile.includes('aria-label="Change cover photo"') && profile.includes('setPhotoSheet("cover")')],
   ['profile media viewer uses the shared accessible gallery lightbox', profile.includes('<MediaLightbox') && profile.includes('onClose={closeMediaPreview}')],
-  ['shared lightbox supports modal semantics, Escape, arrow navigation and scroll lock', lightbox.includes('role="dialog"') && lightbox.includes('aria-modal="true"') && lightbox.includes('e.key === "Escape"') && lightbox.includes('ArrowLeft') && lightbox.includes('document.body.style.overflow = "hidden"')],
+  ['shared lightbox supports modal semantics, Escape, arrow navigation and scroll lock', lightbox.includes('role="dialog"') && lightbox.includes('aria-modal="true"') && lightbox.includes('useDialogA11y') && lightbox.includes('ArrowLeft') && lightbox.includes('ArrowRight')],
   ['lightbox renders full media without cropping', lightbox.includes('object-contain')],
-  ['lightbox traps keyboard focus and restores focus to the opener', lightbox.includes('e.key === "Tab"') && lightbox.includes('previousFocusRef.current.focus()') && lightbox.includes('closeButtonRef.current?.focus()')],
+  ['lightbox traps keyboard focus and restores focus to the opener', lightbox.includes('useDialogA11y') && lightbox.includes('closeButtonRef.current?.focus')],
   ['release metadata and UX gate are synchronized', pkg.version === JSON.parse(read('package-lock.json')).version && read('lib/app-release.ts').includes(`APP_RELEASE_VERSION = "${pkg.version}"`) && JSON.parse(read('package-lock.json')).version === pkg.version && pkg.scripts['check:social-story-profile-media-ux'] && pkg.scripts['prebuild:checks'].includes('check-social-story-profile-media-ux') && pkg.scripts['verify:static'].includes('check-social-story-profile-media-ux') && pkg.scripts['prebuild:checks'].includes('check-creator-media-preview-phase14') && pkg.scripts['verify:static'].includes('check-creator-media-preview-phase14')],
 ]
 for (const [name, passed] of checks) { assert.equal(passed, true, name); console.log(`PASS ${name}`) }

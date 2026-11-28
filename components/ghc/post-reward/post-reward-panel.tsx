@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { createPortal } from "react-dom"
 import { Activity, ArrowUpRight, CheckCircle2, ChevronRight, Coins, Eye, RefreshCw, ShieldCheck, ThumbsDown, ThumbsUp, X } from "lucide-react"
 import type { ContentRewardPublic } from "@/lib/content-reward/public-types"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 function formatGhc(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—"
@@ -71,7 +72,7 @@ export function PostRewardPanel({
   const [qualifiedViews, setQualifiedViews] = useState<number | null>(null)
   const requestRef = useRef<AbortController | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
-  const dialogRef = useRef<HTMLElement | null>(null)
+  const dialogRef = useDialogA11y<HTMLElement>(open, () => setOpen(false))
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const sequenceRef = useRef(0)
   const mountedRef = useRef(true)
@@ -165,29 +166,8 @@ export function PostRewardPanel({
 
   useEffect(() => {
     if (!open) return
-    const previousOverflow = document.body.style.overflow
-    const triggerElement = triggerRef.current
-    document.body.style.overflow = "hidden"
-    const focusClose = window.requestAnimationFrame(() => closeButtonRef.current?.focus())
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); setOpen(false); return }
-      if (event.key !== "Tab" || !dialogRef.current) return
-      const focusable = Array.from<HTMLElement>(dialogRef.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      )).filter((element) => element.offsetParent !== null)
-      if (!focusable.length) { event.preventDefault(); return }
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
-    }
-    window.addEventListener("keydown", onKeyDown)
-    return () => {
-      window.cancelAnimationFrame(focusClose)
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener("keydown", onKeyDown)
-      triggerElement?.focus()
-    }
+    const focusClose = window.requestAnimationFrame(() => closeButtonRef.current?.focus({ preventScroll: true }))
+    return () => window.cancelAnimationFrame(focusClose)
   }, [open])
 
   const up = safeCount(reward?.upvoteCount ?? upvoteCount)
@@ -233,7 +213,7 @@ export function PostRewardPanel({
           </span>
           <span className="hidden text-right sm:block">
             <span className="block text-[11px] font-bold tabular-nums text-foreground">{hasRewardState ? formatGhc(total) : "No active reward"}</span>
-            <span className="block text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">{statusLabel}</span>
+            <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{statusLabel}</span>
           </span>
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted/70 text-muted-foreground transition group-hover:bg-emerald-500/10 group-hover:text-emerald-700"><ArrowUpRight size={16} /></span>
         </button>
@@ -244,14 +224,14 @@ export function PostRewardPanel({
           <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={`curation-title-${postId}`} tabIndex={-1} className="flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[1.65rem] border border-white/15 bg-[var(--card)] shadow-[0_24px_90px_rgba(0,0,0,.28)] sm:rounded-[1.65rem]">
             <header className="flex shrink-0 items-center gap-3 border-b border-border/70 px-4 py-3.5 sm:px-5">
               <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"><Activity size={19} /></span>
-              <div className="min-w-0 flex-1"><p className="text-[9px] font-bold uppercase tracking-[.16em] text-emerald-700 dark:text-emerald-300">Creator analytics</p><h2 id={`curation-title-${postId}`} className="text-base font-extrabold tracking-tight">Post performance</h2></div>
+              <div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-emerald-700 dark:text-emerald-300">Creator analytics</p><h2 id={`curation-title-${postId}`} className="text-base font-extrabold tracking-tight">Post performance</h2></div>
               <button ref={closeButtonRef} type="button" onClick={() => setOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted/75" aria-label="Close post performance"><X size={18} /></button>
             </header>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
               <div className="flex items-center gap-4 rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-emerald-500/[.06] p-4">
                 <ApprovalRing pct={approval} size={84} stroke={8} label />
                 <div className="min-w-0">
-                  <p className="text-[9px] font-bold uppercase tracking-[.15em] text-muted-foreground">Community sentiment</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[.15em] text-muted-foreground">Community sentiment</p>
                   <p className="mt-0.5 text-base font-black tracking-tight text-foreground">{insight.title}</p>
                   <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{insight.body}</p>
                 </div>
@@ -266,14 +246,14 @@ export function PostRewardPanel({
 
               <div className="rounded-2xl border border-border/70 bg-gradient-to-br from-emerald-500/[.09] via-card to-card p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div><p className="text-[9px] font-bold uppercase tracking-[.15em] text-muted-foreground">Confirmed reward value</p><p className="mt-1 text-2xl font-black tracking-tight tabular-nums">{hasRewardState ? formatGhc(total) : "—"}</p><p className="mt-1 text-[10px] text-muted-foreground">{hasRewardState ? status === "accruing" ? "Server-reported accrual estimate" : "Confirmed by the reward system" : "No funded reward state has been confirmed for this post."}</p></div>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background/80 px-2.5 py-1 text-[9px] font-extrabold tracking-wider text-muted-foreground"><ShieldCheck size={11} /> {statusLabel}</span>
+                  <div><p className="text-[10px] font-bold uppercase tracking-[.15em] text-muted-foreground">Confirmed reward value</p><p className="mt-1 text-2xl font-black tracking-tight tabular-nums">{hasRewardState ? formatGhc(total) : "—"}</p><p className="mt-1 text-[10px] text-muted-foreground">{hasRewardState ? status === "accruing" ? "Server-reported accrual estimate" : "Confirmed by the reward system" : "No funded reward state has been confirmed for this post."}</p></div>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background/80 px-2.5 py-1 text-[10px] font-extrabold tracking-wider text-muted-foreground"><ShieldCheck size={11} /> {statusLabel}</span>
                 </div>
                 <div className="mt-3 flex items-center gap-2 rounded-xl bg-background/75 px-3 py-2 text-[10px] text-muted-foreground"><CheckCircle2 size={14} className="shrink-0 text-emerald-600" /> Votes and views are engagement signals; they do not create GHC or guarantee payment.</div>
               </div>
 
               <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
-                <div className="mb-3 flex items-center gap-2"><Coins size={16} className="text-emerald-600" /><h3 className="text-xs font-bold">Reward allocation</h3><span className="ml-auto text-[9px] text-muted-foreground">GHC</span></div>
+                <div className="mb-3 flex items-center gap-2"><Coins size={16} className="text-emerald-600" /><h3 className="text-xs font-bold">Reward allocation</h3><span className="ml-auto text-[10px] text-muted-foreground">GHC</span></div>
                 <div className="space-y-3"><RewardLine label="Creator allocation" amount={author} percent={split?.author} icon="creator" /><RewardLine label="Curation allocation" amount={curation} percent={split?.curation} icon="curator" /></div>
                 {split ? <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-muted" aria-label={`Creator share ${split.author} percent; curation share ${split.curation} percent`}><div className="bg-emerald-500" style={{ width: `${split.author}%` }} /><div className="bg-sky-500" style={{ width: `${split.curation}%` }} /></div> : <p className="mt-3 text-[10px] text-muted-foreground">Allocation details appear only when the server confirms a funded reward state.</p>}
               </div>
@@ -285,7 +265,7 @@ export function PostRewardPanel({
               {loading ? <div role="status" aria-label="Refreshing secure server analytics" className="space-y-2"><Shimmer className="h-3 w-2/3" /><Shimmer className="h-3 w-1/2" /><span className="sr-only">Refreshing secure server analytics…</span></div> : null}
             </div>
             <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border/70 px-4 py-3 pb-[max(.75rem,env(safe-area-inset-bottom))] sm:px-5">
-              <p className="text-[9px] text-muted-foreground">Private creator view · server-authoritative rewards</p>
+              <p className="text-[10px] text-muted-foreground">Private creator view · server-authoritative rewards</p>
               <button type="button" onClick={() => void refreshAnalytics(true)} disabled={loading} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-emerald-600 px-4 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"><RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Refresh</button>
             </footer>
           </section>
@@ -297,12 +277,12 @@ export function PostRewardPanel({
 
 function StatTile({ label, value, detail, tone = "neutral" }: { label: string; value: string; detail: string; tone?: "neutral" | "positive" | "negative" }) {
   const color = tone === "positive" ? "text-emerald-700 dark:text-emerald-300" : tone === "negative" ? "text-rose-700 dark:text-rose-300" : "text-foreground"
-  return <div className={`min-w-0 rounded-xl border border-border/60 bg-background/75 px-3 py-3 border-l-[3px] ${tone === "positive" ? "border-l-emerald-500" : tone === "negative" ? "border-l-rose-500" : "border-l-border"}`}><p className="truncate text-[9px] font-semibold text-muted-foreground">{label}</p><p className={`mt-1 text-lg font-extrabold tabular-nums ${color}`}>{value}</p><p className="mt-0.5 text-[9px] leading-4 text-muted-foreground">{detail}</p></div>
+  return <div className={`min-w-0 rounded-xl border border-border/60 bg-background/75 px-3 py-3 border-l-[3px] ${tone === "positive" ? "border-l-emerald-500" : tone === "negative" ? "border-l-rose-500" : "border-l-border"}`}><p className="truncate text-[10px] font-semibold text-muted-foreground">{label}</p><p className={`mt-1 text-lg font-extrabold tabular-nums ${color}`}>{value}</p><p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">{detail}</p></div>
 }
 function RewardLine({ label, amount, percent, icon }: { label: string; amount: number | null | undefined; percent?: number; icon: "creator" | "curator" }) {
-  return <div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="text-[11px] font-semibold">{label}</p><p className="text-[9px] text-muted-foreground">{percent == null ? "Awaiting confirmed allocation" : `${percent}% of reported reward total`}</p></div><p className={`shrink-0 text-xs font-extrabold tabular-nums ${icon === "creator" ? "text-emerald-700 dark:text-emerald-300" : "text-sky-700 dark:text-sky-300"}`}>{formatGhc(amount)}</p></div>
+  return <div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="text-[11px] font-semibold">{label}</p><p className="text-[10px] text-muted-foreground">{percent == null ? "Awaiting confirmed allocation" : `${percent}% of reported reward total`}</p></div><p className={`shrink-0 text-xs font-extrabold tabular-nums ${icon === "creator" ? "text-emerald-700 dark:text-emerald-300" : "text-sky-700 dark:text-sky-300"}`}>{formatGhc(amount)}</p></div>
 }
 function ImpactTile({ icon, label, amount, positive }: { icon: ReactNode; label: string; amount: number | null | undefined; positive?: boolean }) {
   const color = amount == null ? "text-muted-foreground" : positive ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"
-  return <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/75 p-3"><span className={color}>{icon}</span><div className="min-w-0"><p className="truncate text-[9px] font-semibold text-muted-foreground">{label}</p><p className={`mt-0.5 text-xs font-extrabold tabular-nums ${color}`}>{signedGhc(amount)}</p></div></div>
+  return <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/75 p-3"><span className={color}>{icon}</span><div className="min-w-0"><p className="truncate text-[10px] font-semibold text-muted-foreground">{label}</p><p className={`mt-0.5 text-xs font-extrabold tabular-nums ${color}`}>{signedGhc(amount)}</p></div></div>
 }

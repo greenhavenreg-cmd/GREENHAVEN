@@ -7,6 +7,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from "react"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 import { BrandLogo } from "./brand-logo"
 import { useSessionLock } from "@/contexts/session-lock-context"
 import { IdentityService } from "@/lib/identity/identity-service"
@@ -188,15 +189,17 @@ function PinSheet({
     }
   }, [pin, mode]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(true)
+
   return (
-    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[#050a08] px-6">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="gh-pin-sheet-title" className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[#050a08] px-6">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.14)_0%,transparent_60%)]" />
       <div className="relative z-10 flex w-full max-w-sm flex-col items-center text-center">
         <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/30">
           {mode === "setup" ? <ShieldCheck size={28} /> : <Lock size={28} />}
         </div>
         <BrandLogo onDark size="bar" className="mb-4 opacity-90" />
-        <h1 className="text-xl font-bold tracking-tight text-white">{title}</h1>
+        <h1 id="gh-pin-sheet-title" className="text-xl font-bold tracking-tight text-white">{title}</h1>
         <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-white/50">{subtitle}</p>
         {mode === "setup" && phase === "confirm" ? (
           <p className="mt-2 text-[12px] font-semibold text-emerald-300/90">Confirm your PIN</p>

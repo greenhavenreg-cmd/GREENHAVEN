@@ -26,7 +26,8 @@ export function EnhancedToast({ message, type, onClose, actionLabel, onAction }:
   return (
     <div
       className={`flex items-center justify-between gap-3 rounded-[1rem] border p-3.5 shadow-[var(--gh-card-shadow)] ${bgClass[type]}`}
-      role="status"
+      role={type === "error" ? "alert" : "status"}
+      aria-live={type === "error" ? "assertive" : "polite"}
     >
       <div className="flex min-w-0 flex-1 items-center gap-3">
         {icons[type]}
@@ -46,10 +47,10 @@ export function EnhancedToast({ message, type, onClose, actionLabel, onAction }:
         <button
           type="button"
           onClick={onClose}
-          className="rounded-full p-1.5 text-muted-foreground transition hover:bg-black/5"
-          aria-label="Dismiss"
+          className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition hover:bg-black/5"
+          aria-label="Dismiss notification"
         >
-          <X size={16} />
+          <X size={16} aria-hidden="true" />
         </button>
       </div>
     </div>

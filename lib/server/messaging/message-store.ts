@@ -158,20 +158,21 @@ async function rest<T>(
     return { ok: false, status: 0, data: null }
   }
   try {
+    // Forward the caller's method, body and Prefer header. This helper previously hard-coded GET, so every
+    // insert, patch and receipt write below silently became a list read.
     const headers: Record<string, string> = {
-      apikey: env.supabaseServiceRoleKey,
-      Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-      Accept: "application/json",
       ...(init?.headers as Record<string, string> | undefined),
     }
     if (init?.prefer) headers.Prefer = init.prefer
-    if (init?.body && !headers["Content-Type"]) {
-      headers["Content-Type"] = "application/json"
-    }
-    const res = await (async () => { const r = await supabaseRest(`${path}`, { method: "GET", timeoutMs: 8000 }); return { ok: r.ok, status: r.status, json: async () => r.ok ? r.data : r.body, text: async () => JSON.stringify(r.ok ? r.data : r.body) }; })()
-    if (res.status === 204) return { ok: res.ok, status: res.status, data: null }
-    const data = (await res.json().catch(() => null)) as T | null
-    return { ok: res.ok, status: res.status, data }
+    const r = await supabaseRest<T>(path, {
+      method: init?.method || "GET",
+      headers,
+      body: init?.body ?? undefined,
+      timeoutMs: 8000,
+    })
+    if (r.status === 204) return { ok: r.ok, status: r.status, data: null }
+    const data = (r.ok ? r.data : r.body) as T | null
+    return { ok: r.ok, status: r.status, data: data ?? null }
   } catch {
     return { ok: false, status: 0, data: null }
   }
@@ -1114,10 +1115,12 @@ export async function appendMessage(input: {
           if (!matchesMessageIdempotencyPayload(prior, { body, replyToMessageId: expectedReplyToMessageId, sharedPostId: expectedSharedPostId, mediaAttachments })) {
             return { ok: false, error: "IDEMPOTENCY_CONFLICT" }
           }
+          await ensureSendReceipts(cid, prior.id, uid)
           return { ok: true, message: prior, idempotent: true }
         }
       }
-      if (isProd()) return { ok: false, error: "PERSIST_FAILED" }
+      // A configured database that rejected the insert must never be reported as a sent message.
+      return { ok: false, error: "PERSIST_FAILED" }
     } else if (ins.data?.[0]) {
       Object.assign(msg, rowToMessage(ins.data[0]))
     }
@@ -1132,19 +1135,9 @@ export async function appendMessage(input: {
         }),
       }
     )
-    const recipients = (await listMemberIds(cid)).filter((memberId) => memberId !== uid)
-    if (recipients.length) {
-      await rest("gh_message_receipts", {
-        method: "POST",
-        prefer: "resolution=ignore-duplicates,return=minimal",
-        body: JSON.stringify(recipients.map((recipientId) => ({
-          message_id: msg.id,
-          conversation_id: cid,
-          sender_id: uid,
-          recipient_id: recipientId,
-        }))),
-      })
-    }
+    // The message is already durable here, so a receipt failure must not fail the send. It is retried once and
+    // backfilled when the client replays the same clientMessageId.
+    await ensureSendReceipts(cid, msg.id, uid)
   } else if (isProd()) {
     return { ok: false, error: "STORE_UNAVAILABLE" }
   }
@@ -1182,10 +1175,12 @@ export async function softDeleteMessage(input: {
   if (!(await isMember(cid, uid))) return { ok: false, error: "FORBIDDEN" }
 
   if (dbConfigured()) {
-    // Only sender can soft-delete own message (MVP)
-    const q = `gh_messages?id=eq.${encodeURIComponent(mid)}&conversation_id=eq.${encodeURIComponent(cid)}&sender_id=eq.${encodeURIComponent(uid)}`
-    const res = await rest(q, {
+    // Only the sender can delete their own message. The PATCH returns the rows it changed so a request that
+    // matched nothing (someone else's message, wrong id) is never reported as a successful delete.
+    const base = `gh_messages?id=eq.${encodeURIComponent(mid)}&conversation_id=eq.${encodeURIComponent(cid)}`
+    const res = await rest<Array<{ id?: string }>>(`${base}&sender_id=eq.${encodeURIComponent(uid)}&select=id`, {
       method: "PATCH",
+      prefer: "return=representation",
       body: JSON.stringify({
         status: "deleted",
         body: "",
@@ -1193,8 +1188,14 @@ export async function softDeleteMessage(input: {
         deleted_by: uid,
       }),
     })
-    if (!res.ok && isProd()) return { ok: false, error: "DELETE_FAILED" }
-    return { ok: true }
+    if (!res.ok) return { ok: false, error: "DELETE_FAILED" }
+    if (Array.isArray(res.data) && res.data.length > 0) return { ok: true }
+    const probe = await rest<Array<{ sender_id?: string }>>(`${base}&select=sender_id&limit=1`)
+    if (!probe.ok || !Array.isArray(probe.data)) return { ok: false, error: "DELETE_FAILED" }
+    const row = probe.data[0]
+    if (!row) return { ok: false, error: "NOT_FOUND" }
+    if (row.sender_id !== uid) return { ok: false, error: "FORBIDDEN" }
+    return { ok: true } // already deleted: idempotent
   }
   const list = memMessages.get(cid) || []
   const idx = list.findIndex((m) => m.id === mid && m.senderId === uid)
@@ -1210,6 +1211,32 @@ export async function softDeleteMessage(input: {
   return { ok: true }
 }
 
+
+/**
+ * Create the pending delivery receipts for a sent message. Receipts drive unread counts and delivery state,
+ * so a failed write is retried once and reported instead of being ignored. Duplicates are ignored, which makes
+ * this safe to call again when a client replays an idempotent send.
+ */
+async function ensureSendReceipts(conversationId: string, messageId: string, senderId: string): Promise<boolean> {
+  const recipients = (await listMemberIds(conversationId)).filter((memberId) => memberId !== senderId)
+  if (!recipients.length) return true
+  const body = JSON.stringify(recipients.map((recipientId) => ({
+    message_id: messageId,
+    conversation_id: conversationId,
+    sender_id: senderId,
+    recipient_id: recipientId,
+  })))
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const written = await rest("gh_message_receipts", {
+      method: "POST",
+      prefer: "resolution=ignore-duplicates,return=minimal",
+      body,
+    })
+    if (written.ok) return true
+  }
+  console.error("[messaging] delivery receipts could not be written", conversationId)
+  return false
+}
 
 async function markMessagesDelivered(conversationId: string, recipientId: string, inbound: Array<{ id: string; senderId: string }>): Promise<boolean> {
   if (!dbConfigured() || !inbound.length) return false
@@ -1347,7 +1374,7 @@ export async function markConversationRead(input: {
       method: "POST",
       body: JSON.stringify({ p_user_id: uid, p_conversation_id: cid }),
     })
-    if ((!marked.ok || marked.data !== true) && isProd()) return { ok: false, error: "RECEIPT_UPDATE_FAILED" }
+    if (!marked.ok || marked.data !== true) return { ok: false, error: "RECEIPT_UPDATE_FAILED" }
   } else if (isProd()) {
     return { ok: false, error: "STORE_UNAVAILABLE" }
   }

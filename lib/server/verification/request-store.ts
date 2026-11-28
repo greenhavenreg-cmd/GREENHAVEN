@@ -123,13 +123,15 @@ async function rest<T>(
   }
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    apikey: env.supabaseServiceRoleKey,
-    Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+    ...(init.headers as Record<string, string> | undefined),
   }
   if (init.prefer) headers.Prefer = init.prefer
   try {
-    const res = await (async () => { const r = await supabaseRest(`${path}`, { method: "GET", timeoutMs: 15000 }); return { ok: r.ok, status: r.status, json: async () => r.ok ? r.data : r.body, text: async () => JSON.stringify(r.ok ? r.data : r.body) }; })()
-    const text = await res.text()
+    // Forward method and body: this helper previously hard-coded GET, so verification request writes never ran.
+    const r = await supabaseRest(path, { method: init.method || "GET", headers, body: init.body ?? undefined, timeoutMs: 15000 })
+    const res = { ok: r.ok, status: r.status }
+    const payload = r.ok ? r.data : r.body
+    const text = payload == null ? "" : JSON.stringify(payload)
     let data: T | null = null
     if (text) {
       try {

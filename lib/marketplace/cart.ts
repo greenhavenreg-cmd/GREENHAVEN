@@ -1,7 +1,9 @@
 /**
  * Local cart cache — convenience only.
+ * Signed-in carts are isolated by verified canonical account identity.
  * Server remains authoritative at order create / pay (inventory, price, seller).
  */
+import { IdentityService } from "../identity/identity-service.ts"
 
 export interface MarketplaceCartItem {
   listingId: string
@@ -21,6 +23,27 @@ export interface MarketplaceCartItem {
 }
 
 const CART_KEY = "gh_marketplace_cart_v1"
+
+/**
+ * Keep the legacy key only for anonymous / local-studio browsing. A verified
+ * canonical account gets a private namespace; Pi provider UIDs and unverified
+ * identities are never used as storage principals. No legacy guest cart is
+ * silently assigned to a newly authenticated account.
+ */
+function storageKey(): string {
+  const identity = IdentityService.getIdentity()
+  const canonicalId = String(identity.userId || "").trim()
+  const verified = identity.authState === "authenticated" &&
+    identity.verificationState === "server_verified" &&
+    !identity.isLocalStudioId &&
+    Boolean(canonicalId)
+  return verified ? `${CART_KEY}:account:${encodeURIComponent(canonicalId)}` : CART_KEY
+}
+
+/** Stable identifier for the active cart namespace during async checkout work. */
+export function getMarketplaceCartNamespace(): string {
+  return storageKey()
+}
 const MAX_CART_LINES = 100
 const MAX_QUANTITY = 99
 
@@ -94,12 +117,12 @@ function normalizeCart(value: unknown): MarketplaceCartItem[] {
 function read(): MarketplaceCartItem[] {
   try {
     if (typeof window === "undefined") return []
-    const raw = window.localStorage.getItem(CART_KEY)
+    const raw = window.localStorage.getItem(storageKey())
     const parsed = raw ? JSON.parse(raw) : []
     const normalized = normalizeCart(parsed)
     // Repair malformed/legacy cache once so every consumer sees the same contract.
     if (raw && JSON.stringify(parsed) !== JSON.stringify(normalized)) {
-      window.localStorage.setItem(CART_KEY, JSON.stringify(normalized))
+      window.localStorage.setItem(storageKey(), JSON.stringify(normalized))
     }
     return normalized
   } catch {
@@ -110,7 +133,7 @@ function read(): MarketplaceCartItem[] {
 function write(items: MarketplaceCartItem[]) {
   try {
     if (typeof window === "undefined") return
-    window.localStorage.setItem(CART_KEY, JSON.stringify(normalizeCart(items)))
+    window.localStorage.setItem(storageKey(), JSON.stringify(normalizeCart(items)))
     window.dispatchEvent(new CustomEvent("ghc:marketplace-cart-changed"))
   } catch {
     /* Best-effort local persistence. Server remains authoritative at checkout. */
@@ -225,7 +248,7 @@ export function removeOwnSellerCartItems(viewerId: string): MarketplaceCartItem[
   const next = getMarketplaceCart().filter((item) => String(item.sellerId || "").trim() !== uid)
   if (typeof window !== "undefined") {
     try {
-      window.localStorage.setItem(CART_KEY, JSON.stringify(next))
+      window.localStorage.setItem(storageKey(), JSON.stringify(next))
     } catch {
       /* ignore quota */
     }

@@ -2,6 +2,8 @@
  * GHC amount helpers (display + input only). The ledger is numeric(18,4); the
  * server stays authoritative. Integer "units" = GHC x 10_000 so no float drift.
  */
+import { sanitizeAmountInput } from "./amount-input.ts"
+
 export const GHC_UNIT_SCALE = 10_000
 export const GHC_INPUT_DECIMALS = 4
 
@@ -10,8 +12,13 @@ export type GhcInputResult =
   | { ok: false; code: "EMPTY" | "INVALID" | "TOO_MANY_DECIMALS" | "TOO_LARGE" | "NOT_POSITIVE" }
 
 export function parseGhcInput(raw: string): GhcInputResult {
-  const s = String(raw ?? "").trim().replace(/,/g, "")
-  if (!s) return { ok: false, code: "EMPTY" }
+  const typed = String(raw ?? "").trim()
+  if (!typed) return { ok: false, code: "EMPTY" }
+  // Anything other than digits, "." and "," is invalid (e.g. "1e2"); never sanitise it into a number.
+  if (!/^[\d.,]*$/.test(typed)) return { ok: false, code: "INVALID" }
+  // A comma-decimal keypad types "1,5" for 1.5. Stripping commas turned that into 15 (a 10x error),
+  // so commas go through the shared sanitiser, where a lone "," is a decimal separator.
+  const s = sanitizeAmountInput(typed, 32)
   if (!/^\d*\.?\d*$/.test(s) || s === ".") return { ok: false, code: "INVALID" }
   const [whole = "", frac = ""] = s.split(".")
   if (frac.length > GHC_INPUT_DECIMALS) return { ok: false, code: "TOO_MANY_DECIMALS" }

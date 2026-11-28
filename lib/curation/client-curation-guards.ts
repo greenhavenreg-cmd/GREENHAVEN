@@ -13,10 +13,12 @@ export function humanizeCurationError(code?: string): string {
   const c = String(code || "").toUpperCase()
   switch (c) {
     case "SELF_CURATION":
+    case "SELF_CURATION_FORBIDDEN":
     case "SELF":
     case "OWN_POST":
       return "You cannot curate your own post."
     case "QUOTA":
+    case "DAILY_CURATION_LIMIT":
       return "Daily curation limit reached. Try again tomorrow."
     case "RATE_LIMIT":
     case "RATE_LIMITED":
@@ -31,6 +33,10 @@ export function humanizeCurationError(code?: string): string {
     case "BLOCKED":
     case "FORBIDDEN":
       return "Curation is unavailable for this post."
+    case "CURATION_REVIEW_REQUIRED":
+      return "Curation is temporarily limited while this activity is reviewed."
+    case "CURATION_INTELLIGENCE_UNAVAILABLE":
+    case "SOCIAL_RPC_UNAVAILABLE":
     case "DURABLE_WRITE_REQUIRED":
     case "STORE_UNAVAILABLE":
     case "DATABASE_UNAVAILABLE":

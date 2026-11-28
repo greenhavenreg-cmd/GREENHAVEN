@@ -8,6 +8,7 @@
 
 import { Flag, X, Ban } from "lucide-react"
 import { useState } from "react"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 export type ReportTargetType = "user" | "post" | "comment" | "message" | "story" | "group"
 
@@ -49,6 +50,7 @@ export function ReportChooser({
   const [reason, setReason] = useState("")
   const [details, setDetails] = useState("")
   const [submitted, setSubmitted] = useState(false)
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, () => setOpen(false))
 
   const submit = () => {
     if (!reason) return
@@ -87,7 +89,7 @@ export function ReportChooser({
       {open && (
         <div
           className="fixed inset-0 z-[100] flex items-end bg-black/40 p-4 sm:items-center sm:justify-center"
-          role="dialog"
+          ref={dialogRef} tabIndex={-1} role="dialog"
           aria-modal="true"
           aria-label={`Report ${TARGET_LABELS[targetType]}`}
         >
@@ -105,7 +107,7 @@ export function ReportChooser({
                     type="button"
                     onClick={close}
                     aria-label="Close"
-                    className="rounded-full p-2 text-muted-foreground hover:bg-muted"
+                    className="-m-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
                   >
                     <X size={18} />
                   </button>
@@ -131,7 +133,7 @@ export function ReportChooser({
                     <label className="mb-1 block text-xs font-semibold text-muted-foreground">
                       Additional details (optional)
                     </label>
-                    <textarea
+                    <textarea aria-label="Help us understand the issue…"
                       value={details}
                       onChange={(e) => setDetails(e.target.value.slice(0, 500))}
                       rows={2}
@@ -153,7 +155,7 @@ export function ReportChooser({
               <>
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="text-base font-bold text-foreground">Report submitted</h2>
-                  <button type="button" onClick={close} aria-label="Close" className="rounded-full p-2 text-muted-foreground hover:bg-muted">
+                  <button type="button" onClick={close} aria-label="Close" className="-m-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted">
                     <X size={18} />
                   </button>
                 </div>

@@ -29,7 +29,13 @@ async function rpc(name: string, body: Record<string, unknown>): Promise<Record<
 export async function ensureReferralCode(userId: string) {
   const data = await rpc("ghc_referral_ensure_code", { p_user_id: userId })
   if (!data || data.ok !== true) return { ok: false as const, error: String(data?.error || "RPC_FAILED") }
-  return { ok: true as const, code: String(data.code), createdAt: data.createdAt }
+  const code = typeof data.code === "string" ? data.code.trim().toUpperCase() : ""
+  // The current database contract issues GH + eight uppercase alphanumerics.
+  // Validate the RPC boundary so malformed/missing data never becomes "undefined".
+  if (!/^GH[A-Z0-9]{8}$/.test(code)) {
+    return { ok: false as const, error: "INVALID_REFERRAL_CODE_RESPONSE" }
+  }
+  return { ok: true as const, code, createdAt: data.createdAt }
 }
 
 export async function attributeReferral(referredUserId: string, code: string) {
@@ -85,6 +91,16 @@ export function isReferralSettlementEnabled() {
   return settlementEnabled()
 }
 
+function nonNegativeFinite(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+}
+
+function nonNegativeCount(value: unknown): number {
+  const parsed = nonNegativeFinite(value)
+  return Math.min(Number.MAX_SAFE_INTEGER, Math.floor(parsed))
+}
+
 /** Service-role read of referral programme status for a user (never invents rewards). */
 export async function getReferralStatus(userId: string): Promise<{
   ok: boolean
@@ -116,11 +132,11 @@ export async function getReferralStatus(userId: string): Promise<{
       ok: true,
       code,
       attributed: summary.attributed === true,
-      invitedCount: Math.max(0, Number(summary.invitedCount) || 0),
-      pendingRewardCount: Math.max(0, Number(summary.pendingRewardCount) || 0),
-      postedRewardCount: Math.max(0, Number(summary.postedRewardCount) || 0),
-      pendingRewardGhc: Math.max(0, Number(summary.pendingRewardGhc) || 0),
-      postedRewardGhc: Math.max(0, Number(summary.postedRewardGhc) || 0),
+      invitedCount: nonNegativeCount(summary.invitedCount),
+      pendingRewardCount: nonNegativeCount(summary.pendingRewardCount),
+      postedRewardCount: nonNegativeCount(summary.postedRewardCount),
+      pendingRewardGhc: nonNegativeFinite(summary.pendingRewardGhc),
+      postedRewardGhc: nonNegativeFinite(summary.postedRewardGhc),
       settlementEnabled: settlementEnabled(),
     }
 

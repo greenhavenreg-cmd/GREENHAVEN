@@ -147,6 +147,17 @@ export function EnhancedFeedScreen({ onCompose, onProfile }: EnhancedFeedScreenP
     setDisplayedPostsCount(getAdaptiveFeedPageSize())
     if (containerRef.current) containerRef.current.scrollTo({ top: 0, behavior: "smooth" })
   }, [])
+
+  // Owner-only Create → Others → Saved posts shortcut. The feed owns the saved filter
+  // and applies the same account-scoped saved-post query as the visible filter tabs.
+  useEffect(() => {
+    const openSaved = () => {
+      if (!hasFeedPreferenceOwner || IdentityService.getCurrentUserId() !== feedPreferenceOwnerId) return
+      handleFeedFilterChange("saved")
+    }
+    window.addEventListener("ghc:open-saved-posts", openSaved)
+    return () => window.removeEventListener("ghc:open-saved-posts", openSaved)
+  }, [feedPreferenceOwnerId, handleFeedFilterChange, hasFeedPreferenceOwner])
   useEffect(() => {
     if (!hasFeedPreferenceOwner) {
       setActiveFilter("for-you")

@@ -7,6 +7,8 @@ import { useState, useRef, useEffect } from "react"
 import { Heart, MessageCircle, ThumbsDown, X, ChevronLeft, ChevronRight, Search, Sliders, Flame, MapPin, Briefcase, ShoppingBag, Calendar, Video, TrendingUp, Clock, UserPlus, Star, Zap, TrendingDown, Eye, Volume2, VolumeX, Bell } from "lucide-react"
 import type { Candidate } from "@/lib/ghc-types"
 import { LazyImage } from "./lazy-image"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
+import { activatableProps } from "@/lib/ui/activate-keys"
 import { calculateMatchScore } from "./user-card"
 export { CommunitiesSection } from "./communities-section"
 
@@ -269,7 +271,7 @@ function SmartSuggestionsSection({
             type="button"
             aria-label="Previous pick"
             onClick={() => setCurrentIndex((i) => (i - 1 + suggestions.length) % suggestions.length)}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-card border border-border text-muted-foreground"
+            className="gh-hit-44 flex h-8 w-8 items-center justify-center rounded-full bg-card border border-border text-muted-foreground"
           >
             <ChevronLeft size={16} />
           </button>
@@ -277,7 +279,7 @@ function SmartSuggestionsSection({
             type="button"
             aria-label="Next pick"
             onClick={() => setCurrentIndex((i) => (i + 1) % suggestions.length)}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-card border border-border text-muted-foreground"
+            className="gh-hit-44 flex h-8 w-8 items-center justify-center rounded-full bg-card border border-border text-muted-foreground"
           >
             <ChevronRight size={16} />
           </button>
@@ -339,7 +341,7 @@ function SmartSuggestionsSection({
             aria-label={`Pick ${i + 1}`}
             aria-current={i === currentIndexSafe}
             onClick={() => setCurrentIndex(i)}
-            className={`h-1.5 rounded-full transition ${
+            className={`gh-hit-44 h-1.5 rounded-full transition ${
               i === currentIndexSafe ? "w-4 bg-emerald-600" : "w-1.5 bg-muted-foreground/30"
             }`}
           />
@@ -389,6 +391,7 @@ export function ProfilePreviewModal({
   userAge?: number
   userLocation?: string
   }) {
+  const profileSheetRef = useDialogA11y<HTMLDivElement>(Boolean(isOpen && candidate), onClose)
   if (!isOpen || !candidate) return null
 
   const safeName =
@@ -404,16 +407,33 @@ export function ProfilePreviewModal({
   const score = calculateMatchScore(candidate, userInterests, userAge, userLocation)
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
-      <div className="bg-white w-full rounded-t-3xl overflow-hidden max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 bg-black/50 z-50 flex items-end"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div
+        ref={profileSheetRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${safeName}'s profile`}
+        tabIndex={-1}
+        className="bg-background text-foreground w-full rounded-t-3xl overflow-hidden max-h-[90dvh] overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)] outline-none"
+      >
         {/* Sticky Header */}
-        <div className="sticky top-0 bg-white border-b border-border/70 px-4 py-3 flex items-center justify-between">
+        <div className="sticky top-0 z-10 bg-background border-b border-border/70 px-4 py-3 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-foreground">{safeName}&apos;s Profile</h2>
             <p className="text-xs text-muted-foreground">{safeLocation}</p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center transition">
-            <X className="w-5 h-5" />
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close profile preview"
+            className="w-11 h-11 rounded-full hover:bg-muted flex items-center justify-center transition"
+          >
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -518,8 +538,8 @@ export function ProfilePreviewModal({
         </div>
 
         {/* Sticky Action Buttons */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border/70 p-4 flex gap-3 max-w-md mx-auto">
-          <button
+        <div className="fixed bottom-0 left-0 right-0 bg-background pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-border/70 p-4 flex gap-3 max-w-md mx-auto">
+          <button type="button"
             onClick={() => {
               onMessage(candidate.id)
               onClose()
@@ -529,7 +549,7 @@ export function ProfilePreviewModal({
             <MessageCircle size={18} />
             Message
           </button>
-          <button
+          <button type="button"
             onClick={() => {
               onLike(candidate.id)
               onClose()
@@ -560,14 +580,14 @@ export function DiscoverySection({
   onAction?: () => void
 }) {
   return (
-    <div className="border-b border-border/70 bg-white">
+    <div className="border-b border-border/70 bg-background">
       <div className="px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {Icon}
           <h3 className="font-bold text-sm text-foreground">{title}</h3>
         </div>
         {actionLabel && (
-          <button
+          <button type="button"
             onClick={onAction}
             className="text-xs text-emerald-600 hover:text-emerald-700 font-semibold"
           >
@@ -587,7 +607,7 @@ export function TrendingSection({ candidates, onViewProfile, onLike, onMessage }
     <DiscoverySection title="Trending" icon={<Flame className="w-4 h-4 text-orange-500" />} actionLabel="See all">
       <div className="grid grid-cols-2 gap-3">
         {candidates.slice(0, 4).map((c) => (
-          <div key={c.id} className="bg-gradient-to-br from-orange-50 to-red-50 rounded-lg overflow-hidden border border-orange-200 cursor-pointer hover:shadow-md transition" onClick={() => onViewProfile(c)}>
+          <div key={c.id} {...activatableProps(() => onViewProfile(c), `View ${c.name}'s profile`)} className="bg-gradient-to-br from-orange-50 to-red-50 rounded-lg overflow-hidden border border-orange-200 cursor-pointer hover:shadow-md transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">
             <div className="h-20 bg-gray-200 relative">
               <DurableImage loading="lazy" decoding="async" src={c.photo} alt={c.name} className="w-full h-full object-cover" />
               {c.online && <div className="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full border border-white"></div>}
@@ -609,7 +629,7 @@ export function NearbySection({ candidates, onViewProfile, onLike, onMessage }: 
     <DiscoverySection title="Nearby" icon={<MapPin className="w-4 h-4 text-blue-500" />} actionLabel="Map view">
       <div className="space-y-2">
         {candidates.slice(0, 3).map((c) => (
-          <div key={c.id} onClick={() => onViewProfile(c)} className="flex items-center gap-3 p-2 hover:bg-muted/40 rounded-lg cursor-pointer transition">
+          <div key={c.id} {...activatableProps(() => onViewProfile(c), `View ${c.name}'s profile`)} className="flex items-center gap-3 p-2 hover:bg-muted/40 rounded-lg cursor-pointer transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">
             <DurableImage loading="lazy" decoding="async" src={c.photo} alt={c.name} className="w-12 h-12 rounded-full object-cover" />
             <div className="flex-1 min-w-0">
               <h4 className="font-bold text-sm text-foreground">{c.name}, {c.age}</h4>
@@ -617,7 +637,7 @@ export function NearbySection({ candidates, onViewProfile, onLike, onMessage }: 
                 <MapPin className="w-3 h-3" /> {c.location}
               </p>
             </div>
-            <button onClick={(e) => { e.stopPropagation(); onMessage(c.id); }} className="w-8 h-8 bg-emerald-100 hover:bg-emerald-200 text-emerald-600 rounded-full flex items-center justify-center transition active:scale-90">
+            <button type="button" aria-label={`Message ${c.name}`} onClick={(e) => { e.stopPropagation(); onMessage(c.id); }} className="flex h-11 w-11 shrink-0 bg-emerald-100 hover:bg-emerald-200 text-emerald-600 rounded-full flex items-center justify-center transition active:scale-90">
               <MessageCircle size={14} />
             </button>
           </div>
@@ -635,13 +655,13 @@ export function SuggestedCreatorsSection({ candidates, onViewProfile, onFollow }
     <DiscoverySection title="Suggested Creators" icon={<Video className="w-4 h-4 text-indigo-500" />} actionLabel="Browse">
       <div className="space-y-2">
         {candidates.slice(0, 4).map((c) => (
-          <div key={c.id} onClick={() => onViewProfile(c)} className="flex items-center gap-3 p-2 hover:bg-muted/40 rounded-lg cursor-pointer transition">
+          <div key={c.id} {...activatableProps(() => onViewProfile(c), `View ${c.name}'s profile`)} className="flex items-center gap-3 p-2 hover:bg-muted/40 rounded-lg cursor-pointer transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">
             <DurableImage loading="lazy" decoding="async" src={c.photo} alt={c.name} className="w-10 h-10 rounded-full object-cover border-2 border-indigo-200" />
             <div className="flex-1 min-w-0">
               <h4 className="font-bold text-sm text-foreground flex items-center gap-1">{c.name} {c.verified && <span className="text-blue-500 text-xs">✓</span>}</h4>
               <p className="text-xs text-muted-foreground">Creator</p>
             </div>
-            <button onClick={(e) => { e.stopPropagation(); onFollow(c.id); }} className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 rounded-full text-xs font-bold transition active:scale-90">
+            <button type="button" onClick={(e) => { e.stopPropagation(); onFollow(c.id); }} className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 rounded-full text-xs font-bold transition active:scale-90">
               Follow
             </button>
           </div>
@@ -726,7 +746,7 @@ export function PopularPostsSection({ posts, onViewPost }: { posts: any[]; onVie
     <DiscoverySection title="Popular Posts" icon={<TrendingUp className="w-4 h-4 text-red-500" />} actionLabel="Explore">
       <div className="space-y-2">
         {(posts || []).slice(0, 3).map((p: any) => (
-          <button key={p.id} onClick={() => onViewPost(p.id)} className="w-full text-left flex gap-3 p-2 hover:bg-red-50 rounded-lg transition active:scale-95">
+          <button type="button" key={p.id} onClick={() => onViewPost(p.id)} className="w-full text-left flex gap-3 p-2 hover:bg-red-50 rounded-lg transition active:scale-95">
             {p.images?.[0] && <DurableImage loading="lazy" decoding="async" src={p.images[0]} alt="" className="w-12 h-12 rounded object-cover flex-shrink-0" />}
             <div className="min-w-0">
               <h4 className="font-bold text-xs text-foreground truncate">{p.authorName}</h4>
@@ -754,7 +774,7 @@ export function LiveSection({ onViewLive }: { onViewLive: (streamId: string) => 
     <DiscoverySection title="Live Now" icon={<div className="w-4 h-4 bg-red-500 rounded-full animate-pulse" />} actionLabel="All">
       <div className="space-y-2">
         {liveStreams.map((s) => (
-          <button key={s.id} onClick={() => onViewLive(s.id)} className="w-full text-left flex gap-3 p-2 hover:bg-red-50 rounded-lg transition active:scale-95 border border-red-200">
+          <button type="button" key={s.id} onClick={() => onViewLive(s.id)} className="w-full text-left flex gap-3 p-2 hover:bg-red-50 rounded-lg transition active:scale-95 border border-red-200">
             <div className="w-12 h-12 bg-gradient-to-br from-red-400 to-red-600 rounded flex items-center justify-center flex-shrink-0">
               <Video className="w-5 h-5 text-white" />
             </div>
@@ -781,7 +801,7 @@ export function RecentSearchesSection({ searches, onSearch, onClear, onRemove }:
   {searches.map((s) => (
   <div key={s} className="flex items-center gap-1 rounded-full bg-muted pl-3 pr-1.5 py-1.5 text-xs font-semibold text-foreground/90">
   <button type="button" onClick={() => onSearch(s)} className="max-w-[9rem] truncate hover:text-emerald-700">{s}</button>
-  {onRemove && <button type="button" onClick={() => onRemove(s)} className="rounded-full p-0.5 text-muted-foreground hover:bg-white hover:text-foreground/90" aria-label={`Remove ${s} from recent searches`}><X size={12} /></button>}
+  {onRemove && <button type="button" onClick={() => onRemove(s)} className="rounded-full p-0.5 text-muted-foreground hover:bg-background hover:text-foreground/90" aria-label={`Remove ${s} from recent searches`}><X size={12} /></button>}
   </div>
   ))}
   </div>
@@ -793,14 +813,14 @@ export function RecentSearchesSection({ searches, onSearch, onClear, onRemove }:
 export function QuickActionsBar({ selectedCandidate, onFollow, onMessage, onInvite, onViewProfile }: { selectedCandidate: Candidate | null; onFollow: (id: string) => void; onMessage: (id: string) => void; onInvite: (id: string) => void; onViewProfile: (c: Candidate) => void }) {
   if (!selectedCandidate) return null
   return (
-    <div className="sticky bottom-0 bg-white border-t border-border/70 px-4 py-3 flex gap-2">
-      <button onClick={() => onFollow(selectedCandidate.id)} className="flex-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 py-2 rounded-lg font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1">
+    <div className="sticky bottom-0 bg-background border-t border-border/70 px-4 py-3 flex gap-2">
+      <button type="button" onClick={() => onFollow(selectedCandidate.id)} className="flex-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 py-2 rounded-lg font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1">
         <UserPlus className="w-4 h-4" /> Follow
       </button>
-      <button onClick={() => onMessage(selectedCandidate.id)} className="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 py-2 rounded-lg font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1">
+      <button type="button" onClick={() => onMessage(selectedCandidate.id)} className="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 py-2 rounded-lg font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1">
         <MessageCircle className="w-4 h-4" /> Message
       </button>
-      <button onClick={() => onInvite(selectedCandidate.id)} className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 py-2 rounded-lg font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1">
+      <button type="button" onClick={() => onInvite(selectedCandidate.id)} className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 py-2 rounded-lg font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1">
         <Heart className="w-4 h-4" /> Invite
       </button>
     </div>

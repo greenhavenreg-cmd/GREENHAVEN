@@ -9,7 +9,7 @@ const screen = read('components/ghc/events-discovery-screen.tsx')
 const communityScreen = read('components/ghc/greenhaven-ecosystem-screen.tsx')
 const platformRoute = read('app/api/communities/[id]/platform/route.ts')
 const checks = [
-  ['Events remains Coming Soon with no live destination', /id: "events"[\s\S]{0,220}status: "COMING_SOON"[\s\S]{0,120}destination: \{ kind: "none" \}/.test(registry)],
+  ['Events is released as an active service with a canonical focus destination', /id: "events"[\s\S]{0,260}status: "ACTIVE"[\s\S]{0,140}destination: \{ kind: "focus", serviceId: "events" \}/.test(registry)],
   ['server gate uses canonical registry status', /getServiceById\(id\)/.test(gate) && /isInteractiveStatus\(service\.status\)/.test(gate)],
   ['Coming Soon and unavailable services fail closed on server', /SERVICE_NOT_RELEASED/.test(gate) && /SERVICE_UNAVAILABLE/.test(gate)],
   ['Events API checks release status before authentication or data access', route.indexOf('const access = getEcosystemServiceAccess("events")') < route.indexOf('const auth = await resolveAuthenticatedUser') && route.indexOf('const access = getEcosystemServiceAccess("events")') < route.indexOf('const eventResult = await socialRest<')],
@@ -20,7 +20,7 @@ const checks = [
   ['event projection omits creator IDs and attendance rosters', !/creator_id|attendeeIds|memberRoster/.test(screen)],
   ['RSVP writes reuse the canonical authenticated community platform route', /\/api\/communities\/\$\{encodeURIComponent\(event\.communityId\)\}\/platform/.test(screen) && /action: "event_rsvp"/.test(screen) && /durable !== true/.test(screen)],
   ['Community event create and RSVP path remains intact', /gh_community_event_create/.test(platformRoute) && /gh_community_event_rsvp/.test(platformRoute)],
-  ['Events discovery UI is prepared but not wired into the Coming Soon directory', !/EventsDiscoveryScreen/.test(communityScreen)],
+  ['Events discovery screen is mounted from the active Ecosystem service and supports back navigation', /EventsDiscoveryScreen/.test(communityScreen) && /focusId === "events"/.test(communityScreen) && /service\.id === "events" \|\| service\.id === "services-ip"[\s\S]{0,100}setFocusId\(service\.id\)/.test(communityScreen)],
   ['Events screen aborts stale search and pagination requests on filter changes', /new AbortController\(\)/.test(screen) && /requestRef\.current\?\.abort\(\)/.test(screen) && /signal\?\.aborted/.test(screen)],
   ['service navigation continues to reject non-interactive statuses', /if \(!isInteractiveStatus\(service\.status\)\) return false/.test(nav)],
 ]

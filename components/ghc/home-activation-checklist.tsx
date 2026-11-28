@@ -97,7 +97,7 @@ export function HomeActivationChecklist({
                 <h2 className="text-[13px] font-bold">Make GreenHaven yours</h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">{checklist.doneCount} of {checklist.total} setup steps complete · {checklist.percent}%</p>
               </div>
-              <button type="button" onClick={() => { setVisible(false); setExpanded(false) }} className="-mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted" aria-label="Dismiss setup reminder"><X size={16} /></button>
+              <button type="button" onClick={() => { setVisible(false); setExpanded(false) }} className="gh-hit-44 -mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted" aria-label="Dismiss setup reminder"><X size={16} /></button>
             </div>
             {expanded ? (
               <ul className="mt-2 space-y-1 border-t border-border/60 pt-2">

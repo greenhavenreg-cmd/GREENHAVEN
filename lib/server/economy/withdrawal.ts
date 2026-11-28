@@ -192,16 +192,10 @@ export async function listWithdrawalsForUser(userId: string): Promise<Withdrawal
     const url =
       `ghc_withdrawal_requests` +
       `?user_id=eq.${encodeURIComponent(userId)}&order=created_at.desc&limit=50`
-    const res = await fetch(url, {
-      headers: {
-        apikey: env.supabaseServiceRoleKey,
-        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-      },
-      cache: "no-store",
-      signal: AbortSignal.timeout(8_000),
-    })
+    // Use the shared REST client: it resolves the project base URL and sends service headers.
+    const res = await supabaseRest<unknown>(url, { method: "GET", timeoutMs: 8_000 })
     if (!res.ok) return null
-    const rows = (await res.json()) as unknown
+    const rows = res.data
     return Array.isArray(rows) ? rows.map((row) => mapRow(row as Record<string, unknown>)) : null
   } catch {
     return null

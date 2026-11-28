@@ -412,6 +412,8 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
   const [showPendingSheet, setShowPendingSheet] = useState(false)
   const [showUtilityHelp, setShowUtilityHelp] = useState(false)
   const [claimingHoldId, setClaimingHoldId] = useState<string | null>(null)
+  // Synchronous single-flight guard: `claimingHoldId` only updates after a render.
+  const claimHoldInFlightRef = useRef(false)
   const [walletOnline, setWalletOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine)
   const [claimFeedback, setClaimFeedback] = useState<string | null>(null)
   const [claimReceipt, setClaimReceipt] = useState<{ amount: number; ref?: string } | null>(null)
@@ -953,7 +955,7 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
 
 
   const claimPendingHold = async (holdId: string) => {
-    if (claimingHoldId) return
+    if (claimingHoldId || claimHoldInFlightRef.current) return
     if (!walletOnline) {
       setClaimFeedback?.("You are offline — claim when reconnected")
       return
@@ -962,6 +964,7 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
       setClaimFeedback("You are offline. Claims need a connection so the ledger can confirm.")
       return
     }
+    claimHoldInFlightRef.current = true
     setClaimingHoldId(holdId)
     // Keep the action locked for the lifetime of the request. Each request is
     // bounded below; a detached timer must never re-enable a still-running claim.
@@ -1058,6 +1061,7 @@ export function PremiumWalletScreen({ onBack, initialNotificationTarget }: { onB
     } catch (e) {
       setClaimFeedback(e instanceof Error ? e.message : "Claim failed")
     } finally {
+      claimHoldInFlightRef.current = false
       setClaimingHoldId(null)
     }
   }
@@ -1646,7 +1650,7 @@ const lowBalance = balance === 0 && displayPending === 0
                 <p className="text-[13px] font-black tracking-tight text-foreground">Money & benefits</p>
                 <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">Wallet holds balances and History. Claims open in Rewards; VIP plans open in Membership. GHC and Pi remain separate rails.</p>
               </div>
-              <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Protected</span>
+              <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Protected</span>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button type="button" onClick={() => navigateSettingsSection("rewards")} className="rounded-2xl border border-border/60 bg-muted/30 p-3 text-left transition hover:bg-muted/60 active:scale-[.99]">
@@ -1742,7 +1746,7 @@ const lowBalance = balance === 0 && displayPending === 0
             <p className="mt-1 text-[10px] text-muted-foreground">
               {monthInsight.settledCount} settled entries · {formatGhc(monthInsight.monthPending)} pending, separate
             </p>
-            <p className="mt-0.5 text-[9px] text-muted-foreground">Based on currently loaded GHC ledger records, not a lifetime statement</p>
+            <p className="mt-0.5 text-[10px] text-muted-foreground">Based on currently loaded GHC ledger records, not a lifetime statement</p>
           </div>
           <div className="rounded-2xl border border-border/60 bg-card px-3.5 py-3 shadow-[var(--gh-card-shadow)]">
             <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
@@ -1969,20 +1973,20 @@ const lowBalance = balance === 0 && displayPending === 0
                 activeCount={Number(txFilter !== "all") + Number(txDateRange !== "all") + Number(Boolean(query.trim()))}
                 persistentContent={<label className="relative block">
                   <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                  <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search description, reference or transaction ID…" className="min-h-10 w-full rounded-xl border border-border bg-card py-2 pl-9 pr-3 text-sm outline-none ring-emerald-500/30 focus-visible:ring-2" aria-label="Search GHC transactions by description or reference" />
+                  <input type="search" enterKeyHint="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search description, reference or transaction ID…" className="min-h-10 w-full rounded-xl border border-border bg-card py-2 pl-9 pr-3 text-sm outline-none ring-emerald-500/30 focus-visible:ring-2" aria-label="Search GHC transactions by description or reference" />
                 </label>}
               >
               <section className="grid grid-cols-3 gap-2 rounded-2xl border border-border/70 bg-card p-3 shadow-sm" aria-label="Filtered GHC statement summary">
                 <div className="min-w-0">
-                  <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Money in</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Money in</p>
                   <p className="mt-1 truncate text-sm font-extrabold tabular-nums text-emerald-700 dark:text-emerald-400">+{formatGhc(filteredStatementSummary.incoming)}</p>
                 </div>
                 <div className="min-w-0 border-l border-border pl-2">
-                  <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Money out</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Money out</p>
                   <p className="mt-1 truncate text-sm font-extrabold tabular-nums text-foreground">−{formatGhc(filteredStatementSummary.outgoing)}</p>
                 </div>
                 <div className="min-w-0 border-l border-border pl-2">
-                  <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Pending</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Pending</p>
                   <p className="mt-1 truncate text-sm font-extrabold tabular-nums text-amber-700 dark:text-amber-300">{formatGhc(filteredStatementSummary.pending)}</p>
                 </div>
                 <p className="col-span-3 border-t border-border/70 pt-2 text-[10px] text-muted-foreground">
@@ -2101,7 +2105,7 @@ const lowBalance = balance === 0 && displayPending === 0
                     activeCount={Number(piStatusFilter !== "all") + Number(txDateRange !== "all") + Number(Boolean(query.trim()))}
                     persistentContent={<label className="relative block">
                       <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden />
-                      <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search purpose, product or provider reference…" aria-label="Search Pi payment records" className="min-h-10 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40" />
+                      <input type="search" enterKeyHint="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search purpose, product or provider reference…" aria-label="Search Pi payment records" className="min-h-10 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40" />
                     </label>}
                   >
                     <div className="flex flex-wrap gap-1.5" role="group" aria-label="Pi payment status filter">
@@ -2557,7 +2561,7 @@ const lowBalance = balance === 0 && displayPending === 0
             onClick={() => setShowPendingSheet(false)}
           />
           <div
-            className="relative z-[181] flex max-h-[75vh] w-full max-w-md flex-col rounded-t-[1.25rem] border border-border/50 bg-card shadow-2xl sm:mb-8 sm:rounded-[1.25rem]"
+            className="relative z-[181] flex max-h-[75dvh] w-full max-w-md flex-col rounded-t-[1.25rem] border border-border/50 bg-card shadow-2xl sm:mb-8 sm:rounded-[1.25rem]"
             style={{
               marginBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
             }}
@@ -2575,7 +2579,7 @@ const lowBalance = balance === 0 && displayPending === 0
               <button
                 type="button"
                 onClick={() => setShowPendingSheet(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-muted"
+                className="gh-hit-44 flex h-8 w-8 items-center justify-center rounded-full bg-muted"
                 aria-label="Close pending sheet"
               >
                 <X size={16} />
@@ -2787,7 +2791,7 @@ const lowBalance = balance === 0 && displayPending === 0
           <div className="border-b border-border px-3 py-2">
             <label className="relative block">
               <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search both histories by ID or reference…" aria-label="Search transaction histories across GHC and Pi" className="min-h-11 w-full rounded-xl border border-border bg-card py-2 pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary" />
+              <input type="search" enterKeyHint="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search both histories by ID or reference…" aria-label="Search transaction histories across GHC and Pi" className="min-h-11 w-full rounded-xl border border-border bg-card py-2 pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary" />
             </label>
             <p className="mt-1 text-[10px] text-muted-foreground">The same search term is applied independently to whichever asset rail you select. Amounts are never combined.</p>
             <div className="mt-2 flex w-full rounded-full bg-muted p-1" role="tablist" aria-label="Transaction asset">

@@ -243,7 +243,7 @@ export function PremiumCommunityHub({
   onAcceptInvitation?: () => Promise<boolean>
   onDeclineInvitation?: () => Promise<boolean>
   onLeave?: () => void
-  onMute?: () => void
+  onMute?: () => void | Promise<void>
   onPost?: (body: string, kind?: "text" | "question" | "resource") => Promise<boolean>
   onReplyToPost?: (postId: string, body: string) => void
   onReactToPost?: (postId: string) => void
@@ -284,7 +284,7 @@ export function PremiumCommunityHub({
   useEffect(() => {
     return onCloseTransientUI(() => setShowJoinConfirm(false))
   }, [])
-  const [chatMuted, setChatMuted] = useState(false)
+  const [muteBusy, setMuteBusy] = useState(false)
   const [chatState, setChatState] = useState<{ enabled: boolean; privacy: "members" | "approval"; chatMember: boolean; requestStatus?: string | null; owner: boolean } | null>(null)
   const [chatBusy, setChatBusy] = useState(false)
   const chatStateRequestRef = useRef(0)
@@ -773,7 +773,7 @@ export function PremiumCommunityHub({
             <button
               type="button"
               onClick={onBack}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm hover:bg-black/50"
+              className="gh-hit-44 flex h-9 w-9 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm hover:bg-black/50"
               aria-label="Back to communities"
             >
               <ArrowLeft size={18} />
@@ -802,7 +802,7 @@ export function PremiumCommunityHub({
                   }
                 })
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm hover:bg-black/50"
+              className="gh-hit-44 flex h-9 w-9 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm hover:bg-black/50"
               aria-label="Share community"
             >
               <Share2 size={16} />
@@ -1134,7 +1134,7 @@ export function PremiumCommunityHub({
             {community.isJoined && onPost && (
               <div className="rounded-2xl border border-border bg-card p-3">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Post to board</p>
-                <textarea
+                <textarea aria-label="Share an update, question, or resource…"
                   value={composeBody}
                   onChange={(e) => setComposeBody(e.target.value)}
                   placeholder="Share an update, question, or resource…"
@@ -1637,25 +1637,30 @@ export function PremiumCommunityHub({
                   <div className="mt-4 space-y-2">
                     <p className="text-[12px] text-muted-foreground">Create an optional chat and choose how members enter it.</p>
                     <div className="grid grid-cols-2 gap-2">
-                      <button disabled={chatBusy} onClick={() => void runChatAction("create", "members")} className="min-h-11 rounded-xl bg-[var(--gh-green)] px-3 text-xs font-bold text-white disabled:opacity-60">Create · Members join</button>
-                      <button disabled={chatBusy} onClick={() => void runChatAction("create", "approval")} className="min-h-11 rounded-xl border border-border bg-background px-3 text-xs font-bold disabled:opacity-60">Create · Approval</button>
+                      <button type="button" disabled={chatBusy} onClick={() => void runChatAction("create", "members")} className="min-h-11 rounded-xl bg-[var(--gh-green)] px-3 text-xs font-bold text-white disabled:opacity-60">Create · Members join</button>
+                      <button type="button" disabled={chatBusy} onClick={() => void runChatAction("create", "approval")} className="min-h-11 rounded-xl border border-border bg-background px-3 text-xs font-bold disabled:opacity-60">Create · Approval</button>
                     </div>
                   </div>
                 ) : <p className="mt-4 text-[12px] text-muted-foreground">The owner has not created a chat for this community.</p>
               ) : chatState?.chatMember ? (
                 <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-emerald-50/70 p-3 dark:bg-emerald-950/30">
                   <div><p className="text-xs font-bold text-foreground">You’re in the chat</p><p className="text-[11px] text-muted-foreground">Messages open in the dedicated Messages experience.</p></div>
-                  <button onClick={() => onOpenChat?.()} className="min-h-10 shrink-0 rounded-xl bg-[var(--gh-green)] px-4 text-xs font-bold text-white">Open chat</button>
+                  <button type="button" onClick={() => onOpenChat?.()} className="min-h-10 shrink-0 rounded-xl bg-[var(--gh-green)] px-4 text-xs font-bold text-white">Open chat</button>
                 </div>
               ) : chatState?.requestStatus === "pending" ? (
                 <div className="mt-4 rounded-xl bg-amber-50 p-3 text-[12px] text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">Your chat request is waiting for the owner’s approval.</div>
               ) : (
-                <button disabled={chatBusy} onClick={() => void runChatAction("join")} className="mt-4 min-h-11 w-full rounded-xl bg-[var(--gh-green)] px-4 text-xs font-bold text-white disabled:opacity-60">{chatState?.privacy === "approval" ? "Request to join chat" : "Join community chat"}</button>
+                <button type="button" disabled={chatBusy} onClick={() => void runChatAction("join")} className="mt-4 min-h-11 w-full rounded-xl bg-[var(--gh-green)] px-4 text-xs font-bold text-white disabled:opacity-60">{chatState?.privacy === "approval" ? "Request to join chat" : "Join community chat"}</button>
               )}
             </div>
             {chatState?.chatMember ? (
-              <button type="button" onClick={() => { setChatMuted((v) => !v); try { onMute?.() } catch {} }} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-muted-foreground">
-                <VolumeX size={14} /> {chatMuted ? "Chat muted" : "Mute chat"}
+              <button type="button" disabled={muteBusy || !onMute} aria-pressed={!!community.isMuted} onClick={() => {
+                if (muteBusy || !onMute) return
+                setMuteBusy(true)
+                // The server-backed community mute state is the only source of truth; nothing is flipped locally.
+                void Promise.resolve().then(() => onMute()).catch(() => {}).finally(() => setMuteBusy(false))
+              }} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-muted-foreground disabled:opacity-60">
+                <VolumeX size={14} /> {muteBusy ? "Saving…" : community.isMuted ? "Chat muted · tap to unmute" : "Mute chat"}
               </button>
             ) : null}
             <p className="text-[11px] leading-relaxed text-muted-foreground">Board posts, announcements and events stay in Communities. Realtime chat stays in Messages so each feature has one clear home.</p>
@@ -2075,15 +2080,15 @@ export function PremiumCommunityHub({
                 <div className="mt-2 grid grid-cols-3 gap-2 text-center">
                   <div className="rounded-xl bg-muted/50 px-2 py-2">
                     <p className="text-sm font-bold">{(community as any).stats.membersJoinedThisWeek ?? 0}</p>
-                    <p className="text-[9px] text-muted-foreground">New members / wk</p>
+                    <p className="text-[10px] text-muted-foreground">New members / wk</p>
                   </div>
                   <div className="rounded-xl bg-muted/50 px-2 py-2">
                     <p className="text-sm font-bold">{(community as any).stats.postsThisWeek ?? 0}</p>
-                    <p className="text-[9px] text-muted-foreground">Posts / wk</p>
+                    <p className="text-[10px] text-muted-foreground">Posts / wk</p>
                   </div>
                   <div className="rounded-xl bg-muted/50 px-2 py-2">
                     <p className="text-sm font-bold">{(community as any).stats.activeChatApprox ?? 0}</p>
-                    <p className="text-[9px] text-muted-foreground">Active chat ~</p>
+                    <p className="text-[10px] text-muted-foreground">Active chat ~</p>
                   </div>
                 </div>
               </section>
@@ -2206,15 +2211,15 @@ export function PremiumCommunityHub({
                 <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                   <div className="rounded-xl bg-muted/50 px-2 py-2">
                     <p className="text-sm font-bold text-foreground">{adminHealth.engagementScore}</p>
-                    <p className="text-[9px] font-semibold text-muted-foreground">Engagement</p>
+                    <p className="text-[10px] font-semibold text-muted-foreground">Engagement</p>
                   </div>
                   <div className="rounded-xl bg-muted/50 px-2 py-2">
                     <p className="text-sm font-bold text-foreground">{adminHealth.unansweredCount}</p>
-                    <p className="text-[9px] font-semibold text-muted-foreground">Unanswered</p>
+                    <p className="text-[10px] font-semibold text-muted-foreground">Unanswered</p>
                   </div>
                   <div className="rounded-xl bg-muted/50 px-2 py-2">
                     <p className="text-sm font-bold text-foreground">{adminHealth.openReportCount}</p>
-                    <p className="text-[9px] font-semibold text-muted-foreground">Open reports</p>
+                    <p className="text-[10px] font-semibold text-muted-foreground">Open reports</p>
                   </div>
                 </div>
                 <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-muted-foreground">

@@ -401,6 +401,9 @@ export function CommunitiesScreen() {
   const [directoryLoading, setDirectoryLoading] = useState(true)
   const [directoryDurable, setDirectoryDurable] = useState<boolean | null>(null)
   const [directoryError, setDirectoryError] = useState<string | null>(null)
+  // Query key of the last successful first-page load. A failed refresh of the same query keeps that list
+  // (marked possibly out of date) instead of wiping it; a different query never shows another query's rows.
+  const directoryGoodKeyRef = useRef<string | null>(null)
   const [directoryServerFilterAvailable, setDirectoryServerFilterAvailable] = useState(true)
   const [isOffline, setIsOffline] = useState(false)
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
@@ -566,6 +569,7 @@ export function CommunitiesScreen() {
           })
         }
         setDirectoryHasMore(res.serverFiltered && Boolean(res.pagination?.hasMore))
+        if (directoryOffset === 0) directoryGoodKeyRef.current = `${communityIdentityId}|${directory}|${categoryFilter}|${searchQuery.trim()}`
         setRemoteDirectory((current) => {
           if (directoryOffset === 0) return rows
           const byId = new Map(current.map((community) => [community.id, community]))
@@ -598,9 +602,10 @@ export function CommunitiesScreen() {
       })
       .catch(() => {
         if (!cancelled && activeCommunityIdentityRef.current === communityIdentityId) {
-          if (directoryOffset === 0) setRemoteDirectory([])
-          setDirectoryDurable(false)
-          setDirectoryError(directoryOffset > 0 ? "Could not load more communities. Try again." : "Could not load the community directory")
+          const keepKnownList = directoryOffset === 0 && directoryGoodKeyRef.current === `${communityIdentityId}|${directory}|${categoryFilter}|${searchQuery.trim()}`
+          if (directoryOffset === 0 && !keepKnownList) { setRemoteDirectory([]); directoryGoodKeyRef.current = null }
+          if (!keepKnownList) setDirectoryDurable(false)
+          setDirectoryError(directoryOffset > 0 ? "Could not load more communities. Try again." : keepKnownList ? "Could not refresh the directory. The list below may be out of date." : "Could not load the community directory")
           setDirectoryLoading(false)
           setDirectoryLoadingMore(false)
           setDirectoryHasMore(false)
@@ -734,6 +739,7 @@ export function CommunitiesScreen() {
     setPlatformSnapshots({})
     setPlatformLoading(false)
     setRemoteDirectory([])
+    directoryGoodKeyRef.current = null
     setDurableInvitations([])
     setInvitationsUnavailable(false)
     setDirectoryOffset(0)
@@ -1294,14 +1300,18 @@ export function CommunitiesScreen() {
           }
           onMute={async () => {
             const muted = !!selected.isMuted
-            if (muted && unmuteConversation) {
-              await unmuteConversation(selected.id)
-              addToast("Community unmuted", "success")
-            } else if (muteConversation) {
-              await muteConversation(selected.id, 24 * 7)
-              addToast("Community muted — you remain a member", "info")
-            } else {
-              addToast("Mute unavailable", "error")
+            try {
+              // unmuteConversation / muteConversation report their own success or failure toast and do
+              // not throw on a rejected save, so no second success toast is added here.
+              if (muted && unmuteConversation) {
+                await unmuteConversation(selected.id)
+              } else if (muteConversation) {
+                await muteConversation(selected.id, 24 * 7)
+              } else {
+                addToast("Mute unavailable", "error")
+              }
+            } catch {
+              addToast(muted ? "Could not unmute this community. Please try again." : "Could not mute this community. Please try again.", "error")
             }
             setHubKey((k) => k + 1)
           }}
@@ -1417,7 +1427,7 @@ export function CommunitiesScreen() {
               // Canonical shell navigation — Home tab (no reload / no history hack)
               if (!navigateTo("home")) setTab?.("home")
             }}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground transition hover:bg-muted active:scale-95"
+            className="gh-hit-44 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground transition hover:bg-muted active:scale-95"
             aria-label="Back to Home"
           >
             <ArrowLeft size={18} strokeWidth={2.25} aria-hidden />
@@ -1461,7 +1471,7 @@ export function CommunitiesScreen() {
                 aria-hidden
               />
               <input
-                type="search"
+                type="search" enterKeyHint="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={msg("searchCommunity")}
@@ -1472,7 +1482,7 @@ export function CommunitiesScreen() {
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="gh-hit-44 absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   aria-label="Clear search"
                 >
                   <X size={15} />

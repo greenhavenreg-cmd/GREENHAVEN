@@ -5,7 +5,7 @@
  * Identity link ≠ payout authorization. Server records consent in gh_pi_wallet_authorizations.
  * Never trusts client-supplied recipient UIDs.
  */
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { ShieldCheck, Loader2 } from "lucide-react"
 import { confirmDialog } from "@/lib/ui/global-interactions"
 import { fetchWalletAuthorizationStatus, requestPiWalletConsent } from "@/lib/client/pi-wallet-consent"
@@ -67,12 +67,14 @@ export function PiPayoutAuthorizationCard({
     }
   }, [refresh])
 
+  const authInFlightRef = useRef(false)
   const grant = async () => {
-    if (busy) return
+    if (busy || authInFlightRef.current) return
     if (!consent) {
       setMsg("Tick the consent box to authorize your Pi wallet.")
       return
     }
+    authInFlightRef.current = true
     setBusy(true)
     setMsg(null)
     try {
@@ -87,12 +89,13 @@ export function PiPayoutAuthorizationCard({
       setMsg("Pi payouts authorized and verified for your currently linked Pi identity.")
       await refresh()
     } finally {
+      authInFlightRef.current = false
       setBusy(false)
     }
   }
 
   const revoke = async () => {
-    if (busy) return
+    if (busy || authInFlightRef.current) return
     const ok = await confirmDialog({
       title: "Revoke Pi payout authorization?",
       message: "Future withdrawals will be blocked until you authorize again. Already submitted payouts are not reversed.",
@@ -100,7 +103,8 @@ export function PiPayoutAuthorizationCard({
       cancelLabel: "Keep authorized",
       danger: true,
     })
-    if (!ok) return
+    if (!ok || authInFlightRef.current) return
+    authInFlightRef.current = true
     setBusy(true)
     setMsg(null)
     try {
@@ -127,6 +131,7 @@ export function PiPayoutAuthorizationCard({
     } catch {
       setMsg("Network error while revoking.")
     } finally {
+      authInFlightRef.current = false
       setBusy(false)
     }
   }

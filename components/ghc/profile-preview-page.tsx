@@ -32,6 +32,7 @@ import { resolveUserIntents } from "@/lib/connection-intents"
 import { IdentityService } from "@/lib/identity/identity-service"
 import { ProfileContentLibrary } from "./profile-content-library"
 import { ProfileProfessionalShowcase } from "./profile-professional-showcase"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 export function ProfilePreviewPage({
   candidate,
@@ -115,8 +116,14 @@ export function ProfilePreviewPage({
   })
 
 
+  const dialogRef = useDialogA11y<HTMLElement>(true, onBack)
+
   return (
     <section
+      ref={dialogRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
       className="fixed inset-0 z-[80] flex h-dvh flex-col overflow-hidden bg-background"
       aria-label={`${name}'s profile`}
     >

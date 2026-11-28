@@ -40,7 +40,7 @@ test('social notifications reject client create', /Clients cannot create social 
 test('message routes use bounded JSON bodies', /readBoundedJson/.test(messagesRoute))
 test('offline message flush removes permanent failures and bounds retries', /RETRY_LIMIT_REACHED|MESSAGE_REJECTED/.test(offline))
 test('notification center dual mark-read waits for both social and unified writes', /\/api\/social\/notifications/.test(bell) && /\/api\/notifications/.test(bell) && /Promise\.all/.test(bell))
-test('mark-all reports partial durable failure honestly', /Some alerts could not be marked read/.test(bell))
+test('mark-all reports partial durable failure honestly', /t\("markAllReadFailed"\)/.test(bell) && /markAllReadFailed: "Some alerts could not be marked read/.test(read('lib/i18n/social.ts')))
 test('package and app release versions agree', release.includes(`APP_RELEASE_VERSION = "${pkg.version}"`))
 test('phase 5 checker is registered in prebuild', Boolean(pkg.scripts?.['prebuild:checks']?.includes('check-phase5-messages-notifications.mjs')))
 test('phase 5 programme doc exists in canonical or preserved historical documentation', hasProjectDoc('docs/PHASE-5-MESSAGES-NOTIFICATIONS-2026-11-08.md'))

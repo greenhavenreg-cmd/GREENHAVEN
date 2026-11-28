@@ -9,5 +9,6 @@ export async function POST(request: Request) {
   const __rateLimited = await enforceUserMutationRateLimit(auth.userId, "economy/notifications/read-all:POST", 60, 60_000, { failClosed: false })
   if (__rateLimited) return __rateLimited
   const n = await markAllGhcNotificationsRead(auth.userId)
+  if (n === null) return jsonErr("NOTIFICATION_STORE_UNAVAILABLE", "Could not mark notifications read. Please retry.", 503)
   return jsonOk({ marked: n, userId: auth.userId })
 }

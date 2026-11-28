@@ -24,11 +24,14 @@ export async function GET(
   }
   const { id } = await ctx.params
   const postId = String(id || "").trim()
-  if (!postId) {
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(postId)) {
     return NextResponse.json({ ok: false, error: "INVALID_ID" }, { status: 400 })
   }
   const url = new URL(request.url)
   const choice = String(url.searchParams.get("choice") || "").trim()
+  if (choice && choice !== "upvote" && choice !== "downvote") {
+    return NextResponse.json({ ok: false, error: "INVALID_CHOICE" }, { status: 400 })
+  }
   const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 50) || 50))
 
   if (!socialDbConfigured()) {

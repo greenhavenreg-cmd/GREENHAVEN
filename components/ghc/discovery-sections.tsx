@@ -93,7 +93,7 @@ function MiniPersonCard({
           <p className="truncate text-[10px] text-white/85">{location}</p>
         </div>
         {c.verified && (
-          <span className="absolute left-2 top-2 rounded-full bg-sky-500/95 px-1.5 py-0.5 text-[9px] font-bold text-white">
+          <span className="absolute left-2 top-2 rounded-full bg-sky-500/95 px-1.5 py-0.5 text-[10px] font-bold text-white">
             ✓
           </span>
         )}

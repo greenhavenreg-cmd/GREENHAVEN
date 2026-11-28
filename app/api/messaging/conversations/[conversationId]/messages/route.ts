@@ -284,7 +284,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
         pinned: body.pinned,
       })
       if (!result.ok) {
-        const status = result.error === "FORBIDDEN" ? 403 : 404
+        const status = result.error === "FORBIDDEN" ? 403 : result.error === "NOT_FOUND" ? 404 : 503
         return NextResponse.json(
           { ok: false, error: result.error },
           { status, headers: { "Cache-Control": "no-store" } }
@@ -372,7 +372,7 @@ export async function DELETE(request: Request, ctx: Ctx) {
       actorId: auth.userId,
     })
     if (!result.ok) {
-      const status = result.error === "FORBIDDEN" ? 403 : 404
+      const status = result.error === "FORBIDDEN" ? 403 : result.error === "NOT_FOUND" ? 404 : 503
       return NextResponse.json(
         { ok: false, error: result.error },
         { status, headers: { "Cache-Control": "no-store" } }

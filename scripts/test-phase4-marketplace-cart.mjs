@@ -8,6 +8,7 @@ import {
   removeMarketplaceCartItemsBySnapshots,
   updateMarketplaceCartQuantity,
 } from "../lib/marketplace/cart.ts"
+import { IdentityService } from "../lib/identity/identity-service.ts"
 
 const store = new Map()
 globalThis.CustomEvent = class CustomEvent {
@@ -88,5 +89,18 @@ store.set("gh_marketplace_cart_v1", JSON.stringify(Array.from({ length: 140 }, (
 cart = getMarketplaceCart()
 assert.equal(cart.length, 100, "cart storage is bounded to 100 unique lines")
 
-console.log("Phase 4 marketplace cart runtime: baseline + race-safety assertions PASS")
+// Verified canonical identities must never share a browser-local cart namespace.
+IdentityService.setFromPi({ uid: "pi-account-a", canonicalUserId: "canonical-account-a", verifiedByServer: true })
+assert.equal(getMarketplaceCart().length, 0, "a verified account does not inherit anonymous cart contents")
+addMarketplaceCartItem(item("private-a"))
+assert.equal(store.has("gh_marketplace_cart_v1:account:canonical-account-a"), true, "verified account cart uses canonical account namespace")
+IdentityService.setFromPi({ uid: "pi-account-b", canonicalUserId: "canonical-account-b", verifiedByServer: true })
+assert.equal(getMarketplaceCart().length, 0, "switching accounts does not expose the previous account cart")
+addMarketplaceCartItem(item("private-b"))
+IdentityService.setFromPi({ uid: "pi-account-a", canonicalUserId: "canonical-account-a", verifiedByServer: true })
+assert.deepEqual(getMarketplaceCart().map((line) => line.listingId), ["private-a"], "returning to an account restores only that account cart")
+IdentityService.clear()
+assert.equal(getMarketplaceCart().length, 100, "anonymous cart remains separate and intact after account switching")
+
+console.log("Phase 4 marketplace cart runtime: baseline + account isolation + race-safety assertions PASS")
 

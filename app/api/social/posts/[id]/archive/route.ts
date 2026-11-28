@@ -24,7 +24,7 @@ export async function POST(request: Request, ctx: Ctx) {
   if (__rateLimited) return __rateLimited
   const { id } = await ctx.params
   const postId = String(id || "").trim()
-  if (!postId) {
+  if (!/^[a-zA-Z0-9_-]{1,180}$/.test(postId)) {
     return NextResponse.json({ ok: false, error: "INVALID_ID" }, { status: 400 })
   }
   const parsedBody = await readBoundedJson(request, 64 * 1024)
@@ -117,7 +117,7 @@ export async function POST(request: Request, ctx: Ctx) {
     }
 
     const patchRes = await fetch(
-      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_posts?id=eq.${encodeURIComponent(postId)}`,
+      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_posts?id=eq.${encodeURIComponent(postId)}&author_id=eq.${encodeURIComponent(auth.userId)}&deleted_at=is.null`,
       {
         method: "PATCH",
         headers: {

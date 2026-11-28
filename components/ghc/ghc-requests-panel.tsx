@@ -4,12 +4,13 @@
  * Phase D3 — Incoming / outgoing GHC request inbox + pay / decline / cancel.
  */
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import { ArrowLeft, Loader2, X } from "lucide-react"
 import { GhcCoinIcon } from "./ghc-coin-icon"
 import { EMPTY_STATES, isRequestPayable, mapGhcUxError, requestStatusLabel } from "@/lib/domains/ghc-wallet-ux"
 import { getBoundDomainServices } from "@/lib/domains/compat"
 import type { GhcTransferRequest } from "@/lib/domains/economy-types"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 function formatGhc(n: number): string {
   if (!Number.isFinite(n)) return "₲ 0.00"
@@ -96,7 +97,11 @@ export function GhcRequestsPanel({ open, onClose, availableBalance, onChanged }:
     []
   )
 
+  const actionInFlightRef = useRef(false)
+
   const cancel = useCallback(async (ref: string) => {
+    if (actionInFlightRef.current) return
+    actionInFlightRef.current = true
     setBusyId(ref)
     setMsg(null)
     try {
@@ -112,6 +117,7 @@ export function GhcRequestsPanel({ open, onClose, availableBalance, onChanged }:
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Could not cancel")
     } finally {
+      actionInFlightRef.current = false
       setBusyId(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -119,6 +125,8 @@ export function GhcRequestsPanel({ open, onClose, availableBalance, onChanged }:
 
   const pay = useCallback(
     async (req: GhcTransferRequest) => {
+      if (actionInFlightRef.current) return
+      actionInFlightRef.current = true
       setBusyId(req.referenceId)
       setMsg(null)
       try {
@@ -160,6 +168,7 @@ export function GhcRequestsPanel({ open, onClose, availableBalance, onChanged }:
       } catch (e) {
         setMsg(e instanceof Error ? e.message : "Payment failed")
       } finally {
+        actionInFlightRef.current = false
         setBusyId(null)
       }
     },
@@ -167,23 +176,24 @@ export function GhcRequestsPanel({ open, onClose, availableBalance, onChanged }:
     []
   )
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, onClose)
   if (!open) return null
 
   const list = tab === "incoming" ? incoming : outgoing
 
   return (
-    <div
+    <div ref={dialogRef} tabIndex={-1}
       className="fixed inset-0 z-[85] flex items-end justify-center bg-black/40 sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-label="GHC requests"
     >
       <button type="button" className="absolute inset-0" aria-label="Close" onClick={onClose} />
-      <div className="relative z-[1] flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-t-[1.75rem] border border-border bg-card shadow-xl sm:rounded-[1.75rem]">
+      <div className="relative z-[1] flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-t-[1.75rem] border border-border bg-card shadow-xl sm:rounded-[1.75rem]">
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">
           <button
             type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
+            className="gh-hit-44 flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
             onClick={onClose}
             aria-label="Back"
           >
@@ -193,7 +203,7 @@ export function GhcRequestsPanel({ open, onClose, availableBalance, onChanged }:
             <p className="text-sm font-bold">Requests</p>
             <p className="text-[11px] text-muted-foreground">Pending GHC requests · no balance change until paid</p>
           </div>
-          <button type="button" className="rounded-full p-2 hover:bg-muted" onClick={onClose} aria-label="Close">
+          <button type="button" className="-m-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-muted" onClick={onClose} aria-label="Close">
             <X size={16} />
           </button>
         </div>

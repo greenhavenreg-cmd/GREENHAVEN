@@ -93,7 +93,7 @@ export function SetupChecklist({
           </div>
           <button
             type="button"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
             aria-label="Dismiss"
             onClick={() => {
               setCelebrated(true)
@@ -129,7 +129,7 @@ export function SetupChecklist({
         </div>
         <button
           type="button"
-          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
           aria-label="Dismiss checklist"
           onClick={() => {
             setDismissed(true)

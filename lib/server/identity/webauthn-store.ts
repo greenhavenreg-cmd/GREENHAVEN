@@ -314,16 +314,10 @@ async function dbListCredentials(
   try {
     let url = `gh_webauthn_credentials?gh_user_id=eq.${encodeURIComponent(ghUserId)}&select=*&order=created_at.desc`
     if (!includeRevoked) url += "&revoked_at=is.null"
-    const res = await fetch(url, {
-      headers: {
-        apikey: env.supabaseServiceRoleKey,
-        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-      },
-      cache: "no-store",
-    })
+    const res = await supabaseRest<Array<Record<string, unknown>>>(url, { method: "GET", timeoutMs: 8_000 })
     if (!res.ok) return []
-    const rows = (await res.json()) as Array<Record<string, unknown>>
-    return (rows || []).map((r) => ({
+    const rows = res.data
+    return (Array.isArray(rows) ? rows : []).map((r) => ({
       id: String(r.id),
       ghUserId: String(r.gh_user_id),
       credentialId: String(r.credential_id),

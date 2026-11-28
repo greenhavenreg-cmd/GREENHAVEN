@@ -13,6 +13,8 @@ import { canViewSocialPost } from "@/lib/server/social/post-visibility"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
+const ID_SHAPE = /^[a-zA-Z0-9_-]+$/
+
 type Ctx = { params: Promise<{ id: string; commentId: string }> }
 
 export async function DELETE(request: Request, ctx: Ctx) {
@@ -23,7 +25,7 @@ export async function DELETE(request: Request, ctx: Ctx) {
   const { id, commentId } = await ctx.params
   const postId = String(id || "").trim()
   const cid = String(commentId || "").trim()
-  if (!postId || postId.length > 128 || !cid || cid.length > 160) {
+  if (!postId || postId.length > 128 || !ID_SHAPE.test(postId) || !cid || cid.length > 160 || !ID_SHAPE.test(cid)) {
     return NextResponse.json({ ok: false, error: "INVALID_ID" }, { status: 400 })
   }
   if (!socialDbConfigured()) {
@@ -52,7 +54,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
   const { id, commentId } = await ctx.params
   const postId = String(id || "").trim()
   const cid = String(commentId || "").trim()
-  if (!postId || postId.length > 128 || !cid || cid.length > 160) {
+  if (!postId || postId.length > 128 || !ID_SHAPE.test(postId) || !cid || cid.length > 160 || !ID_SHAPE.test(cid)) {
     return NextResponse.json({ ok: false, error: "INVALID_ID" }, { status: 400 })
   }
   const canView = await canViewSocialPost(auth.userId, postId)
@@ -64,7 +66,13 @@ export async function PATCH(request: Request, ctx: Ctx) {
   }
   const parsedBody = await readBoundedJson(request, 16384)
   if (!parsedBody.ok) return NextResponse.json({ ok: false, error: parsedBody.error }, { status: parsedBody.error === "REQUEST_TOO_LARGE" ? 413 : 400 })
+  if (!parsedBody.value || typeof parsedBody.value !== "object" || Array.isArray(parsedBody.value)) {
+    return NextResponse.json({ ok: false, error: "INVALID_BODY" }, { status: 400, headers: { "Cache-Control": "no-store" } })
+  }
   const body = parsedBody.value as { text?: unknown; isPinned?: unknown }
+  if (body.text != null && typeof body.text !== "string") {
+    return NextResponse.json({ ok: false, error: "INVALID_COMMENT_TEXT" }, { status: 400, headers: { "Cache-Control": "no-store" } })
+  }
   const isPinMutation = typeof body.isPinned === "boolean"
   const text = String(body.text ?? "").trim()
   if (!isPinMutation && (!text || text.length > 2000)) {

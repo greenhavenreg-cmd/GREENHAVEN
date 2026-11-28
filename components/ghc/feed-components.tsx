@@ -15,6 +15,7 @@ import { LazyImage } from "./lazy-image"
 import { closeAllActionSheets } from "./action-sheet"
 import { navigateTo } from "@/lib/navigation/navigate"
 import { openListing, messageListingSeller } from "@/lib/marketplace/commerce-actions"
+import { plural } from "@/lib/ui/plural"
 
 // Skeleton loader for posts
 export function PostSkeleton() {
@@ -162,10 +163,13 @@ export const PostCard = memo(function PostCard({
         </div>
         {(isOwnPost || onHidePost || onReportPost) && (
           <button
+            type="button"
             onClick={handleMenuOpen}
-            className="text-muted-foreground hover:text-foreground/90 active:scale-90 transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full p-1"
+            aria-label="More post options"
+            aria-haspopup="menu"
+            className="inline-flex min-h-9 min-w-9 items-center justify-center text-muted-foreground hover:text-foreground/90 active:scale-90 transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full p-1"
           >
-            <MoreVertical size={16} />
+            <MoreVertical size={16} aria-hidden="true" />
           </button>
         )}
       </header>
@@ -316,7 +320,7 @@ export const PostCard = memo(function PostCard({
 
       {/* Engagement buttons */}
       <div className="px-3 py-2 bg-card border-t border-border/50 flex items-center justify-around text-xs">
-        <button
+        <button type="button"
           onClick={() => onLike(post.id)}
           className={`flex items-center gap-1 py-2 px-3 rounded-full font-semibold transition-all active:scale-95 ${
             isLiked
@@ -328,7 +332,7 @@ export const PostCard = memo(function PostCard({
           Like
         </button>
 
-        <button
+        <button type="button"
           onClick={() => onComment(post.id)}
           className={`flex items-center gap-1 py-2 px-3 rounded-full font-semibold transition-all active:scale-95 text-muted-foreground ${
             isCommentingPostId ? "bg-sky-50 text-sky-600" : "hover:bg-sky-50 hover:text-sky-600"
@@ -339,7 +343,7 @@ export const PostCard = memo(function PostCard({
         </button>
 
         <div className="relative">
-          <button
+          <button type="button"
             onClick={() => setShowShareMenu(!showShareMenu)}
             className="flex items-center gap-1 py-2 px-3 rounded-full font-semibold text-muted-foreground hover:bg-emerald-50 hover:text-emerald-700 transition-all active:scale-95"
           >
@@ -356,9 +360,11 @@ export const PostCard = memo(function PostCard({
           )}
         </div>
 
-        <button
+        <button type="button"
           onClick={() => onBookmark?.(post.id)}
-          className={`flex items-center gap-1 py-2 px-3 rounded-full font-semibold transition-all active:scale-95 ${
+          aria-label={isBookmarked ? "Remove bookmark" : "Bookmark post"}
+          aria-pressed={Boolean(isBookmarked)}
+          className={`flex min-h-11 min-w-11 items-center justify-center gap-1 py-2 px-3 rounded-full font-semibold transition-all active:scale-95 ${
             isBookmarked
               ? "text-blue-600 bg-blue-50"
               : "text-muted-foreground hover:bg-blue-50 hover:text-blue-600"
@@ -384,8 +390,8 @@ export const PostCard = memo(function PostCard({
             />
           ))}
           {post.comments.length > 3 && (
-            <button className="text-xs text-blue-600 hover:underline">
-              View all {post.comments.length} comments
+            <button type="button" className="text-xs text-blue-600 hover:underline">
+              View all {plural(post.comments.length, "comment")}
             </button>
           )}
         </div>
@@ -461,7 +467,7 @@ export function ModeFilter({ currentMode, selectedFilter, onFilterChange }: Mode
   return (
     <div className="flex gap-2 overflow-x-auto pb-2 px-4 scrollbar-hide">
       {relevantModes.map((mode) => (
-        <button
+        <button type="button"
           key={mode.id}
           onClick={() => onFilterChange(mode.id)}
           className={`flex items-center gap-1 whitespace-nowrap py-1.5 px-3 rounded-full font-semibold text-xs transition-all active:scale-95 ${
@@ -487,7 +493,7 @@ interface FloatingCreateButtonProps {
 /** Prefer bottom-nav Create hub; FAB retained for rare embeds */
 export function FloatingCreateButton({ onClick, isVisible }: FloatingCreateButtonProps) {
   return (
-    <button
+    <button type="button"
       onClick={onClick}
       className={`fixed bottom-24 right-4 w-14 h-14 rounded-full gh-create-fab text-white shadow-lg hover:shadow-xl active:scale-90 transition-all flex items-center justify-center z-40 ${
         isVisible ? "translate-y-0 opacity-100" : "translate-y-20 opacity-0 pointer-events-none"
@@ -530,7 +536,7 @@ export function PeopleRecommendation({ people, onFollow }: PeopleRecommendationP
               />
             </div>
             <p className="text-xs font-bold text-foreground truncate w-14">{person.name}</p>
-            <button
+            <button type="button"
               onClick={() => onFollow(person.id)}
               className="text-xs text-pink-600 font-semibold mt-1 hover:text-pink-700 active:scale-90 transition-all"
             >

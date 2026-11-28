@@ -228,7 +228,7 @@ export function GreenHavenIdentityCard({
             className="flex flex-col items-center gap-1 rounded-xl border border-border/80 bg-card/90 px-1 py-2 text-center transition hover:border-emerald-300 hover:bg-emerald-50/50 active:scale-[0.98] dark:hover:bg-emerald-950/40"
           >
             <span className="text-emerald-700 dark:text-emerald-300">{a.icon}</span>
-            <span className="text-[9px] font-bold leading-tight text-foreground">{a.label}</span>
+            <span className="text-[10px] font-bold leading-tight text-foreground">{a.label}</span>
           </button>
         ))}
       </div>
@@ -283,6 +283,10 @@ export function GreenHavenIdentityCard({
             <textarea
               value={scanInput}
               onChange={(e) => setScanInput(e.target.value)}
+              aria-label="Paste a GH ID or receive link"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
               rows={3}
               placeholder="GH-AB72KD or ghc://receive?v=1&id=..."
               className="w-full rounded-2xl border border-border bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-emerald-500/40"
@@ -309,7 +313,7 @@ export function GreenHavenIdentityCard({
                 <X size={18} />
               </button>
             </div>
-            <input
+            <input aria-label="GH-AB72KD"
               value={findInput}
               onChange={(e) => setFindInput(e.target.value)}
               placeholder="GH-AB72KD"

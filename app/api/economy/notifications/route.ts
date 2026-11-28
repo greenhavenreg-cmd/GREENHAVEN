@@ -1,6 +1,6 @@
 import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
 import { jsonErr, jsonOk } from "@/lib/server/economy/http"
-import { listGhcNotifications } from "@/lib/server/economy/notifications"
+import { listGhcNotificationsChecked } from "@/lib/server/economy/notifications"
 
 export async function GET(request: Request) {
   const auth = await resolveAuthenticatedUser(request.headers)
@@ -14,10 +14,12 @@ export async function GET(request: Request) {
   const limit = Number(url.searchParams.get("limit") || "50")
   const unreadOnly = url.searchParams.get("unreadOnly") === "1"
 
-  const items = await listGhcNotifications(auth.userId, {
+  const items = await listGhcNotificationsChecked(auth.userId, {
     limit: Number.isFinite(limit) ? limit : 50,
     unreadOnly,
   })
+  // An unreadable store is an outage, not an empty inbox.
+  if (items === null) return jsonErr("NOTIFICATIONS_UNAVAILABLE", "Notifications are temporarily unavailable", 503)
 
   return jsonOk({ items, userId: auth.userId })
 }

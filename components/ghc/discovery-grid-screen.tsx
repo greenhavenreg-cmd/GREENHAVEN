@@ -554,7 +554,7 @@ export function DiscoveryGridScreen() {
           </div>
           <button
             type="button"
-            className="gh-icon-btn h-8 w-8 shrink-0 border border-border/40"
+            className="gh-icon-btn h-10 w-10 shrink-0 border border-border/40"
             aria-label={filtersOpen ? `${t("connectionFilters")}: ${t("cancel")}` : t("connectionFilters")}
             aria-expanded={filtersOpen}
             title={t("connectionFilters")}

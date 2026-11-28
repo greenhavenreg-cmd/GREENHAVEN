@@ -22,6 +22,7 @@ import {
 import { socialRecordAttention } from "@/lib/social/client"
 import { useRegionalContext } from "@/contexts/regional-context"
 import { getSocialMessage as socialText } from "@/lib/i18n/social"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 type ShortPost = {
   id: string
@@ -162,10 +163,11 @@ export function ShortVideoScreen({ open, onClose, seedPosts = [] }: ShortVideoSc
     })
   }
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, onClose)
   if (!open) return null
 
   return (
-    <div
+    <div ref={dialogRef} tabIndex={-1}
       className="fixed inset-0 z-[80] flex flex-col bg-black text-white"
       role="dialog"
       aria-modal="true"

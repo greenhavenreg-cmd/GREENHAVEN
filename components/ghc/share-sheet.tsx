@@ -30,6 +30,7 @@ import {
   type ShareResult,
 } from "@/lib/share-service"
 import { shareText, shareFile, canShareFile } from "@/lib/pi-native"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 type DestTab = "timeline" | "story" | "private" | "group" | "link"
 
@@ -98,6 +99,7 @@ export function ShareSheet({
     return onCloseTransientUI(() => onClose())
   }, [open, onClose])
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, onClose)
   if (!open) return null
 
   const toggleId = (id: string) => {
@@ -193,7 +195,7 @@ export function ShareSheet({
   return (
     <div
       className="fixed inset-0 z-[110] flex items-end bg-black/45 sm:items-center sm:justify-center"
-      role="dialog"
+      ref={dialogRef} tabIndex={-1} role="dialog"
       aria-modal="true"
       aria-label="Share post"
     >
@@ -201,7 +203,7 @@ export function ShareSheet({
       <div className="relative z-10 flex max-h-[min(92dvh,36rem)] w-full max-w-md flex-col overflow-hidden rounded-t-[1.75rem] border border-border/50 bg-card text-card-foreground shadow-[var(--gh-modal-shadow)] sm:rounded-[1.75rem]">
         <div className="flex shrink-0 items-center justify-between border-b border-border/50 px-4 py-2.5">
           <h2 className="text-base font-bold text-foreground">Share</h2>
-          <button type="button" onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-muted" aria-label="Close">
+          <button type="button" onClick={onClose} className="-m-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted" aria-label="Close">
             <X size={18} />
           </button>
         </div>
@@ -342,8 +344,8 @@ export function ShareSheet({
             <div className="space-y-2">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-                <input
-                  type="search"
+                <input aria-label="Search people to share with"
+                  type="search" enterKeyHint="search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={tab === "private" ? "Search chats…" : "Search communities…"}

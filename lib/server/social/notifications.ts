@@ -117,12 +117,17 @@ export async function markSocialNotificationsRead(
   })
 }
 
+/** Base URL of the project's PostgREST endpoint (server-only, service role). */
+function restBase(supabaseUrl: string | undefined): string {
+  return `${String(supabaseUrl || "").replace(/\/$/, "")}/rest/v1`
+}
+
 /** Resolve post author for like/comment notifications — session actor must not supply author. */
 export async function lookupPostAuthor(postId: string): Promise<string | null> {
   const env = readGhcServerEnv()
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey || !postId) return null
   try {
-    const url = new URL("https://rest.local/gh_posts"); const restTable = "gh_posts"
+    const url = new URL(`${restBase(env.supabaseUrl)}/gh_posts`)
     url.searchParams.set("id", `eq.${postId}`)
     url.searchParams.set("select", "author_id,deleted_at")
     url.searchParams.set("limit", "1")
@@ -132,6 +137,7 @@ export async function lookupPostAuthor(postId: string): Promise<string | null> {
         Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(5_000),
     })
     const rows = (await res.json().catch(() => [])) as Array<{
       author_id?: string
@@ -164,7 +170,7 @@ export async function lookupCommentThreadParticipants(
     const visited = new Set<string>()
     for (let depth = 0; cursor && depth < 8 && !visited.has(cursor); depth += 1) {
       visited.add(cursor)
-      const parentUrl = new URL("https://rest.local/gh_post_comments"); const parentTable = "gh_post_comments"
+      const parentUrl = new URL(`${restBase(env.supabaseUrl)}/gh_post_comments`)
       parentUrl.searchParams.set("id", `eq.${cursor}`)
       parentUrl.searchParams.set("post_id", `eq.${post}`)
       parentUrl.searchParams.set("deleted_at", "is.null")
@@ -182,7 +188,7 @@ export async function lookupCommentThreadParticipants(
       cursor = String(parent.parent_id || "").trim()
     }
 
-    const url = new URL("https://rest.local/gh_post_comments"); const restTable = "gh_post_comments"
+    const url = new URL(`${restBase(env.supabaseUrl)}/gh_post_comments`)
     url.searchParams.set("post_id", `eq.${post}`)
     url.searchParams.set("deleted_at", "is.null")
     url.searchParams.set("select", "id,parent_id,author_id")
@@ -231,7 +237,7 @@ export async function lookupPostListingId(postId: string): Promise<string | null
   const env = readGhcServerEnv()
   if (!/^[a-zA-Z0-9_-]{1,180}$/.test(id) || !env.supabaseUrl || !env.supabaseServiceRoleKey) return null
   try {
-    const url = new URL("https://rest.local/gh_posts"); const restTable = "gh_posts"
+    const url = new URL(`${restBase(env.supabaseUrl)}/gh_posts`)
     url.searchParams.set("id", `eq.${id}`)
     url.searchParams.set("deleted_at", "is.null")
     url.searchParams.set("select", "listing_id")

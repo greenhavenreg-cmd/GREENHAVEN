@@ -581,21 +581,14 @@ export async function listIntentsForUserAsync(userId: string): Promise<PaymentIn
       "select",
       "id,user_id,provider,provider_payment_id,purpose,amount,currency,status,reference_id,metadata,txid,last_error,idempotency_key,audit,created_at,approved_at,submitted_at,completed_at,fulfilled_at,cancelled_at,refunded_at"
     )
-    const res = await fetch(`${base}?${params}`, {
-      headers: {
-        apikey: env.supabaseServiceRoleKey,
-        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-      },
-      cache: "no-store",
-      signal: AbortSignal.timeout(8_000),
-    })
+    const res = await supabaseRest<Array<Record<string, unknown>>>(`${base}?${params}`, { method: "GET", timeoutMs: 8_000 })
     if (!res.ok) {
       if (isPaymentProd()) {
         throw new Error("PAYMENT_INTENT_STORE_UNAVAILABLE")
       }
       return listIntentsForUser(uid)
     }
-    const rows = (await res.json()) as Array<Record<string, unknown>>
+    const rows = res.data
     if (!Array.isArray(rows)) {
       if (isPaymentProd()) throw new Error("PAYMENT_INTENT_STORE_UNAVAILABLE")
       return listIntentsForUser(uid)

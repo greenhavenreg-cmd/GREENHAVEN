@@ -14,6 +14,7 @@ import {
   type ReactNode,
 } from "react"
 import { createPortal } from "react-dom"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 const CLOSE_ALL_EVENT = "ghc:close-action-sheets"
 const OPEN_EVENT = "ghc:action-sheet-open"
@@ -135,10 +136,11 @@ export function ActionSheet({
     }
   }, [open, id, close])
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, onClose)
   if (!open || typeof document === "undefined") return null
 
   const sheet = (
-    <div
+    <div ref={dialogRef} tabIndex={-1}
       className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center"
       role="dialog"
       aria-modal="true"
@@ -155,7 +157,7 @@ export function ActionSheet({
         className="relative z-[201] flex w-full max-w-md flex-col rounded-t-[1.75rem] border border-violet-200/45 bg-card shadow-[0_24px_70px_rgba(23,19,59,0.20)] sm:mb-6 sm:rounded-[1.75rem]"
         style={{
           marginBottom: "calc(4.5rem + env(safe-area-inset-bottom, 0px))",
-          maxHeight: "min(72vh, 32rem)",
+          maxHeight: "min(72dvh, 32rem)",
         }}
         onClick={(e) => e.stopPropagation()}
       >

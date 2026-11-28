@@ -23,7 +23,7 @@ const checks = [
   ['creator API reports independent source health', /dataQuality/.test(creatorRoute) && /publishedPosts: posts\.ok/.test(creatorRoute)],
   ['creator rewards are not queried from a fabricated empty post set', /posts\.ok \? await getCreatorEconomySummary/.test(creatorRoute) && /creatorEconomy: economy\?\.ok === true/.test(creatorRoute)],
   ['Creator Studio hides unknown totals instead of rendering zero', /value === null \|\| value === undefined/.test(panel) && /creatorEconomy\?\.ok === true/.test(panel)],
-  ['Creator Studio distinguishes unavailable posts from a true empty state', /publishedPosts === false/.test(panel)],
+  ['Creator Studio distinguishes unavailable posts from a true empty state', /publishedPosts (?:=== false|!== true)/.test(panel)],
 ]
 
 for (const [label, ok] of checks) console.log(`${ok ? 'PASS' : 'FAIL'} ${label}`)

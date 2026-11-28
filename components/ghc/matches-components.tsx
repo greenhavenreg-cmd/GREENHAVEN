@@ -113,7 +113,7 @@ export function EmptyMatchesState({ onStartSwiping }: { onStartSwiping: () => vo
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-1.5">
                 <p className="text-sm font-bold text-foreground">Alex</p>
-                <span className="rounded-full border border-amber-100 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-900">
+                <span className="rounded-full border border-amber-100 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
                   Mentorship
                 </span>
               </div>

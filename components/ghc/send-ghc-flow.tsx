@@ -27,6 +27,8 @@ import {
   parseGhcAmount,
   buildTransferReference,
 } from "@/lib/domains/send-ghc-helpers"
+import { sanitizeAmountInput } from "@/lib/wallet/amount-input"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 export { parseGhcAmount, buildTransferReference }
 
@@ -422,23 +424,24 @@ export function SendGhcFlow({
     }
   }, [recipient, amount, note, currentUserId, onCompleted, reconcileAndFinish])
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, onClose)
   if (!open) return null
 
   return (
     <div
       className="fixed inset-0 z-[220] flex items-end justify-center bg-black/45 sm:items-center sm:p-4"
-      role="dialog"
+      ref={dialogRef} tabIndex={-1} role="dialog"
       aria-modal="true"
       aria-label="Send GHC"
     >
       <button type="button" className="absolute inset-0 z-0" aria-label="Close send flow" onClick={onClose} />
-      <div className="relative z-10 flex max-h-[92vh] pointer-events-auto w-full max-w-md flex-col overflow-hidden rounded-t-[1.75rem] border border-border bg-card shadow-2xl sm:rounded-[1.75rem]">
+      <div className="relative z-10 flex max-h-[92dvh] pointer-events-auto w-full max-w-md flex-col overflow-hidden rounded-t-[1.75rem] border border-border bg-card shadow-2xl sm:rounded-[1.75rem]">
         {/* Header */}
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
           {step !== "success" && step !== "sending" && step !== "reconciling" && (
             <button
               type="button"
-              className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
+              className="gh-hit-44 flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
               aria-label="Back"
               onClick={() => {
                 if (step === "recipient") onClose()
@@ -465,7 +468,7 @@ export function SendGhcFlow({
           </div>
           <button
             type="button"
-            className="rounded-full p-2 hover:bg-muted"
+            className="-m-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-muted"
             aria-label="Close"
             onClick={onClose}
             disabled={step === "sending"}
@@ -578,7 +581,7 @@ export function SendGhcFlow({
                     inputMode="decimal"
                     pattern="[0-9]*"
                     value={amountRaw}
-                    onChange={(e) => setAmountRaw(e.target.value.replace(/[^\d.]/g, ""))}
+                    onChange={(e) => setAmountRaw(sanitizeAmountInput(e.target.value, 4))}
                     placeholder="0.00"
                     className="min-w-0 flex-1 bg-transparent text-2xl font-semibold tabular-nums outline-none"
                     aria-invalid={!!amountError}

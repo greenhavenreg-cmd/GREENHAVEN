@@ -17,7 +17,7 @@ test('Promoted share is capped and never applied to price sorts', /limitPromoted
 test('Best-match sort ranks only the fetched page', /browseSort === "relevance" \? rankByRelevance\(ordered, query\)/.test(screen) && /value="relevance">Best match/.test(screen))
 test('Relevance sort keeps price domains separate', /sort === "relevance"\) return \[\.\.\.items\]/.test(read('lib/marketplace/order-lifecycle.ts')))
 test('Seller Centre insights wired from recorded orders and listings', /data-testid="seller-insights"/.test(screen) && /completedRevenueByCurrency\(sellerOrders\)/.test(screen))
-test('Buyer return guide is guidance only (no new transition call)', /data-testid="return-guide"/.test(screen) && !/returnGuideFor[^\n]*runOrderAction/.test(screen))
+test('Buyer return guide is display-only; dispute actions remain separately gated', /data-testid="return-guide"/.test(screen) && !/runOrderAction/.test(read('lib/marketplace/returns.ts')))
 test('More-from-seller reads the existing listing domain', /data-testid="more-from-seller"/.test(screen) && /getMarketplaceDomain\(\)\?\.listListings/.test(screen))
 test('Recently viewed strip is wired and hidden during search/category browsing', /data-testid="recently-viewed"/.test(screen) && /!query\.trim\(\) && !category && recentIds\.length > 0/.test(screen))
 test('Seller checklist is wired into the create-listing form, display only and non-blocking', /from "@\/lib\/marketplace\/seller-checklist"/.test(screen) && /data-testid="seller-checklist"/.test(screen) && /sellerChecklist\(\{/.test(screen) && !/checklistProgress\([^)]*\)\.requiredMet[^\n]*(setSellError|return)/.test(screen))

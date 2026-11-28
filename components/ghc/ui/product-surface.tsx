@@ -77,7 +77,7 @@ export function EconomyActionStrip({
             {item.label.slice(0, 1)}
           </span>
           <span className="text-[11px] font-bold text-foreground">{item.label}</span>
-          <span className="max-w-full truncate text-[9px] text-muted-foreground">{item.hint}</span>
+          <span className="max-w-full truncate text-[10px] text-muted-foreground">{item.hint}</span>
         </button>
       ))}
     </div>

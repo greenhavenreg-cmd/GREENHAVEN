@@ -76,7 +76,7 @@ export async function POST(
       body: "Someone shared your post",
       dedupeKey: `share:${auth.userId}:${postId}`,
       metadata: { kind: "share", postId },
-    })
+    }).catch(() => undefined)
   }
 
   // Attention share signal (measurement only)

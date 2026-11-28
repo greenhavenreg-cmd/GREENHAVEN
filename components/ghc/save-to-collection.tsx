@@ -13,6 +13,7 @@ import {
   savePostToCollectionWithStatus,
   type SavedCollection,
 } from "@/lib/feed-profile-experience"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 export function SaveToCollectionSheet({
   open,
@@ -41,6 +42,7 @@ export function SaveToCollectionSheet({
     }
   }, [open, scopeId])
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(Boolean(open && postId), onClose)
   if (!open || !postId) return null
 
   const pick = (c: SavedCollection) => {
@@ -76,7 +78,7 @@ export function SaveToCollectionSheet({
 
   return (
     <div className="fixed inset-0 z-[75] flex items-end bg-black/40 sm:items-center sm:justify-center" onClick={onClose}>
-      <div
+      <div ref={dialogRef} tabIndex={-1}
         className="w-full max-w-sm rounded-t-2xl bg-white p-4 shadow-2xl sm:rounded-2xl dark:bg-card"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -87,7 +89,7 @@ export function SaveToCollectionSheet({
           <h3 className="flex items-center gap-2 text-base font-bold text-foreground">
             <Bookmark size={18} className="text-purple-600" /> Save to collection
           </h3>
-          <button type="button" onClick={onClose} className="rounded-full p-2 hover:bg-muted" aria-label="Close">
+          <button type="button" onClick={onClose} className="-m-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-muted" aria-label="Close">
             <X size={18} />
           </button>
         </div>
@@ -111,7 +113,7 @@ export function SaveToCollectionSheet({
         </div>
         {creating ? (
           <div className="mt-3 flex gap-2">
-            <input
+            <input aria-label="Collection name"
               value={newName}
               onChange={(e) => setNewName(e.target.value.slice(0, 40))}
               placeholder="Collection name"

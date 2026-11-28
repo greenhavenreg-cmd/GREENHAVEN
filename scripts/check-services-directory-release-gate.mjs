@@ -9,14 +9,14 @@ const marketplace = read('components/ghc/marketplace-screen.tsx')
 const marketplaceDomain = read('lib/domains/marketplace-domain.ts')
 const listingPresentation = read('lib/marketplace/listing-presentation.ts')
 const checks = [
-  ['Services remains Coming Soon with no live destination', /id: "services-ip"[\s\S]{0,220}status: "COMING_SOON"[\s\S]{0,120}destination: \{ kind: "none" \}/.test(registry)],
+  ['Services is released as an active service with a canonical focus destination', /id: "services-ip"[\s\S]{0,260}status: "ACTIVE"[\s\S]{0,140}destination: \{ kind: "focus", serviceId: "services-ip" \}/.test(registry)],
   ['Services directory queries only service listings from canonical Marketplace API', /kind: "service"/.test(screen) && /\/api\/marketplace\/listings/.test(screen)],
   ['directory requires durable server-backed listing results', /payload\.durable !== true/.test(screen)],
   ['directory filters active service listing payloads and supported currencies', /row\.kind !== "service" \|\| row\.status !== "active"/.test(read('lib/ecosystem/services-directory.ts')) && /currency !== "GHC" && currency !== "PI"/.test(read('lib/ecosystem/services-directory.ts'))],
   ['service details hand off to existing canonical Marketplace listing detail', /onOpenMarketplace\(listingId\)/.test(screen) && /ghc:open-listing/.test(screen)],
   ['Marketplace API supports service kind and server-side active listing query', /\["product", "service", "opportunity"\]/.test(listingsRoute) && /kind: rawKind \? rawKind as "product" \| "service" \| "opportunity"/.test(listingsRoute)],
   ['Marketplace already includes seller command center and service listing support', /function SellerCommandCenter/.test(marketplace) && /products and services customers can discover/i.test(marketplace) && /kind:\s*ListingKind/.test(marketplaceDomain) && /kind === "service"/.test(listingPresentation)],
-  ['Services screen is prepared but not wired into the Coming Soon directory', /ServicesDirectoryScreen/.test(screen) && !/ServicesDirectoryScreen/.test(ecosystem)],
+  ['Services directory is mounted from the active Ecosystem service with marketplace detail handoff', /ServicesDirectoryScreen/.test(ecosystem) && /focusId === "services-ip"/.test(ecosystem) && /onOpenMarketplace=/.test(ecosystem) && /navigateTo\("marketplace", \{ listingId \}\)/.test(ecosystem)],
   ['directory does not fabricate listings or trigger checkout/payment', !/localStorage|checkout|paymentIntent|createOrder/i.test(screen)],
   ['no new Services database migration is introduced in this increment', !fs.readdirSync('supabase/migrations').some((name) => /ecosystem_services|service_directory/i.test(name))],
 ]

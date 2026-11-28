@@ -15,7 +15,7 @@ const checks = [
   ["notification badge uses unique visible durable IDs", /const durableById = new Map<string, Notification>\(\)/.test(bell) && /setUnread\(durableUnread \+ localUnreadOnly\)/.test(bell)],
   ["notification refresh requests are queued when a prior refresh is in flight", /refreshQueuedRef\.current = true/.test(bell) && /window\.setTimeout\(\(\) => refresh\(\), 0\)/.test(bell)],
   ["single read queues unified and applicable social writes before the refresh notification", /const requests: Promise<Response \| null>\[\] = \[\]/.test(bell) && /requests\.push\(fetch\("\/api\/notifications"/.test(bell) && /if \(sourceType === "social"\) requests\.push\(fetch\("\/api\/social\/notifications"/.test(bell) && /void Promise\.all\(requests\)\.then\(\(responses\) => \{[\s\S]*?ghc:notifications-read/.test(bell)],
-  ["mark-all read reports partial durable-store failures", /const results = await Promise\.all/.test(bell) && /Some alerts could not be marked read/.test(bell)],
+  ["mark-all read reports partial durable-store failures", /const results = await Promise\.all/.test(bell) && /t\("markAllReadFailed"\)/.test(bell)],
   ["feed performs initial canonical server hydration on mount", /Always hydrate the canonical server feed on first mount/.test(feed) && /const result = await refreshFeedAndSync\(\)/.test(feed)],
   ["feed initial hydration retries a superseded response", /result\.error === "FEED_REQUEST_SUPERSEDED"/.test(feed) && /result = await refreshFeedAndSync\(\)/.test(feed)],
   ["feed waits for initial network hydration before rendering an empty state", /!feedBootstrapped \|\| !initialFeedLoadSettled/.test(feed)],

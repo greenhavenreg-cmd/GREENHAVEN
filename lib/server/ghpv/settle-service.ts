@@ -90,17 +90,9 @@ async function loadCalibrationMap(reviewerIds: string[]): Promise<Map<string, Cu
     `?user_id=in.(${encodeURIComponent(list)})` +
     `&select=user_id,jcs,integrity_score,correct_count,incorrect_count,unresolved_count,curation_power`
   try {
-    const res = await fetch(url, {
-      headers: {
-        apikey: env.supabaseServiceRoleKey,
-        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    })
-    if (!res.ok) return map
-    const rows = (await res.json()) as Array<Record<string, unknown>>
-    for (const row of rows) {
+    const res = await supabaseRest<Array<Record<string, unknown>>>(url, { method: "GET", timeoutMs: 8_000 })
+    if (!res.ok || !Array.isArray(res.data)) return map
+    for (const row of res.data) {
       const userId = String(row.user_id || "")
       if (!userId) continue
       const base = defaultCalibration(userId)

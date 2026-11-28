@@ -3,6 +3,7 @@
 import { computePostInsights } from "@/lib/feed-profile-experience"
 import type { Post } from "@/lib/ghc-types"
 import { X, Eye, Heart, MessageCircle, Share2, Bookmark } from "lucide-react"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 export function PostInsightsSheet({
   post,
@@ -13,6 +14,7 @@ export function PostInsightsSheet({
   open: boolean
   onClose: () => void
 }) {
+  const dialogRef = useDialogA11y<HTMLDivElement>(Boolean(open && post), onClose)
   if (!open || !post) return null
   const i = computePostInsights(post)
   const up = Number((post as { upvotes?: number }).upvotes ?? (post as { voteUp?: number }).voteUp ?? 0)
@@ -24,7 +26,7 @@ export function PostInsightsSheet({
 
   return (
     <div className="fixed inset-0 z-[75] flex items-end bg-black/40 sm:items-center sm:justify-center" onClick={onClose}>
-      <div
+      <div ref={dialogRef} tabIndex={-1}
         className="w-full max-w-sm rounded-t-[1.75rem] border border-border/50 bg-card p-5 shadow-[var(--gh-modal-shadow)] sm:rounded-[1.75rem]"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -33,7 +35,7 @@ export function PostInsightsSheet({
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-bold text-foreground">Post insights</h3>
-          <button type="button" onClick={onClose} className="rounded-full p-2 hover:bg-muted" aria-label="Close">
+          <button type="button" onClick={onClose} className="-m-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-muted" aria-label="Close">
             <X size={18} />
           </button>
         </div>

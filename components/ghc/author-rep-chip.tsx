@@ -18,7 +18,7 @@ export function AuthorRepChip({
   if (!label) return null
   return (
     <span
-      className={`inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 ${className}`}
+      className={`inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 ${className}`}
       title="Reputation from verified activity — not for sale"
     >
       {label}

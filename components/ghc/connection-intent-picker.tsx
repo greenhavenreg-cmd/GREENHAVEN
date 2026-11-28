@@ -5,8 +5,9 @@
  * Multi-select; optional note. Accessible dialog (role=dialog, Escape, focus).
  */
 
-import { useCallback, useEffect, useId, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useState } from "react"
 import { X } from "lucide-react"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 import {
   CONNECTION_INTENT_OPTIONS,
   type ConnectionIntentId,
@@ -55,7 +56,7 @@ export function ConnectionIntentPicker({
 }: ConnectionIntentPickerProps) {
   const titleId = useId()
   const descId = useId()
-  const panelRef = useRef<HTMLDivElement>(null)
+  const panelRef = useDialogA11y<HTMLDivElement>(open, busy ? undefined : onCancel)
   const me = IdentityService.getCurrentUserId()
   const seed =
     defaultIntents && defaultIntents.length > 0
@@ -77,26 +78,6 @@ export function ConnectionIntentPicker({
     setNote("")
     setLocalError(null)
   }, [open, defaultIntents, maxIntents, me])
-
-  useEffect(() => {
-    if (!open) return
-    const prev = document.activeElement as HTMLElement | null
-    const t = window.setTimeout(() => {
-      panelRef.current?.querySelector<HTMLElement>("button, [href], input, textarea")?.focus()
-    }, 30)
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) {
-        e.preventDefault()
-        onCancel()
-      }
-    }
-    window.addEventListener("keydown", onKey)
-    return () => {
-      window.clearTimeout(t)
-      window.removeEventListener("keydown", onKey)
-      prev?.focus?.()
-    }
-  }, [open, busy, onCancel])
 
   const toggle = useCallback(
     (id: ConnectionIntentId) => {
@@ -131,7 +112,8 @@ export function ConnectionIntentPicker({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descId}
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-border bg-background p-4 shadow-2xl sm:rounded-3xl"
+        tabIndex={-1}
+        className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-border bg-background p-4 shadow-2xl sm:rounded-3xl"
       >
         <div className="mb-3 flex items-start justify-between gap-2">
           <div>

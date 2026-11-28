@@ -106,6 +106,7 @@ import {
   addMarketplaceCartItem,
   clearMarketplaceCart,
   getMarketplaceCart,
+  getMarketplaceCartNamespace,
   removeMarketplaceCartItem,
   removeMarketplaceCartItemsBySnapshots,
   removeMarketplaceCartItemsBySeller,
@@ -119,7 +120,11 @@ import {
   quoteListingEditFee,
   type ListingFeeRail,
 } from "@/lib/marketplace/listing-fee-client"
+import { sanitizeAmountInput } from "@/lib/wallet/amount-input"
 import { getMarketplaceOrderCurrency, type MarketplaceCurrency } from "@/lib/marketplace/checkout-contract"
+
+/** Mirrors MAX_PRICE_DECIMALS in app/api/marketplace/listings/route.ts; the server stays the authority. */
+const MARKETPLACE_PRICE_MAX_DECIMALS = 8
 
 function ListingCard({
   listing,
@@ -219,7 +224,7 @@ function CheckoutPanel({ listing }: { listing: MarketplaceListing }) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
-  const idempotencyKeyRef = useRef<string | null>(null)
+  const idempotencyKeyRef = useRef<{ namespace: string; key: string } | null>(null)
   const listingCur = (listing.currency || "GHC").toUpperCase()
   // Orders are settled in the listing's server-authoritative currency. Do not offer
   // a second rail unless a verified conversion/dual-currency quote exists.
@@ -229,6 +234,7 @@ function CheckoutPanel({ listing }: { listing: MarketplaceListing }) {
 
   const runCheckout = async () => {
     if (busy || isOwn) return
+    const checkoutNamespace = getMarketplaceCartNamespace()
     setBusy(true)
     setErr(null)
     setMsg(null)
@@ -236,16 +242,26 @@ function CheckoutPanel({ listing }: { listing: MarketplaceListing }) {
       const { socialCreateMarketplaceOrder, socialPayMarketplaceOrder } = await import(
         "@/lib/social/client"
       )
+      if (getMarketplaceCartNamespace() !== checkoutNamespace) {
+        setErr("Your account changed. Reopen this listing before checking out.")
+        return
+      }
       const nonce = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
         : `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
-      const idempotencyKey = idempotencyKeyRef.current || `buy_${nonce}`
-      idempotencyKeyRef.current = idempotencyKey
+      const idempotencyKey = idempotencyKeyRef.current?.namespace === checkoutNamespace
+        ? idempotencyKeyRef.current.key
+        : `buy_${nonce}`
+      idempotencyKeyRef.current = { namespace: checkoutNamespace, key: idempotencyKey }
       const created = await socialCreateMarketplaceOrder({
         listingId: listing.id,
         quantity: 1,
         idempotencyKey,
       })
+      if (getMarketplaceCartNamespace() !== checkoutNamespace) {
+        setErr("Your account changed while the order was being reserved. Check Orders before retrying.")
+        return
+      }
       if (!created.ok || !created.order) {
         const errCode = !created.ok ? String(created.error || "") : ""
         setErr(humanizeClientErrorCode(errCode, "Could not create order"))
@@ -289,6 +305,10 @@ function CheckoutPanel({ listing }: { listing: MarketplaceListing }) {
       }
 
       const paid = await socialPayMarketplaceOrder(orderId, "ghc")
+      if (getMarketplaceCartNamespace() !== checkoutNamespace) {
+        setErr("Your account changed during payment. Check Orders before retrying.")
+        return
+      }
       if (!paid.ok) {
         setErr(paid.message || paid.error || "GHC payment failed — check available balance")
         try {
@@ -302,7 +322,7 @@ function CheckoutPanel({ listing }: { listing: MarketplaceListing }) {
         }
         return
       }
-      idempotencyKeyRef.current = null
+      if (idempotencyKeyRef.current?.namespace === checkoutNamespace) idempotencyKeyRef.current = null
       setMsg(authoritativeCurrency === "GHC"
         ? "Paid with GHC. Order confirmed — track it under Orders."
         : "Order payment confirmed — track it under Orders.")
@@ -530,7 +550,7 @@ function ListingDetail({
         <button
           type="button"
           onClick={onBack}
-          className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="gh-hit-44 flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="Back to listings"
         >
           <ArrowLeft size={18} />
@@ -541,7 +561,7 @@ function ListingDetail({
         <button
           type="button"
           onClick={() => void shareListing()}
-          className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
+          className="gh-hit-44 flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
           aria-label="Search marketplace"
         >
           <Search size={18} className="text-muted-foreground" />
@@ -852,7 +872,7 @@ function ListingDetail({
           {reportOpen ? (
             <div className="mt-3 space-y-2 rounded-xl border border-amber-500/30 bg-amber-50/50 p-3 dark:bg-amber-950/20">
               <p className="text-[11px] font-semibold text-foreground">Report this listing</p>
-              <select
+              <select aria-label="Report reason"
                 value={reportReason}
                 onChange={(e) => setReportReason(e.target.value as ListingReportReason)}
                 className="w-full rounded-lg border border-border bg-card px-2 py-1.5 text-[12px]"
@@ -863,7 +883,7 @@ function ListingDetail({
                 <option value="counterfeit">Counterfeit</option>
                 <option value="other">Other</option>
               </select>
-              <textarea
+              <textarea aria-label="Optional details"
                 value={reportNote}
                 onChange={(e) => setReportNote(e.target.value)}
                 placeholder="Optional details"
@@ -1234,7 +1254,7 @@ function SellListingForm({
               <LazyImage src={src} alt="" className="h-full w-full object-cover" />
               <button
                 type="button"
-                className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
+                className="gh-hit-44 absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 before:absolute before:-inset-2.5 before:content-[''] text-white"
                 aria-label="Remove photo"
                 onClick={() => setMediaUrls(mediaUrls.filter((u) => u !== src))}
               >
@@ -1277,7 +1297,7 @@ function SellListingForm({
         <span className="text-[12px] font-bold text-muted-foreground">Base listing price · {wt("price")}</span>
         <input
           value={price}
-          onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ""))}
+          onChange={(e) => setPrice(sanitizeAmountInput(e.target.value, MARKETPLACE_PRICE_MAX_DECIMALS))}
           inputMode="decimal"
           className="mt-1 w-full rounded-xl border border-border/70 bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
           placeholder="0.00"
@@ -1379,7 +1399,7 @@ function SellListingForm({
             </button>
           ))}
         </div>
-        <input
+        <input aria-label="Optional notes (e.g. ships in 2 days, meetup at park)"
           value={deliveryNotes}
           onChange={(e) => setDeliveryNotes(e.target.value.slice(0, 200))}
           className="mt-2 w-full rounded-xl border border-border/70 bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
@@ -1507,10 +1527,16 @@ function CartPanel({
       setError("You can't buy your own listing. Remove it from the cart to continue.")
       return
     }
+    const checkoutNamespace = getMarketplaceCartNamespace()
     setBusy(true)
     setError(null)
     setMessage(null)
     setCheckoutProgress(null)
+    const assertCheckoutAccount = () => {
+      if (getMarketplaceCartNamespace() !== checkoutNamespace) {
+        throw new Error("Your account changed during checkout. Open Orders to review any reserved items before retrying.")
+      }
+    }
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null
     const hardTimeout = typeof window !== "undefined"
       ? window.setTimeout(() => {
@@ -1521,13 +1547,15 @@ function CartPanel({
     const paidGhcIds: string[] = []
     try {
       const { socialCreateMarketplaceOrder, socialPayMarketplaceOrder } = await import("@/lib/social/client")
+      assertCheckoutAccount()
       // Phase 3: reserve every purchasable line with stable idempotency; never invent payment success.
       const total = purchasableItems.length
       for (let i = 0; i < purchasableItems.length; i++) {
         if (controller?.signal?.aborted) throw new Error("Checkout timed out")
         const item = purchasableItems[i]
         setCheckoutProgress(`Reserving ${i + 1} of ${total}: ${item.title}`)
-        const lineKey = `${item.listingId}:${item.variantId || "legacy"}:${item.quantity}:${item.sellerId}`
+        assertCheckoutAccount()
+        const lineKey = `${checkoutNamespace}:${item.listingId}:${item.variantId || "legacy"}:${item.quantity}:${item.sellerId}`
         let idempotencyKey = checkoutKeysRef.current.get(lineKey)
         if (!idempotencyKey) {
           const nonce = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -1542,6 +1570,7 @@ function CartPanel({
           quantity: item.quantity,
           idempotencyKey,
         })
+        assertCheckoutAccount()
         if (!result.ok || !result.order) {
           const code = String(result.error || "")
           throw new Error(humanizeClientErrorCode(code, `Could not reserve ${item.title}`))
@@ -1566,7 +1595,9 @@ function CartPanel({
         if (controller?.signal?.aborted) throw new Error("Checkout timed out")
         const { id, item } = ghcOrders[i]
         setCheckoutProgress(`Paying GHC ${i + 1} of ${ghcOrders.length}: ${item.title}`)
+        assertCheckoutAccount()
         const paid = await socialPayMarketplaceOrder(id, "ghc")
+        assertCheckoutAccount()
         if (!paid.ok) {
           throw new Error(
             humanizeClientErrorCode(paid.error, paid.message || "GHC payment failed — check available balance"),
@@ -1577,10 +1608,11 @@ function CartPanel({
 
       // Remove only successfully reserved lines. Preserve own listings and any
       // unrelated cart edits made while the asynchronous checkout was running.
+      assertCheckoutAccount()
       const completedLineSnapshots = created.map(({ item }) => item)
       removeMarketplaceCartItemsBySnapshots(completedLineSnapshots)
       for (const { item } of created) {
-        checkoutKeysRef.current.delete(`${item.listingId}:${item.variantId || "legacy"}:${item.quantity}:${item.sellerId}`)
+        checkoutKeysRef.current.delete(`${checkoutNamespace}:${item.listingId}:${item.variantId || "legacy"}:${item.quantity}:${item.sellerId}`)
       }
 
       if (piOrders.length === 1) {
@@ -1624,11 +1656,11 @@ function CartPanel({
       // If one or more GHC orders settled before a later line failed, remove only
       // those paid purchase-intent snapshots. Keep unpaid/reserved lines available
       // for recovery and preserve any cart edits made while checkout was running.
-      if (paidGhcIds.length) {
+      if (paidGhcIds.length && getMarketplaceCartNamespace() === checkoutNamespace) {
         const paidLines = created.filter(({ id }) => paidGhcIds.includes(id))
         removeMarketplaceCartItemsBySnapshots(paidLines.map(({ item }) => item))
         for (const { item } of paidLines) {
-          checkoutKeysRef.current.delete(`${item.listingId}:${item.variantId || "legacy"}:${item.quantity}:${item.sellerId}`)
+          checkoutKeysRef.current.delete(`${checkoutNamespace}:${item.listingId}:${item.variantId || "legacy"}:${item.quantity}:${item.sellerId}`)
         }
       }
       const aborted = controller?.signal?.aborted
@@ -1727,13 +1759,13 @@ function CartPanel({
                           : "Seller details unavailable"}
                     </p>
                   </div>
-                  <button type="button" onClick={() => onRemove(item.listingId, item.variantId ?? "")} disabled={busy} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-muted disabled:opacity-40" aria-label={`Remove ${item.title}`}><X size={15} /></button>
+                  <button type="button" onClick={() => onRemove(item.listingId, item.variantId ?? "")} disabled={busy} className="gh-hit-44 flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-muted disabled:opacity-40" aria-label={`Remove ${item.title}`}><X size={15} /></button>
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <div className="inline-flex items-center rounded-full border border-border/70 bg-background">
-                    <button type="button" onClick={() => onChange(item.listingId, item.quantity - 1, item.variantId)} disabled={busy || item.quantity <= 1} className="flex h-8 w-8 items-center justify-center disabled:opacity-30" aria-label="Decrease quantity"><Minus size={13} /></button>
+                    <button type="button" onClick={() => onChange(item.listingId, item.quantity - 1, item.variantId)} disabled={busy || item.quantity <= 1} className="gh-hit-44 flex h-8 w-8 items-center justify-center disabled:opacity-30" aria-label="Decrease quantity"><Minus size={13} /></button>
                     <span className="min-w-7 text-center text-xs font-bold">{item.quantity}</span>
-                    <button type="button" onClick={() => onChange(item.listingId, item.quantity + 1, item.variantId)} disabled={busy || (Boolean(item.availability) && item.quantity >= Number(item.availability))} className="flex h-8 w-8 items-center justify-center disabled:opacity-30" aria-label="Increase quantity"><Plus size={13} /></button>
+                    <button type="button" onClick={() => onChange(item.listingId, item.quantity + 1, item.variantId)} disabled={busy || (Boolean(item.availability) && item.quantity >= Number(item.availability))} className="gh-hit-44 flex h-8 w-8 items-center justify-center disabled:opacity-30" aria-label="Increase quantity"><Plus size={13} /></button>
                   </div>
                   <p className="text-sm font-extrabold">{currency === "GHC" ? "₲ " : ""}{lineTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })}{currency === "GHC" ? "" : currency === "PI" ? " π" : ` ${currency}`}</p>
                 </div>
@@ -1746,9 +1778,9 @@ function CartPanel({
       <div className="rounded-[1.4rem] border border-emerald-600/20 bg-emerald-50/50 p-4 dark:bg-emerald-950/15">
         <div className="flex items-center gap-2 text-[12px] font-bold"><ShieldCheck size={16} className="text-emerald-700 dark:text-emerald-300" /> Protected marketplace checkout</div>
         <div className="mt-3 grid grid-cols-3 gap-2" aria-label="Checkout journey">
-          <div className="rounded-xl bg-background/70 p-2"><CheckCircle2 size={14} className="text-emerald-700" /><p className="mt-1 text-[10px] font-bold">1. Revalidate</p><p className="text-[9px] text-muted-foreground">Price & stock</p></div>
-          <div className="rounded-xl bg-background/70 p-2"><ShieldCheck size={14} className="text-emerald-700" /><p className="mt-1 text-[10px] font-bold">2. Secure order</p><p className="text-[9px] text-muted-foreground">Server record</p></div>
-          <div className="rounded-xl bg-background/70 p-2"><Clock3 size={14} className="text-emerald-700" /><p className="mt-1 text-[10px] font-bold">3. Track</p><p className="text-[9px] text-muted-foreground">Until complete</p></div>
+          <div className="rounded-xl bg-background/70 p-2"><CheckCircle2 size={14} className="text-emerald-700" /><p className="mt-1 text-[10px] font-bold">1. Revalidate</p><p className="text-[10px] text-muted-foreground">Price & stock</p></div>
+          <div className="rounded-xl bg-background/70 p-2"><ShieldCheck size={14} className="text-emerald-700" /><p className="mt-1 text-[10px] font-bold">2. Secure order</p><p className="text-[10px] text-muted-foreground">Server record</p></div>
+          <div className="rounded-xl bg-background/70 p-2"><Clock3 size={14} className="text-emerald-700" /><p className="mt-1 text-[10px] font-bold">3. Track</p><p className="text-[10px] text-muted-foreground">Until complete</p></div>
         </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           <div className="flex gap-2"><Truck size={15} className="mt-0.5 shrink-0 text-muted-foreground" /><p className="text-[11px] leading-relaxed text-muted-foreground">Delivery terms stay with each seller and order.</p></div>
@@ -2195,6 +2227,8 @@ export function MarketplaceScreen({
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [ordersLoadState, setOrdersLoadState] = useState<"loading" | "ready" | "unavailable">("loading")
   const [orderBusy, setOrderBusy] = useState<string | null>(null)
+  const [disputeDraftOrderId, setDisputeDraftOrderId] = useState<string | null>(null)
+  const [disputeReason, setDisputeReason] = useState("")
   const [orderRoleFilter, setOrderRoleFilter] = useState<"all" | "buying" | "selling">("all")
   const [focusedOrderId, setFocusedOrderId] = useState<string | null>(initialOrderId || null)
   const [focusedResponseAt, setFocusedResponseAt] = useState<number | null>(initialResponseAt || null)
@@ -2227,9 +2261,12 @@ export function MarketplaceScreen({
     window.addEventListener("ghc:marketplace-cart-changed", handler)
     // Keep multiple tabs/devices in the same browser profile coherent.
     window.addEventListener("storage", handler)
+    // Identity changes switch the active local cart namespace immediately.
+    const unsubscribeIdentity = IdentityService.subscribe(handler)
     return () => {
       window.removeEventListener("ghc:marketplace-cart-changed", handler)
       window.removeEventListener("storage", handler)
+      unsubscribeIdentity()
     }
   }, [syncCart])
 
@@ -2441,16 +2478,18 @@ export function MarketplaceScreen({
   }, [])
 
   const runOrderAction = useCallback(async (orderId: string, action: string, payload: Record<string, unknown> = {}) => {
-    if (orderBusy) return
+    if (orderBusy) return false
     setOrderBusy(orderId + ":" + action)
     try {
       const res = await fetch(`/api/marketplace/orders/${encodeURIComponent(orderId)}/commerce`, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ action, ...payload }) })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok || !data.ok) throw new Error(String(data.error || "Order action failed"))
+      if (!res.ok || !data.ok) throw new Error(String(data.message || data.error || "Order action failed"))
       await loadDurableOrders()
       window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "Order updated", type: "success" } }))
+      return true
     } catch (e) {
       window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: e instanceof Error ? e.message : "Order action failed", type: "error" } }))
+      return false
     } finally { setOrderBusy(null) }
   }, [loadDurableOrders, orderBusy])
 
@@ -2826,7 +2865,7 @@ export function MarketplaceScreen({
           <button
             type="button"
             onClick={onBack}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="gh-hit-44 flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             aria-label="Back"
           >
             <ArrowLeft size={18} />
@@ -2917,9 +2956,10 @@ export function MarketplaceScreen({
               />
               <input
                 ref={searchRef}
-                type="search"
+                type="search" enterKeyHint="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Escape" && query) { e.preventDefault(); e.stopPropagation(); setQuery("") } }}
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setSearchFocused(false)}
                 placeholder={msg("searchListings")}
@@ -2931,7 +2971,7 @@ export function MarketplaceScreen({
                 <button
                   type="button"
                   onClick={() => setQuery("")}
-                  className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+                  className="gh-hit-44 absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
                   aria-label="Clear search"
                 >
                   <X size={15} />
@@ -3000,8 +3040,8 @@ export function MarketplaceScreen({
               </select>
             </label>
             <div className="grid grid-cols-2 gap-2">
-              <label className="text-[10px] font-semibold text-muted-foreground">Minimum price<input inputMode="decimal" value={minPrice} onChange={(event) => setMinPrice(event.target.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1").slice(0,19))} placeholder="No minimum" className="mt-1 min-h-9 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground" /></label>
-              <label className="text-[10px] font-semibold text-muted-foreground">Maximum price<input inputMode="decimal" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1").slice(0,19))} placeholder="No maximum" className="mt-1 min-h-9 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground" /></label>
+              <label className="text-[10px] font-semibold text-muted-foreground">Minimum price<input inputMode="decimal" value={minPrice} onChange={(event) => setMinPrice(sanitizeAmountInput(event.target.value, MARKETPLACE_PRICE_MAX_DECIMALS).slice(0,19))} placeholder="No minimum" className="mt-1 min-h-9 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground" /></label>
+              <label className="text-[10px] font-semibold text-muted-foreground">Maximum price<input inputMode="decimal" value={maxPrice} onChange={(event) => setMaxPrice(sanitizeAmountInput(event.target.value, MARKETPLACE_PRICE_MAX_DECIMALS).slice(0,19))} placeholder="No maximum" className="mt-1 min-h-9 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground" /></label>
               <label className="text-[10px] font-semibold text-muted-foreground">Listed from<input type="date" value={browseFrom} max={browseTo || undefined} onChange={(event) => setBrowseFrom(event.target.value)} className="mt-1 min-h-9 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground" /></label>
               <label className="text-[10px] font-semibold text-muted-foreground">Listed to<input type="date" value={browseTo} min={browseFrom || undefined} onChange={(event) => setBrowseTo(event.target.value)} className="mt-1 min-h-9 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground" /></label>
             </div>
@@ -3665,7 +3705,7 @@ export function MarketplaceScreen({
                               className={`h-1.5 w-full rounded-full ${done ? "bg-emerald-600" : "bg-muted"}`}
                               aria-hidden
                             />
-                            <span className={`text-[9px] font-semibold ${done ? "text-emerald-800 dark:text-emerald-300" : "text-muted-foreground"}`}>
+                            <span className={`text-[10px] font-semibold ${done ? "text-emerald-800 dark:text-emerald-300" : "text-muted-foreground"}`}>
                               {step.label}
                             </span>
                           </li>
@@ -3686,6 +3726,7 @@ export function MarketplaceScreen({
                       {o.trackingUrl ? <a href={o.trackingUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex min-h-8 items-center gap-1 font-bold text-emerald-700 underline dark:text-emerald-300">Track shipment <Truck className="h-3 w-3" /></a> : null}
                       {o.estimatedDeliveryAt ? <p className="mt-1 text-muted-foreground">Estimated delivery: {new Date(o.estimatedDeliveryAt).toLocaleDateString()}</p> : null}
                       {o.dispatchedAt ? <p className="text-muted-foreground">Dispatched: {new Date(o.dispatchedAt).toLocaleString()}</p> : null}
+                      {o.deliveredAt ? <p className="text-muted-foreground">Delivered: {new Date(o.deliveredAt).toLocaleString()}</p> : null}
                     </div> : null}
                     {nextHint ? (
                       <p className="mt-1.5 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">{nextHint}</p>
@@ -3753,17 +3794,39 @@ export function MarketplaceScreen({
                           Leave review
                         </button>
                       ) : null}
-                      {!['completed','cancelled','disputed','refunded'].includes(status) && o.paymentStatus === "verified" ? <button type="button" disabled={busy} onClick={() => void runOrderAction(o.id,"dispute")} className="min-h-9 rounded-full border border-amber-500/50 px-3 text-xs font-bold text-amber-700 dark:text-amber-300">Open dispute</button> : null}
+                      {!['completed','cancelled','disputed','refunded'].includes(status) && o.paymentStatus === "verified" && returnGuideFor({ status, paymentStatus: o.paymentStatus, deliveryStatus: o.deliveryStatus, deliveredAt: o.deliveredAt }).canOpenDispute ? <button type="button" disabled={busy} onClick={() => { setDisputeDraftOrderId(o.id); setDisputeReason("") }} className="min-h-9 rounded-full border border-amber-500/50 px-3 text-xs font-bold text-amber-700 dark:text-amber-300">Open dispute</button> : null}
                     </div>
+                    {disputeDraftOrderId === o.id ? (
+                      <form className="mt-3 space-y-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3" onSubmit={(event) => {
+                        event.preventDefault()
+                        if (disputeReason.trim().length < 8 || busy) return
+                        void (async () => {
+                          const submitted = await runOrderAction(o.id, "dispute", { note: disputeReason.trim() })
+                          if (submitted) { setDisputeDraftOrderId(null); setDisputeReason("") }
+                        })()
+                      }}>
+                        <label className="block text-[11px] font-bold text-foreground" htmlFor={`marketplace-dispute-${o.id}`}>Describe the problem (at least 8 characters)</label>
+                        <textarea id={`marketplace-dispute-${o.id}`} value={disputeReason} onChange={(event) => setDisputeReason(event.target.value.slice(0, 500))} maxLength={500} minLength={8} rows={3} required placeholder="Explain what happened and what evidence you have…" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs" />
+                        <div className="flex flex-wrap gap-2">
+                          <button type="submit" disabled={busy || disputeReason.trim().length < 8} className="min-h-9 rounded-full bg-amber-600 px-3 text-xs font-bold text-white disabled:opacity-50">Submit dispute</button>
+                          <button type="button" onClick={() => { setDisputeDraftOrderId(null); setDisputeReason("") }} className="min-h-9 rounded-full border border-border px-3 text-xs font-bold">Keep order open</button>
+                        </div>
+                      </form>
+                    ) : null}
                     {!isSeller ? (() => {
-                      const guide = returnGuideFor({ status, paymentStatus: o.paymentStatus, deliveryStatus: o.deliveryStatus, deliveredAt: o.fulfilledAt, completedAt: o.completedAt, updatedAt: o.updatedAt })
+                      const guide = returnGuideFor({ status, paymentStatus: o.paymentStatus, deliveryStatus: o.deliveryStatus, deliveredAt: o.deliveredAt })
                       return guide.stage === "not_eligible" ? null : (
                         <details className="mt-2 rounded-xl border border-border/50 bg-muted/20 px-3 py-2" data-testid="return-guide">
-                          <summary className="cursor-pointer text-[12px] font-bold text-foreground">Returns &amp; problems · {guide.headline}</summary>
+                          <summary className="cursor-pointer text-[12px] font-bold text-foreground">Delivery &amp; issue resolution · {guide.headline}</summary>
                           {guide.steps.length ? <ol className="mt-1.5 list-decimal space-y-1 pl-4 text-[11px] text-muted-foreground">{guide.steps.map((step) => <li key={step}>{step}</li>)}</ol> : null}
                         </details>
                       )
                     })() : null}
+                    {status === "disputed" && o.disputeReason ? <p className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-[11px] text-muted-foreground"><strong className="text-foreground">Dispute reason:</strong> {o.disputeReason}</p> : null}
+                    {status === "cancelled" && o.cancellationReason ? <p className="mt-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground"><strong className="text-foreground">Cancellation reason:</strong> {o.cancellationReason}</p> : null}
+                    {o.sellerNote ? <p className="mt-2 rounded-lg bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground"><strong className="text-foreground">Seller update:</strong> {o.sellerNote}</p> : null}
+                    {isSeller && o.buyerNote ? <p className="mt-2 rounded-lg bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground"><strong className="text-foreground">Buyer update:</strong> {o.buyerNote}</p> : null}
+                    {o.buyerConfirmedAt ? <p className="mt-1 text-[10px] text-muted-foreground">Buyer confirmed receipt: {new Date(o.buyerConfirmedAt).toLocaleString()}</p> : null}
                     <OrderTimelinePanel orderId={o.id} initialOpen={focusedOrderId === o.id} focusAt={focusedResponseAt} focusAction={focusedResponseAction} />
                     <p className="mt-2 text-[11px] text-muted-foreground">Updated {new Date(o.updatedAt || o.createdAt).toLocaleString()}</p>
                     {reviewDraftOrderId === o.id ? (
@@ -3775,7 +3838,7 @@ export function MarketplaceScreen({
                               key={n}
                               type="button"
                               onClick={() => setReviewRating(n)}
-                              className={`h-8 w-8 rounded-full text-[12px] font-bold ${
+                              className={`gh-hit-44 h-8 w-8 rounded-full text-[12px] font-bold ${
                                 reviewRating === n
                                   ? "bg-emerald-700 text-white"
                                   : "border border-border bg-card text-muted-foreground"
@@ -3785,7 +3848,7 @@ export function MarketplaceScreen({
                             </button>
                           ))}
                         </div>
-                        <textarea
+                        <textarea aria-label="What went well? (min 3 characters)"
                           value={reviewText}
                           onChange={(e) => setReviewText(e.target.value.slice(0, 2000))}
                           rows={3}

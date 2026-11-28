@@ -9,7 +9,7 @@ const checks = [
   ["shared-media action is wired into the conversation header", /onSharedMedia=\{\(\) => setSharedMediaOpen\(true\)\}/.test(screen)],
   ["shared-media panel is an accessible dialog", /role="dialog" aria-modal="true" aria-labelledby="gh-shared-media-title"/.test(screen)],
   ["gallery is derived from loaded conversation messages", /messages\.flatMap\(\(message\)/.test(screen)],
-  ["gallery explicitly reports loaded-history scope", /items in the loaded conversation history/.test(screen)],
+  ["gallery explicitly reports loaded-history scope", /plural\(sharedMedia\.length, "item"\)\} in the loaded conversation history/.test(screen)],
   ["gallery supports image and GIF attachments", /media\.type === "image" \|\| media\.type === "gif"/.test(screen)],
   ["gallery supports native video playback", /<video className="aspect-square w-full bg-black object-contain" controls preload="metadata"/.test(screen)],
   ["gallery supports voice playback", /aria-label="Play shared voice message"/.test(screen)],

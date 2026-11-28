@@ -417,6 +417,32 @@ export function getMembershipStatus(userId = "current-user"): MembershipStatus {
   return loadStatus(userId)
 }
 
+/**
+ * One stable spend reference per (tier, period) purchase attempt. A retry after a timeout or a dropped
+ * connection must reuse the reference so the ledger recognises it; a fresh reference per call could
+ * debit twice if the first request had in fact completed. The entry is dropped as soon as the server
+ * answers definitively, and expires after ten minutes so a later renewal always gets a new reference.
+ */
+const GHC_ATTEMPT_TTL_MS = 10 * 60 * 1000
+const ghcPurchaseAttempts = new Map<string, { id: string; at: number }>()
+
+function ghcPurchaseAttemptId(tier: string, periodKey: string): string {
+  const key = `${tier}:${periodKey}`
+  const now = Date.now()
+  const existing = ghcPurchaseAttempts.get(key)
+  if (existing && now - existing.at < GHC_ATTEMPT_TTL_MS) return existing.id
+  const id =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${now}-${Math.random().toString(36).slice(2, 12)}`
+  ghcPurchaseAttempts.set(key, { id, at: now })
+  return id
+}
+
+function settleGhcPurchaseAttempt(tier: string, periodKey: string): void {
+  ghcPurchaseAttempts.delete(`${tier}:${periodKey}`)
+}
+
 export function createMembershipDomain(deps: {
   currentUserId?: string
   /**
@@ -694,9 +720,7 @@ export function createMembershipDomain(deps: {
       const plan = planFor(tier)
       const periodKey = membershipPeriodForPaidMonths(billingPeriod)
       const price = getMembershipGhcPrice(tier, billingPeriod).chargeGhc
-      const purchaseAttemptId = typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+      const purchaseAttemptId = ghcPurchaseAttemptId(tier, periodKey)
       if (price <= 0) {
         return { ok: false, error: "Invalid price", phase: "validate", requestId: "local" }
       }
@@ -719,6 +743,11 @@ export function createMembershipDomain(deps: {
           }),
         })
         const data = await res.json().catch(() => ({}))
+        // A definitive server answer (granted, or an explicit rejection) ends this attempt. An
+        // unreadable or failed response keeps the reference so a retry is recognised, not re-charged.
+        if ((res.ok && data?.ok && data?.entitlement) || data?.error || data?.message) {
+          settleGhcPurchaseAttempt(tier, periodKey)
+        }
         if (res.ok && data?.ok && data?.entitlement) {
           const e = data.entitlement
           const activated = await this.activate({
@@ -758,7 +787,7 @@ export function createMembershipDomain(deps: {
       if (!allowLocalAuthFallback()) {
         return {
           ok: false,
-          error: "Membership server unavailable. GHC was not spent.",
+          error: "The membership server did not confirm this purchase. If GHC was deducted you will not be charged twice: retry, or check Wallet → History.",
           phase: "permission",
           requestId: "server",
         }

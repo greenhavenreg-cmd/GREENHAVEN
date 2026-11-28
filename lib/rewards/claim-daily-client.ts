@@ -5,6 +5,7 @@
  * The client never supplies an amount; the server/database is authoritative.
  */
 import { IdentityService } from "@/lib/identity/identity-service"
+import { fetchWithTimeout } from "@/lib/client/fetch-timeout"
 
 export type DailyClaimStatusClientResult = {
   ok: boolean
@@ -42,11 +43,12 @@ function authHeaders(): Record<string, string> {
 /** Read the authoritative daily-claim state. */
 export async function getDailyClaimStatus(): Promise<DailyClaimStatusClientResult> {
   try {
-    const response = await fetch("/api/economy/rewards/daily", {
+    const response = await fetchWithTimeout("/api/economy/rewards/daily", {
       method: "GET",
       credentials: "include",
       headers: authHeaders(),
       cache: "no-store",
+      timeoutMs: 15_000,
     })
     const data = (await response.json().catch(() => ({}))) as DailyClaimStatusClientResult & {
       message?: string
@@ -67,12 +69,13 @@ export async function getDailyClaimStatus(): Promise<DailyClaimStatusClientResul
 /** Claim exactly once through the canonical server endpoint. */
 export async function postDailyClaim(): Promise<DailyClaimClientResult> {
   try {
-    const response = await fetch("/api/economy/rewards/daily", {
+    const response = await fetchWithTimeout("/api/economy/rewards/daily", {
       method: "POST",
       credentials: "include",
       cache: "no-store",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({}),
+      timeoutMs: 20_000,
     })
     const data = (await response.json().catch(() => ({}))) as {
       ok?: boolean
@@ -120,7 +123,15 @@ export async function postDailyClaim(): Promise<DailyClaimClientResult> {
       cycleDay: data.cycleDay != null ? Number(data.cycleDay) : undefined,
       referenceId: data.referenceId != null ? String(data.referenceId) : undefined,
     }
-  } catch {
+  } catch (cause) {
+    // A timed-out claim may still have committed server-side. Never tell the
+    // person it failed outright; the server's idempotency makes a retry safe.
+    if (cause instanceof DOMException && cause.name === "AbortError") {
+      return {
+        ok: false,
+        error: "The rewards service is taking longer than expected. Your claim may already be recorded — refresh your status, then retry if it still shows as available.",
+      }
+    }
     return { ok: false, error: "Could not reach the rewards service. Check your connection and retry." }
   }
 }

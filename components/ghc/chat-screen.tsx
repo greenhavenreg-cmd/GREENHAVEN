@@ -14,6 +14,7 @@ import { GroupCard } from "./group-card"
 import { FeaturedGroupCard } from "./featured-group-card"
 import { CreateGroupModal } from "./create-group-modal"
 import type { CreateGroupFormData } from "./create-group-modal"
+import { plural } from "@/lib/ui/plural"
 
 // Enhanced Group type
 interface Group {
@@ -149,7 +150,7 @@ export function ChatScreen() {
       newGroup.id = createdId
       setMyGroups((prev) => [newGroup, ...prev.filter((group) => group.id !== createdId)])
 
-      const memberText = formData.invitedMembers.length > 0 ? `${formData.invitedMembers.length} members invited` : "no members invited yet"
+      const memberText = formData.invitedMembers.length > 0 ? `${plural(formData.invitedMembers.length, "member")} invited` : "no members invited yet"
       const privacyText = formData.privacy === "public" ? "Public" : formData.privacy === "private" ? "Private" : "Invite Only"
       addToast(`"${formData.name}" (${privacyText}) created! ${memberText}`, "success")
 
@@ -171,7 +172,7 @@ export function ChatScreen() {
       <div className="sticky top-0 z-10 bg-white border-b border-border/50 px-4 pt-4 pb-3 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <h1 className="text-lg font-bold text-foreground">Messages</h1>
-          <button
+          <button type="button"
             onClick={() => setShowCreateGroup(true)}
             className="p-2 hover:bg-emerald-50/80 rounded-lg transition active:bg-emerald-100"
             aria-label="Create new group chat"
@@ -191,7 +192,7 @@ export function ChatScreen() {
             aria-label="Search groups"
           />
           {searchQuery && (
-            <button
+            <button type="button"
               onClick={() => setSearchQuery("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground"
               aria-label="Clear search"
@@ -219,7 +220,7 @@ export function ChatScreen() {
             ) : (
               <div className="py-12 text-center">
                 <p className="text-muted-foreground text-sm">No groups found for "{searchQuery}"</p>
-                <button
+                <button type="button"
                   onClick={() => setSearchQuery("")}
                   className="mt-3 text-emerald-600 hover:text-emerald-700 text-sm font-medium"
                 >
@@ -291,7 +292,7 @@ export function ChatScreen() {
             {!organizedGroups.featured.length && !organizedGroups.myGroupsList.length && !organizedGroups.suggested.length && (
               <div className="px-4 py-12 text-center">
                 <p className="text-muted-foreground text-sm">This legacy screen has no live group catalog. Use Communities or Messages from the main app.</p>
-                <button
+                <button type="button"
                   onClick={() => setShowCreateGroup(true)}
                   className="mt-4 px-4 py-2 bg-[var(--gh-green)] text-white rounded-full text-sm font-medium hover:brightness-105"
                 >

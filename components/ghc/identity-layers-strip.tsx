@@ -99,7 +99,7 @@ function Layer({
         {title}
       </span>
       <span className="w-full truncate text-[12px] font-bold text-foreground">{subtitle}</span>
-      <span className="text-[9px] font-medium text-muted-foreground">{hint}</span>
+      <span className="text-[10px] font-medium text-muted-foreground">{hint}</span>
     </button>
   )
 }

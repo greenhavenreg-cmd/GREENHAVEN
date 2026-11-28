@@ -3,6 +3,7 @@
 import { DirectCallSheet } from "@/components/ghc/direct-call-sheet"
 
 import { incomingRequestBadgeCount } from "@/lib/domains/adapters/connection-connect-flow"
+import { groupsAttentionCount, messagesAttentionCount } from "@/lib/messaging/unread-attention"
 import { IdentityService } from "@/lib/identity/identity-service"
 import { captureReferralCodeFromLocation, flushPendingReferralAttribution } from "@/lib/referral/capture-ref"
 import { notificationSystem, NOTIFICATIONS_CHANGED_EVENT } from "@/lib/notifications"
@@ -15,7 +16,7 @@ import type { Candidate } from "@/lib/ghc-types"
 import { usePiAuth } from "@/contexts/pi-auth-context"
 import { useRegionalContext } from "@/contexts/regional-context"
 import { getShellMessage } from "@/lib/i18n/shell"
-import { Compass, MessagesSquare, Newspaper, ShoppingCart, UserRound, Users } from "lucide-react"
+import { Compass, MessagesSquare, Newspaper, ShoppingCart, UserRound, Users, X } from "lucide-react"
 import { ErrorBoundary } from "@/lib/error-boundary"
 import { toUserFacingError } from "@/lib/user-facing-error"
 import { ConsentGate } from "./consent-gate"
@@ -98,7 +99,7 @@ function TabScreenFallback({ label }: { label: string }) {
   const loadingLabel = getShellMessage("loading", regional.locale)
   return (
     <AccessibleStatus
-      className="flex h-full min-h-[50vh] flex-col gap-3 bg-background px-3 pt-4"
+      className="flex h-full min-h-[50dvh] flex-col gap-3 bg-background px-3 pt-4"
       label={`${loadingLabel} ${label}`}
       busy
     >
@@ -230,7 +231,7 @@ function ScreenBoundary({ children, label, onReset, onDismiss }: { children: Rea
 }
 
 // Memoized toast component (Quick Win: prevent unnecessary re-renders)
-const Toast = memo(({ message, type }: { message: string; type: string }) => {
+const Toast = memo(({ message, type, onDismiss }: { message: string; type: string; onDismiss?: () => void }) => {
   const isError = type === "error"
   const isSuccess = type === "success"
   const shell =
@@ -250,6 +251,16 @@ const Toast = memo(({ message, type }: { message: string; type: string }) => {
     >
       <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} aria-hidden />
       <p className="min-w-0 flex-1 text-[13px] font-semibold leading-snug tracking-tight">{message}</p>
+      {onDismiss ? (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss message"
+          className="-mr-2.5 -my-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full opacity-70 transition hover:opacity-100 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-current"
+        >
+          <X size={16} aria-hidden />
+        </button>
+      ) : null}
     </div>
   )
 })
@@ -409,13 +420,8 @@ export function GHConnectApp() {
   const [connectionRequestBadge, setConnectionRequestBadge] = useState<number>(0)
   const [socialAttentionCount, setSocialAttentionCount] = useState(0)
   const [economyAttentionCount, setEconomyAttentionCount] = useState(0)
-  const unreadMessageCount = useMemo(() => (Array.isArray(conversations) ? conversations : []).reduce(
-    (count, conversation) => count + (typeof (conversation as { unreadCount?: number }).unreadCount === "number"
-      ? Math.max(0, Number((conversation as { unreadCount?: number }).unreadCount) || 0)
-      : conversation.unread ? 1 : 0), 0), [conversations])
-  const unreadGroupCount = useMemo(() => (Array.isArray(conversations) ? conversations : []).reduce(
-    (count, conversation) => count + (conversation.conversationType === "group" &&
-      (conversation.unread || Number((conversation as { unreadCount?: number }).unreadCount || 0) > 0) ? 1 : 0), 0), [conversations])
+  const unreadMessageCount = useMemo(() => messagesAttentionCount(conversations), [conversations])
+  const unreadGroupCount = useMemo(() => groupsAttentionCount(conversations), [conversations])
 
   // Section attention indicators use authenticated server counts plus local in-app
   // alerts. Polling and event-driven refresh cover new activity without requiring a tap.
@@ -741,9 +747,12 @@ export function GHConnectApp() {
     syncCartBadge()
     window.addEventListener("ghc:marketplace-cart-changed", syncCartBadge)
     window.addEventListener("focus", syncCartBadge)
+    // Recompute the badge when authentication switches the active cart namespace.
+    const unsubscribeIdentity = IdentityService.subscribe(syncCartBadge)
     return () => {
       window.removeEventListener("ghc:marketplace-cart-changed", syncCartBadge)
       window.removeEventListener("focus", syncCartBadge)
+      unsubscribeIdentity()
     }
   }, [])
 
@@ -1227,7 +1236,12 @@ export function GHConnectApp() {
       aria-live="polite"
     >
       {visibleToasts.map((toast) => (
-        <Toast key={toast.id} message={toast.message} type={toast.type} />
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          onDismiss={() => setHiddenToastIds((current: Set<string>) => new Set(current).add(toast.id))}
+        />
       ))}
     </div>
   )
@@ -1267,7 +1281,7 @@ export function GHConnectApp() {
     return (
       <>
       {themeLayer}
-      <div className="relative flex h-screen flex-col items-center justify-center overflow-hidden bg-[#050a08] px-6">
+      <div className="relative flex h-dvh flex-col items-center justify-center overflow-hidden bg-[#050a08] px-6">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.18)_0%,transparent_60%)]" />
         <div className="relative z-10 flex flex-col items-center">
           <div className="relative">
@@ -1313,7 +1327,7 @@ export function GHConnectApp() {
     return (
       <>
         {themeLayer}
-        <div className="relative flex h-screen flex-col items-center justify-center overflow-hidden bg-[#050a08] px-6">
+        <div className="relative flex h-dvh flex-col items-center justify-center overflow-hidden bg-[#050a08] px-6">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(239,68,68,0.12)_0%,transparent_60%)]" />
           <div role="alert" className="relative z-10 flex max-w-sm flex-col items-center text-center">
             <p className="text-sm font-semibold tracking-wide text-red-300/90">Identity service unavailable</p>
@@ -1338,7 +1352,7 @@ export function GHConnectApp() {
     return (
       <>
         {themeLayer}
-        <div className="relative flex h-screen flex-col items-center justify-center overflow-hidden bg-[#050a08] px-6">
+        <div className="relative flex h-dvh flex-col items-center justify-center overflow-hidden bg-[#050a08] px-6">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.18)_0%,transparent_60%)]" />
           <div className="relative z-10 flex flex-col items-center">
             <div className="relative">
@@ -1722,7 +1736,7 @@ export function GHConnectApp() {
                       className={(id as string) === "create" ? "text-white" : undefined}
                     />
                     {id === "cart" && cartBadgeCount > 0 ? (
-                      <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[9px] font-bold leading-none text-white shadow-sm ring-2 ring-card">
+                      <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-bold leading-none text-white shadow-sm ring-2 ring-card">
                         {cartBadgeCount > 99 ? "99+" : cartBadgeCount}
                       </span>
                     ) : null}
@@ -1733,7 +1747,11 @@ export function GHConnectApp() {
                       (id === "profile" && economyAttentionCount > 0 && activeTab !== "profile")) ? (
                       <span
                         role="img"
-                        className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-card"
+                        className={
+                          id === "messages"
+                            ? "absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white shadow-sm ring-2 ring-card"
+                            : "absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-card"
+                        }
                         aria-label={
                           id === "home"
                             ? `${socialAttentionCount} unread notification${socialAttentionCount === 1 ? "" : "s"} — open Home again for inbox`
@@ -1752,7 +1770,9 @@ export function GHConnectApp() {
                                 ? "Community activity"
                                 : "Wallet or rewards activity — open Profile → Wallet / Rewards"
                         }
-                      />
+                      >
+                        {id === "messages" ? (unreadMessageCount > 99 ? "99+" : regional.formatNumber(unreadMessageCount)) : null}
+                      </span>
                     ) : null}
                   </span>
                 </span>

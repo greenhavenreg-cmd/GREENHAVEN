@@ -1,6 +1,7 @@
 "use client"
 
 import { broadcastPostEngagement, normalizeEngagementMetrics, POST_ENGAGEMENT_EVENT } from "@/lib/engagement/post-engagement"
+import { toastSafeMessage } from "@/lib/ux/toast-safe-message"
 import { isStrictlyOlderFeedCursor } from "@/lib/feed/phase5-feed-primitives"
 import { broadcastPostSync } from "@/lib/social/post-sync"
 import { mapRemoteFeedPosts } from "@/lib/social/map-remote-feed-posts"
@@ -1886,12 +1887,20 @@ export function GHCProvider({ children }: { children: ReactNode }) {
   }, [state.ready])
 
   // Define addToast first - it's used by other functions
-  const addToast = useCallback((message: string, type: "success" | "error" | "info") => {
+  const addToast = useCallback((rawMessage: string, type: "success" | "error" | "info") => {
     const id = generateId()
-    setState((s) => ({ ...s, toasts: [...s.toasts, { id, message, type }] }))
+    // Raw server codes (RATE_LIMITED, PI_...) and infrastructure text must never reach the person.
+    const message = toastSafeMessage(rawMessage, type)
+    setState((s) => {
+      // A repeat replaces the identical toast already listed, so the newest one gets a fresh display
+      // time instead of stacking duplicate cards or being swallowed after the older one was hidden.
+      return { ...s, toasts: [...s.toasts.filter((t) => !(t.message === message && t.type === type)), { id, message, type }] }
+    })
+    // The shell hides each toast after 3.2s (info/success) or 6.5s (error). The provider must keep the
+    // entry at least that long, otherwise an error is removed at 3s and the longer error time never applies.
     setTimeout(() => {
       setState((s) => ({ ...s, toasts: s.toasts.filter((t) => t.id !== id) }))
-    }, 3000)
+    }, type === "error" ? 7500 : 4000)
   }, [])
 
 
@@ -7486,24 +7495,38 @@ const dismissMatchCelebration = useCallback(() => {
           role === "admin" || role === "owner" || role === "moderator" || role === "member"
             ? role
             : "member"
-        const result = await domains.community.setRole(conversationId, userId, normalized as any)
-        if (!result.ok) {
-          addToast(result.error, "error")
-          return
-        }
-        // Durable role when community membership is server-backed
+        // Server is the authority: owner transfer is not available through the roles API,
+        // so an owner request is sent as admin. Nothing is applied locally until the server confirms.
+        const roleApi = normalized === "owner" ? "admin" : normalized
+        let confirmedRole: string = roleApi
         try {
-          // Owner transfer is separate; map owner promotion request to admin on API
-          const roleApi =
-            normalized === "owner" ? "admin" : normalized
-          await fetch(`/api/communities/${encodeURIComponent(conversationId)}/roles`, {
+          const response = await fetch(`/api/communities/${encodeURIComponent(conversationId)}/roles`, {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json", Accept: "application/json" },
             body: JSON.stringify({ targetUserId: userId, role: roleApi }),
+            signal: AbortSignal.timeout(10_000),
           })
+          const payload = (await response.json().catch(() => ({}))) as { ok?: boolean; durable?: boolean; role?: string; error?: string }
+          if (!response.ok || payload?.ok === false || payload?.durable !== true) {
+            addToast(
+              response.status === 403 || payload?.error === "FORBIDDEN"
+                ? "You don't have permission to change this role"
+                : "Role could not be updated. Please try again.",
+              "error"
+            )
+            return
+          }
+          if (typeof payload.role === "string") confirmedRole = payload.role
         } catch {
-          /* offline / studio */
+          addToast("Could not reach the community server", "error")
+          return
+        }
+        const result = await domains.community.setRole(conversationId, userId, confirmedRole as any)
+        if (!result.ok) {
+          // Server already saved the role; refresh the local mirror instead of reporting a failure.
+          addToast("Role saved. Refresh to see the latest members.", "info")
+          return
         }
         setState((s) => ({
           ...s,

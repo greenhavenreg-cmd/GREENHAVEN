@@ -7,7 +7,8 @@
  * Confirm → parent runs authoritative join.
  */
 
-import { useEffect, useId, useRef, useState } from "react"
+import { useEffect, useId, useState } from "react"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 import { Check, ChevronLeft, X } from "lucide-react"
 import {
   COMMUNITY_JOIN_REASON_OPTIONS,
@@ -44,7 +45,7 @@ export function CommunityJoinReasonPicker({
 }: CommunityJoinReasonPickerProps) {
   const titleId = useId()
   const descId = useId()
-  const panelRef = useRef<HTMLDivElement>(null)
+  const panelRef = useDialogA11y<HTMLDivElement>(open, busy ? undefined : onCancel)
   const [step, setStep] = useState<Step>("reasons")
   const [selected, setSelected] = useState<CommunityJoinReasonId[]>([])
   const [rulesAck, setRulesAck] = useState(false)
@@ -58,21 +59,7 @@ export function CommunityJoinReasonPicker({
     setSelected([])
     setRulesAck(false)
     setLocalError(null)
-    const t = window.setTimeout(() => {
-      panelRef.current?.querySelector<HTMLElement>("button, [href], input")?.focus()
-    }, 30)
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) {
-        e.preventDefault()
-        onCancel()
-      }
-    }
-    window.addEventListener("keydown", onKey)
-    return () => {
-      window.clearTimeout(t)
-      window.removeEventListener("keydown", onKey)
-    }
-  }, [open, busy, onCancel])
+  }, [open])
 
   if (!open) return null
 
@@ -112,7 +99,8 @@ export function CommunityJoinReasonPicker({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descId}
-        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-border bg-background p-4 shadow-2xl sm:rounded-3xl"
+        tabIndex={-1}
+        className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-border bg-background p-4 shadow-2xl sm:rounded-3xl"
       >
         {/* Progress */}
         <div className="mb-3 flex items-center gap-2" aria-hidden>

@@ -138,7 +138,7 @@ function BrandHeader({ showBack, onBack }: { showBack?: boolean; onBack?: () => 
           <button
             type="button"
             onClick={onBack}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-emerald-300 ring-1 ring-white/10 transition hover:bg-white/10"
+            className="gh-hit-44 flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-emerald-300 ring-1 ring-white/10 transition hover:bg-white/10"
             aria-label="Back"
           >
             <ChevronLeft size={20} />
@@ -504,7 +504,7 @@ export function Onboarding() {
                     type="button"
                     aria-label={`Intro page ${i + 1}`}
                     onClick={() => setIntroPage(i)}
-                    className={`h-1.5 rounded-full transition-all ${
+                    className={`gh-hit-44 h-1.5 rounded-full transition-all ${
                       i === introPage ? "w-6 bg-emerald-400" : "w-1.5 bg-white/25"
                     }`}
                   />
@@ -604,7 +604,7 @@ export function Onboarding() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1.5 block text-[12px] font-bold text-white/60">First name <span className="font-normal text-white/35">(optional)</span></label>
-                    <input
+                    <input aria-label="Given name"
                       type="text"
                       value={formData.firstName}
                       onChange={(e) => {
@@ -624,7 +624,7 @@ export function Onboarding() {
                   </div>
                   <div>
                     <label className="mb-1.5 block text-[12px] font-bold text-white/60">Surname <span className="font-normal text-white/35">(optional)</span></label>
-                    <input
+                    <input aria-label="Family name"
                       type="text"
                       value={formData.lastName}
                       onChange={(e) => {
@@ -648,7 +648,7 @@ export function Onboarding() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1.5 block text-[12px] font-bold text-white/60">Date of birth <span className="font-normal text-white/35">(optional)</span></label>
-                    <input
+                    <input aria-label="Date of birth"
                       type="date"
                       max={maxBornDateForMinAge(18)}
                       value={formData.bornDate}
@@ -663,7 +663,7 @@ export function Onboarding() {
                   </div>
                   <div>
                     <label className="mb-1.5 block text-[12px] font-bold text-white/60">Gender <span className="font-normal text-white/35">(optional)</span></label>
-                    <select
+                    <select aria-label="Gender"
                       value={formData.gender}
                       onChange={(e) => {
                         const v = e.target.value as Gender
@@ -717,7 +717,7 @@ export function Onboarding() {
                   <label className="mb-1.5 block text-[12px] font-bold text-white/60">
                     Bio (optional) · {formData.bio.length}/500
                   </label>
-                  <textarea
+                  <textarea aria-label="Tell us about yourself…"
                     value={formData.bio}
                     onChange={(e) => {
                       setFormData((p) => ({ ...p, bio: e.target.value.slice(0, 500) }))
@@ -879,7 +879,7 @@ export function Onboarding() {
                     <button
                       type="button"
                       onClick={() => removePhoto(idx)}
-                      className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-rose-500 text-white shadow"
+                      className="gh-hit-44 absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-rose-500 text-white shadow"
                       aria-label="Remove photo"
                     >
                       <X size={14} />

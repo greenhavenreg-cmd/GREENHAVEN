@@ -77,7 +77,7 @@ export default function A2uQualificationPage() {
         <label className="text-sm">A2U admin key<input type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)} className="mt-1 w-full rounded-lg border p-2" placeholder="Server-configured operator key" /></label>
         <label className="text-sm">Operator identifier<input value={operator} onChange={e=>setOperator(e.target.value)} className="mt-1 w-full rounded-lg border p-2" placeholder="Your operator ID" /></label>
       </div>
-      <button disabled={busy || key.length<32 || operator.trim().length<2} onClick={refresh} className="mt-3 rounded-lg bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{busy ? "Working…" : "Load qualification register"}</button>
+      <button type="button" disabled={busy || key.length<32 || operator.trim().length<2} onClick={refresh} className="mt-3 rounded-lg bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{busy ? "Working…" : "Load qualification register"}</button>
       {message && <p role="status" className="mt-3 text-sm text-emerald-800">{message}</p>}
       {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
     </section>
@@ -97,7 +97,7 @@ export default function A2uQualificationPage() {
           <label className="text-sm sm:col-span-2">Non-sensitive KYC evidence reference<input value={evidenceRef} onChange={e=>setEvidenceRef(e.target.value)} className="mt-1 w-full rounded-lg border p-2" placeholder="Internal review reference (no personal data)" /></label>
         </div>
         <label className="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" checked={kycConfirmed} onChange={e=>setKycConfirmed(e.target.checked)} className="mt-1" />I personally verified this Pioneer shows **KYC passed / fully approved** in the official Pi KYC app. This is not tentative approval.</label>
-        <button disabled={busy || !key || operator.trim().length<2 || ghUserId.trim().length<8 || piAppUid.trim().length<3 || evidenceRef.trim().length<4 || !kycConfirmed} onClick={attest} className="mt-3 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-40">Save KYC attestation</button>
+        <button type="button" disabled={busy || !key || operator.trim().length<2 || ghUserId.trim().length<8 || piAppUid.trim().length<3 || evidenceRef.trim().length<4 || !kycConfirmed} onClick={attest} className="mt-3 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-40">Save KYC attestation</button>
       </section>
       <section className="rounded-xl border p-4">
         <h2 className="font-semibold">2. Verify and record a completed A2U payment</h2>
@@ -107,7 +107,7 @@ export default function A2uQualificationPage() {
           <label className="text-sm">Verified blockchain transaction ID<input value={txid} onChange={e=>setTxid(e.target.value)} className="mt-1 w-full rounded-lg border p-2" /></label>
           <label className="text-sm sm:col-span-2">Recipient Pi app-specific UID<input value={piAppUid} onChange={e=>setPiAppUid(e.target.value)} className="mt-1 w-full rounded-lg border p-2" /></label>
         </div>
-        <button disabled={busy || !key || operator.trim().length<2 || paymentId.trim().length<1 || txid.trim().length<8 || piAppUid.trim().length<3} onClick={record} className="mt-3 rounded-lg bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Verify provider record and count transaction</button>
+        <button type="button" disabled={busy || !key || operator.trim().length<2 || paymentId.trim().length<1 || txid.trim().length<8 || piAppUid.trim().length<3} onClick={record} className="mt-3 rounded-lg bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Verify provider record and count transaction</button>
       </section>
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-xl border p-4"><h2 className="font-semibold">KYC-attested recipients ({data.recipients?.length||0})</h2><div className="mt-3 space-y-2">{(data.recipients||[]).map(r=><article key={r.piAppUid} className="rounded-lg bg-slate-50 p-3 text-xs"><strong>{r.piAppUid}</strong><p>{r.kycStatus} · {r.verifiedBy}</p><p className="text-slate-500">Evidence ref: {r.kycEvidenceRef}</p></article>)}</div></div>

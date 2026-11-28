@@ -56,7 +56,9 @@ export async function POST(request: Request) {
   if (!auth) {
     return NextResponse.json({ ok: false, error: "AUTH_REQUIRED" }, { status: 401 })
   }
-  const __rateLimited = await enforceUserMutationRateLimit(auth.userId, "referral/attribute:POST", 60, 60_000, { failClosed: false })
+  // Referral attribution is permanent and can lead to future economic rewards.
+  // Do not fall back to per-instance throttling if the durable limiter is down.
+  const __rateLimited = await enforceUserMutationRateLimit(auth.userId, "referral/attribute:POST", 30, 60_000, { failClosed: true })
   if (__rateLimited) return __rateLimited
   const parsedBody = await readBoundedJson(request, 16 * 1024)
   if (!parsedBody.ok) return NextResponse.json({ ok: false, error: parsedBody.error }, { status: parsedBody.error === "REQUEST_TOO_LARGE" ? 413 : 400 })

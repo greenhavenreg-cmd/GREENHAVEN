@@ -23,6 +23,7 @@ import { prefersReducedMotion } from "@/lib/ui/prefers-reduced-motion"
 import { ComposeMediaStrip, ComposeUploadProgress, ComposeDraftBanner } from "./compose-media-strip"
 import { MediaLightbox } from "./media-lightbox"
 import { DurableVideo } from "./durable-video"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 export type ComposeMode = "post" | "story"
 export type Audience = "public" | "followers" | "mutuals" | "private"
@@ -207,6 +208,7 @@ export function UnifiedCompose({ open, onOpenChange, initialMode = "post" }: Uni
   const postRequestRef = useRef<{ id: string; signature: string } | null>(null)
   const storyRequestRef = useRef<{ id: string; signature: string } | null>(null)
   const closeRef = useRef<() => void>(() => undefined)
+  const composeDialogRef = useDialogA11y<HTMLDivElement>(open, uploadProgress || isPublishing ? undefined : () => closeRef.current())
   const pendingComposeRef = useRef<{ text?: string; draftId?: string } | null>(null)
 
   const communityOptions = useMemo(
@@ -259,10 +261,6 @@ export function UnifiedCompose({ open, onOpenChange, initialMode = "post" }: Uni
     setMode("post")
     const closeComposer = () => closeRef.current()
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !uploadProgress && !isPublishing) {
-        closeComposer()
-        return
-      }
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !uploadProgress && !isPublishing) {
         e.preventDefault()
         void handlePublishRef.current?.()
@@ -865,6 +863,8 @@ export function UnifiedCompose({ open, onOpenChange, initialMode = "post" }: Uni
 
   return (
     <div
+      ref={composeDialogRef}
+      tabIndex={-1}
       className={`gh-world-compose fixed inset-0 z-[70] flex flex-col bg-background text-foreground ${prefersReducedMotion() ? "" : "animate-in fade-in duration-200"}`}
       role="dialog"
       aria-modal="true"
@@ -1090,7 +1090,7 @@ export function UnifiedCompose({ open, onOpenChange, initialMode = "post" }: Uni
             value={text}
             onChange={(e) => setText(e.target.value.slice(0, textMaxForMode(mode)))}
             placeholder={mode === "post" ? "What's on your mind?" : "Share a moment…"}
-            className="min-h-[110px] max-h-[45vh] w-full resize-y bg-transparent text-[17px] leading-relaxed text-foreground placeholder-gray-400 focus:outline-none"
+            className="min-h-[110px] max-h-[45dvh] w-full resize-y bg-transparent text-[17px] leading-relaxed text-foreground placeholder-gray-400 focus:outline-none"
             onPaste={(e) => {
               if (mode !== "post" || isPublishing) return
               const items = e.clipboardData?.items
@@ -1296,12 +1296,12 @@ export function UnifiedCompose({ open, onOpenChange, initialMode = "post" }: Uni
           {mode === "story" && storyMedia?.type === "image" && (
             <div className="relative mt-3 overflow-hidden rounded-2xl bg-black/5">
               <button type="button" onClick={() => setStoryPreviewOpen(true)} className="block w-full cursor-zoom-in" aria-label="Preview story photo full screen">
-                                <DurableImage src={storyMedia.url} alt="Story photo preview" className="max-h-[min(62vh,34rem)] w-full object-contain" />
+                                <DurableImage src={storyMedia.url} alt="Story photo preview" className="max-h-[min(62dvh,34rem)] w-full object-contain" />
                 <span className="absolute bottom-3 left-3 rounded-full bg-black/65 px-3 py-1.5 text-xs font-semibold text-white">Tap to preview</span>
               </button>
               <button
                 type="button"
-                className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-white"
+                className="gh-hit-44 absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-white"
                 onClick={() => setStoryMedia(null)}
                 aria-label="Remove story media"
               >
@@ -1315,7 +1315,7 @@ export function UnifiedCompose({ open, onOpenChange, initialMode = "post" }: Uni
                 <span>Story video preview</span>
                 <button type="button" onClick={() => setStoryMedia(null)} className="min-h-9 rounded-lg px-2 text-xs font-bold text-rose-700 hover:bg-rose-50">Remove</button>
               </div>
-              <DurableVideo src={storyMedia.url} controls playsInline muted={false} preload="none" className="max-h-[min(62vh,34rem)] w-full rounded-xl bg-black object-contain" />
+              <DurableVideo src={storyMedia.url} controls playsInline muted={false} preload="none" className="max-h-[min(62dvh,34rem)] w-full rounded-xl bg-black object-contain" />
             </div>
           )}
           <MediaLightbox

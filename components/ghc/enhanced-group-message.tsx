@@ -167,7 +167,7 @@ const ReactionPill = memo(function ReactionPill({
   onClick: () => void
 }) {
   return (
-    <button
+    <button type="button"
       onClick={onClick}
       className={`px-2 py-1 rounded-full text-sm font-medium transition-colors ${
         userReacted
@@ -290,7 +290,7 @@ const EnhancedGroupMessageComponent = ({
                   onClick={() => onReact?.(message.id, emoji)}
                 />
               ))}
-              <button
+              <button type="button"
                 onClick={() => setShowReactions(!showReactions)}
                 className="px-2 py-1 rounded-full hover:bg-muted transition-colors"
                 title="Add reaction"
@@ -304,7 +304,7 @@ const EnhancedGroupMessageComponent = ({
           {showReactions && (
             <div className="flex flex-wrap gap-1 mt-2">
               {REACTION_EMOJIS.map((emoji) => (
-                <button
+                <button type="button"
                   key={emoji}
                   onClick={() => {
                     onReact?.(message.id, emoji)
@@ -329,21 +329,21 @@ const EnhancedGroupMessageComponent = ({
               onMouseEnter={() => setShowActions(true)}
               onMouseLeave={() => setShowActions(false)}
             >
-              <button
+              <button type="button"
                 onClick={() => onReply?.(message.id)}
                 className="p-1 hover:bg-muted rounded transition-colors"
                 title="Reply"
               >
                 <Reply size={14} />
               </button>
-              <button
+              <button type="button"
                 onClick={() => onReact?.(message.id, "❤️")}
                 className="p-1 hover:bg-muted rounded transition-colors"
                 title="Like"
               >
                 <Heart size={14} />
               </button>
-              <button
+              <button type="button"
                 className="p-1 hover:bg-muted rounded transition-colors"
                 title="More options"
               >

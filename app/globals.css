@@ -1887,7 +1887,7 @@ body {
   .gh-world-compose > div { border-inline:1px solid var(--gh-ref-line); background:var(--gh-ref-surface); }
   .gh-world-compose > footer { border:1px solid var(--gh-ref-line) !important; border-radius:0 0 1.55rem 1.55rem; box-shadow:var(--gh-ref-shadow); }
   .dark .gh-world-compose > [role="tablist"], .dark .gh-world-compose > div { background:var(--card) !important; }
-  .gh-world-notifications > div:last-child { top:1rem !important; border-radius:1.55rem !important; max-height:min(86vh,46rem) !important; }
+  .gh-world-notifications > div:last-child { top:1rem !important; border-radius:1.55rem !important; max-height:min(86dvh,46rem) !important; }
   .gh-world-media-viewer > div:nth-child(2) { padding:1.25rem 2rem; }
 }
 
@@ -4045,7 +4045,7 @@ header img[alt="GreenHaven"],
   }
 }
 .gh-post-card[data-post-surface] video {
-  max-height: min(70vh, 520px);
+  max-height: min(70dvh, 520px);
   background: #000;
 }
 .gh-fb-reaction-summary {
@@ -4454,4 +4454,92 @@ body { background: var(--gh-premium-canvas); letter-spacing: -.008em; }
   [data-gh-module="wallet"] [aria-label="PI wallet actions"] > div:last-child { gap: .5rem; }
   .gh-message-bubble { max-width: min(86vw, 30rem); }
   .gh-marketplace-listing-grid { gap: .5rem; }
+}
+
+
+/* RUN453 — resilient app viewport sizing for Android WebViews and Pi Browser.
+   Keep a legacy 100vh fallback, then prefer the dynamic viewport where supported.
+   min-height:0 preserves the flex/scroll contract for nested screen panels. */
+.gh-app-shell {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  max-height: 100dvh;
+}
+@supports not (height: 100dvh) {
+  .gh-app-shell { max-height: 100vh; }
+}
+.gh-bottom-nav > div > button {
+  min-height: 3rem;
+  touch-action: manipulation;
+}
+
+/* RUN452 — consistent, non-janky vertical scrolling across app surfaces.
+   Keep native momentum and pinch zoom; avoid scripted smooth-scroll animation
+   on long lists, which can lag behind fast swipes in mobile WebViews. */
+.gh-app-shell :where(.gh-scroll-root, .gh-scroll-stable, .gh-premium-feed-scroll, [data-surface-scroll]) {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y pinch-zoom;
+  scroll-behavior: auto;
+  overflow-anchor: auto;
+  scroll-padding-block: 0.75rem;
+}
+.gh-app-shell :where(main, [data-gh-tab-panel]) { min-height: 0; }
+.gh-app-shell :where(.overflow-y-auto, [data-surface-scroll]) {
+  min-height: 0;
+  max-height: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gh-app-shell :where(.gh-scroll-root, .gh-scroll-stable, .gh-premium-feed-scroll) { scroll-behavior: auto !important; }
+}
+
+/* RUN463 — production-grade form and dialog baseline.
+   iOS/Android zoom the viewport when a focused field is under 16px, which breaks
+   fixed-position sheets and the app shell. Keep text entry at 16px on touch devices
+   (opt out per field with data-allow-small-text). */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([data-allow-small-text]),
+  select:not([data-allow-small-text]),
+  textarea:not([data-allow-small-text]) {
+    font-size: 16px !important;
+  }
+}
+
+/* Dialog panels receive programmatic focus; never draw a ring around the whole sheet. */
+[role="dialog"][tabindex="-1"]:focus,
+[role="dialog"][tabindex="-1"]:focus-visible {
+  outline: none;
+}
+
+/* Disabled money/destructive actions must look and behave disabled. */
+button:disabled,
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+/* Search inputs use type="search" for mobile keyboards; our own clear buttons replace the native one. */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
+/*
+ * Touch-target expansion (RUN468). Small icon buttons keep their visual size but get an invisible
+ * 44x44 hit area so they are reliable to tap on a phone. Positioned buttons (absolute/fixed/sticky)
+ * keep their own positioning; only static ones become the pseudo-element's containing block.
+ */
+.gh-hit-44:not(.absolute):not(.fixed):not(.sticky):not(.relative) {
+  position: relative;
+}
+.gh-hit-44::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
 }

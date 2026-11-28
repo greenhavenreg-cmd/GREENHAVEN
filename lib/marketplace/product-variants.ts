@@ -51,6 +51,19 @@ export function normalizeProductVariants(value: unknown): MarketplaceProductVari
   return output
 }
 
+/**
+ * Comma-decimal keypads type "1,5" for 1.5. A single comma followed by 1-8 digits is a decimal
+ * separator. A comma followed by exactly three digits ("1,000") is ambiguous (grouping or decimal),
+ * so it is rejected rather than guessed: a wrong guess is a 1000x price error. Anything else
+ * (several commas, a dot together with a comma) is rejected too.
+ */
+export function normalizeVariantPrice(value: string): string | null {
+  const v = String(value ?? "").trim()
+  if (!v.includes(",")) return v
+  if (v.includes(".") || !/^\d+,\d{1,8}$/.test(v) || /^\d+,\d{3}$/.test(v)) return null
+  return v.replace(",", ".")
+}
+
 /** Seller authoring format: SKU | Label | Price | Stock (one variant per line). */
 export function parseProductVariantsText(value: string, currency: string): Array<Omit<MarketplaceProductVariant, "id">> | null {
   const lines = value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
@@ -60,8 +73,9 @@ export function parseProductVariantsText(value: string, currency: string): Array
   for (const line of lines) {
     const parts = line.split("|").map((part) => part.trim())
     if (parts.length !== 4) return null
-    const [sku, label, rawPrice, rawStock] = parts
-    if (!/^\d+(?:\.\d{1,8})?$/.test(rawPrice)) return null
+    const [sku, label, typedPrice, rawStock] = parts
+    const rawPrice = normalizeVariantPrice(typedPrice)
+    if (rawPrice === null || !/^\d+(?:\.\d{1,8})?$/.test(rawPrice)) return null
     const price = Number(rawPrice)
     const stockOnHand = Number(rawStock)
     const key = sku.toLocaleLowerCase("en-US")

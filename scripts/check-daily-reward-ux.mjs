@@ -21,7 +21,7 @@ const checks = [
   ["failed claim retains retryable error state", /setError\(res\.error \|\|/.test(prompt) && /role="alert"/.test(prompt)],
   ["duplicate taps are synchronously guarded while claim is in flight", /claimInFlightRef = useRef\(false\)/.test(prompt) && /if \(claimInFlightRef\.current \|\| claiming \|\| !canAttemptClaim\) return/.test(prompt) && /claimInFlightRef\.current = true/.test(prompt) && /claimInFlightRef\.current = false/.test(prompt)],
   ["popover close control is disabled while a claim is in flight", /disabled=\{claiming\}/.test(prompt) && /aria-label="Close"/.test(prompt)],
-  ["daily claim uses canonical server endpoint and no client amount", /fetch\("\/api\/economy\/rewards\/daily"/.test(client) && /body: JSON\.stringify\(\{\}\)/.test(client)],
+  ["daily claim uses canonical server endpoint and no client amount", /(?:fetch|fetchWithTimeout)\("\/api\/economy\/rewards\/daily"/.test(client) && /body: JSON\.stringify\(\{\}\)/.test(client)],
   ["server rejects unauthenticated claim requests", /resolveAuthenticatedUser\(request\.headers\)/.test(route) && /AUTH_REQUIRED/.test(route)],
   ["server uses durable fail-closed rate limits for repeated daily claim attempts", /await checkDurableRateLimit\(`daily_claim:\$\{auth\.userId\}`, 10, 60_000, \{ onUnavailable: "deny" \}\)/.test(route)],
   ["server requires atomic durable claim RPC and fails closed", /rpcExecuteDailyClaimV12/.test(route) && /GHC_DAILY_CLAIM_MIGRATION_REQUIRED/.test(route)],

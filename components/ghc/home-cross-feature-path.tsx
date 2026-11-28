@@ -30,8 +30,8 @@ export function HomeCrossFeaturePath({ signals, onOpen }: { signals: HomeCrossFe
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary"><PrimaryIcon size={19} aria-hidden /></span>
           <span className="min-w-0 flex-1">
             <span className="mb-1 flex items-center gap-1.5">
-              <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-primary">Recommended</span>
-              <span className="text-[9px] font-semibold text-muted-foreground">Best next step</span>
+              <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-primary">Recommended</span>
+              <span className="text-[10px] font-semibold text-muted-foreground">Best next step</span>
             </span>
             <span className="block text-[13px] font-bold tracking-tight text-foreground">{primary.title}</span>
             <span className="mt-1 block text-[11px] leading-snug text-muted-foreground">{primary.detail}</span>

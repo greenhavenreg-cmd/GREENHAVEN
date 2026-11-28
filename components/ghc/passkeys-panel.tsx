@@ -27,6 +27,8 @@ export function PasskeysPanel() {
   const [supported, setSupported] = useState<boolean | null>(null)
   const [creds, setCreds] = useState<Cred[]>([])
   const [loading, setLoading] = useState(true)
+  // A failed load is not "no passkeys": keep the last known list and say it could not be refreshed.
+  const [loadFailed, setLoadFailed] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -37,10 +39,14 @@ export function PasskeysPanel() {
         credentials: "include",
       })
       const data = await res.json().catch(() => ({}))
-      if (res.ok && data.ok) setCreds(data.credentials || [])
-      else setCreds([])
+      if (res.ok && data.ok) {
+        setCreds(Array.isArray(data.credentials) ? data.credentials : [])
+        setLoadFailed(false)
+      } else {
+        setLoadFailed(true)
+      }
     } catch {
-      setCreds([])
+      setLoadFailed(true)
     } finally {
       setLoading(false)
     }
@@ -121,9 +127,27 @@ export function PasskeysPanel() {
         </p>
       ) : null}
 
+      {!loading && loadFailed && creds.length > 0 ? (
+        <p className="text-[12px] text-amber-600" role="status">
+          This list could not be refreshed and may be out of date.{" "}
+          <button type="button" onClick={() => void load()} className="font-bold underline">Try again</button>
+        </p>
+      ) : null}
+
       {loading ? (
         <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+        </div>
+      ) : creds.length === 0 && loadFailed ? (
+        <div role="alert" className="space-y-2">
+          <p className="text-[13px] text-amber-600">Your passkeys could not be loaded. This does not mean none are registered.</p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="inline-flex min-h-10 items-center rounded-full border border-border px-4 text-[12px] font-bold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+          >
+            Try again
+          </button>
         </div>
       ) : creds.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">No passkeys registered.</p>

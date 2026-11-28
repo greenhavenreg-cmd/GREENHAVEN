@@ -60,7 +60,7 @@ assert.equal(returnGuideFor({ status: "fulfilling", paymentStatus: "verified", d
 let g = returnGuideFor({ status: "fulfilling", paymentStatus: "verified", deliveryStatus: "delivered", deliveredAt: NOW - 2 * DAY, now: NOW })
 assert.equal(g.stage, "return_window"); assert.equal(g.daysLeft, RETURN_WINDOW_DAYS - 2); assert.equal(g.canOpenDispute, true)
 g = returnGuideFor({ status: "completed", paymentStatus: "verified", deliveryStatus: "completed", completedAt: NOW - 30 * DAY, now: NOW })
-assert.equal(g.stage, "window_closed"); assert.equal(g.canOpenDispute, false)
+assert.equal(g.stage, "window_closed"); assert.equal(g.canOpenDispute, false); assert.match(g.headline, /Order completed/)
 assert.equal(returnGuideFor({ status: "refunded", now: NOW }).stage, "resolved")
 assert.equal(returnGuideFor({ status: "disputed", paymentStatus: "verified", now: NOW }).canOpenDispute, false, "no second dispute while one is open")
 

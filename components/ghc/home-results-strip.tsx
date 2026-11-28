@@ -49,7 +49,7 @@ export function HomeResultsStrip({
                 </div>
                 <ArrowRight size={14} className="mb-0.5 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" aria-hidden />
               </div>
-              <p className="mt-0.5 line-clamp-1 text-[9px] leading-snug text-muted-foreground">{metric.detail}</p>
+              <p className="mt-0.5 line-clamp-1 text-[10px] leading-snug text-muted-foreground">{metric.detail}</p>
             </button>
           )
         })}

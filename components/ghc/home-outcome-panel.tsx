@@ -82,7 +82,7 @@ export function HomeOutcomePanel({
                     <span className={`flex h-6 w-6 items-center justify-center rounded-lg ${step.done ? "bg-emerald-600 text-white" : active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
                       {step.done ? <Check size={13} aria-hidden /> : <Icon size={13} aria-hidden />}
                     </span>
-                    <span className="line-clamp-1 text-[9px] font-bold text-foreground">
+                    <span className="line-clamp-1 text-[10px] font-bold text-foreground">
                       {step.id === "profile" ? "Identity" : step.id === "discover" ? "Discover" : step.id === "connect" ? "Connect" : "Participate"}
                     </span>
                   </button>

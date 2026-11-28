@@ -729,9 +729,9 @@ function EnhancedPostCardInner({
 
       {editingPost && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label="Edit post">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[1.25rem] border border-border/50 bg-card p-5 shadow-2xl">
+          <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-[1.25rem] border border-border/50 bg-card p-5 shadow-2xl">
             <h2 className="text-lg font-bold text-foreground">Edit post</h2>
-            <textarea
+            <textarea aria-label="Update your post…"
               autoFocus
               value={draftContent}
               onChange={(event) => setDraftContent(event.target.value)}
@@ -748,7 +748,7 @@ function EnhancedPostCardInner({
                                             <DurableImage loading="lazy" src={url} alt="" className="h-full w-full object-cover" />
                       <button
                         type="button"
-                        className="absolute right-0 top-0 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                        className="gh-hit-44 absolute right-0 top-0 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 before:absolute before:-inset-2.5 before:content-[''] text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                         aria-label="Remove image"
                         onClick={() => setDraftImages((prev) => prev.filter((u) => u !== url))}
                       >

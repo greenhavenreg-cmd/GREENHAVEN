@@ -75,7 +75,7 @@ export function ComposeMediaStrip({
                 </span>
                 <button
                   type="button"
-                  className="absolute right-1.5 top-1.5 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/75 text-white shadow transition hover:bg-black"
+                  className="gh-hit-44 absolute right-1.5 top-1.5 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/75 text-white shadow transition hover:bg-black"
                   onClick={() => onRemoveImage(i)}
                   aria-label={`Remove photo ${i + 1}`}
                 >

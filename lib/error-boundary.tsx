@@ -13,6 +13,37 @@ interface ErrorBoundaryProps {
   onDismiss?: () => void
 }
 
+/**
+ * A failed dynamic import (stale deployment, dropped connection in Pi Browser) is cached by
+ * React.lazy, so re-rendering can never succeed. Only a full reload recovers.
+ */
+export function isChunkLoadError(error: unknown): boolean {
+  const text = `${(error as Error | null)?.name ?? ""} ${(error as Error | null)?.message ?? ""}`.toLowerCase()
+  return (
+    text.includes("chunkloaderror") ||
+    text.includes("loading chunk") ||
+    text.includes("loading css chunk") ||
+    text.includes("failed to fetch dynamically imported module") ||
+    text.includes("error loading dynamically imported module") ||
+    text.includes("importing a module script failed")
+  )
+}
+
+const CHUNK_RELOAD_KEY = "gh:chunk-reload-at"
+
+/** Reloads at most once per 30s so a persistent outage cannot cause a reload loop. */
+function reloadForChunkError(): boolean {
+  try {
+    const last = Number(window.sessionStorage.getItem(CHUNK_RELOAD_KEY) || 0)
+    if (Date.now() - last < 30_000) return false
+    window.sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()))
+  } catch {
+    /* storage unavailable: still allow one reload attempt */
+  }
+  window.location.reload()
+  return true
+}
+
 export class ErrorBoundary extends React.Component<
   ErrorBoundaryProps,
   { hasError: boolean; error: Error | null; autoRetried: boolean }
@@ -31,6 +62,11 @@ export class ErrorBoundary extends React.Component<
       componentStack: errorInfo?.componentStack?.slice(0, 400),
     })
     // One soft auto-retry for transient first-paint / HMR / race issues
+    if (isChunkLoadError(error)) {
+      // Reload once automatically; if that was already tried, the user sees the manual reload button.
+      reloadForChunkError()
+      return
+    }
     if (!this.state.autoRetried) {
       const msg = (error?.message || "").toLowerCase()
       const transient =
@@ -53,6 +89,15 @@ export class ErrorBoundary extends React.Component<
   }
 
   retry = () => {
+    if (isChunkLoadError(this.state.error)) {
+      try {
+        window.sessionStorage.removeItem(CHUNK_RELOAD_KEY)
+      } catch {
+        /* */
+      }
+      window.location.reload()
+      return
+    }
     this.setState({ hasError: false, error: null, autoRetried: false })
     try {
       this.props.onRetry?.()
@@ -67,7 +112,9 @@ export class ErrorBoundary extends React.Component<
         return this.props.fallback(this.state.error!, this.retry)
       }
 
-      const friendly = toUserFacingError(this.state.error)
+      const friendly = isChunkLoadError(this.state.error)
+        ? { title: "A new version is available", message: "This screen could not load, usually because of a weak connection or a recent update. Reload to continue." }
+        : toUserFacingError(this.state.error)
       const section = this.props.label ? `${this.props.label} needs a refresh` : friendly.title
 
       return (
@@ -99,8 +146,8 @@ export class ErrorBoundary extends React.Component<
               onClick={this.retry}
               className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-700"
             >
-              <RefreshCw size={16} />
-              Try again
+              <RefreshCw size={16} aria-hidden="true" />
+              {isChunkLoadError(this.state.error) ? "Reload app" : "Try again"}
             </button>
             {this.props.onDismiss && (
               <button

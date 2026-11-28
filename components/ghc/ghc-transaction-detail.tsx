@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react"
 import { GhcCoinIcon } from "./ghc-coin-icon"
 import type { GhcTransaction } from "@/lib/domains/economy-types"
 import { navigateGhcActivityTarget, resolveGhcActivityAttribution } from "@/lib/domains/ghc-activity-attribution"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 const KIND_LABELS: Record<string, string> = {
   earned: "Activity credit",
@@ -127,6 +128,7 @@ export function GhcTransactionDetail({ tx, open, onClose }: GhcTransactionDetail
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [open, onClose])
+  const dialogRef = useDialogA11y<HTMLDivElement>(Boolean(open && tx), onClose)
   if (!open || !tx) return null
 
   const positive = Number.isFinite(tx.amount) && tx.amount >= 0
@@ -190,16 +192,16 @@ export function GhcTransactionDetail({ tx, open, onClose }: GhcTransactionDetail
   return (
     <div
       className="gh-world-transaction fixed inset-0 z-[88] flex items-end justify-center bg-black/45 sm:items-center sm:p-4"
-      role="dialog"
+      ref={dialogRef} tabIndex={-1} role="dialog"
       aria-modal="true"
       aria-label="Transaction details"
     >
       <button type="button" className="absolute inset-0" aria-label="Close" onClick={onClose} />
-      <div className="relative z-[1] flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[1.45rem] border border-border bg-card shadow-2xl sm:rounded-[1.45rem]">
+      <div className="relative z-[1] flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[1.45rem] border border-border bg-card shadow-2xl sm:rounded-[1.45rem]">
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">
           <button
             type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
+            className="gh-hit-44 flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
             onClick={onClose}
             aria-label="Back"
           >
@@ -209,7 +211,7 @@ export function GhcTransactionDetail({ tx, open, onClose }: GhcTransactionDetail
             <p className="text-sm font-bold text-foreground">Transaction</p>
             <p className="text-[11px] text-muted-foreground">{kindLabel}</p>
           </div>
-          <button type="button" className="rounded-full p-2 hover:bg-muted" onClick={onClose} aria-label="Close">
+          <button type="button" className="-m-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-muted" onClick={onClose} aria-label="Close">
             <X size={16} />
           </button>
         </div>

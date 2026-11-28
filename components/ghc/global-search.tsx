@@ -20,6 +20,8 @@ import { navigateTo, openCommunity, openChat } from "@/lib/navigation/navigate"
 import { openListing } from "@/lib/marketplace/commerce-actions"
 import { piLocalGet, piLocalSet } from "@/lib/pi-local-storage"
 import { POST_SYNC_EVENT, readPostSyncDetail } from "@/lib/social/post-sync"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
+import { onTablistKeyDown } from "@/lib/ui/tablist-keys"
 
 type SearchTab = "all" | "people" | "creators" | "posts" | "videos" | "communities" | "events" | "activities" | "services" | "ids"
 
@@ -97,6 +99,9 @@ export function GlobalSearchModal({
   const [serverVideos, setServerVideos] = useState<Array<{ id?: string; content?: string; authorName?: string; video?: string | null }>>([])
   const [serverCreators, setServerCreators] = useState<Array<{ userId?: string; displayName?: string; bio?: string }>>([])
   const [serverOk, setServerOk] = useState(false)
+  // Server search lifecycle: an in-flight or failed request must not read as "no results".
+  const [serverStatus, setServerStatus] = useState<"idle" | "loading" | "ready" | "failed">("idle")
+  const [searchRetry, setSearchRetry] = useState(0)
   const requestGen = useRef(0)
   const [resultGen, setResultGen] = useState<number>(0)
 
@@ -131,6 +136,7 @@ export function GlobalSearchModal({
 
   useEffect(() => {
     if (!open || debouncedQuery.length < 2) {
+      setServerStatus("idle")
       setServerOk(false)
       setServerPeople([])
       setServerPosts([])
@@ -149,6 +155,7 @@ export function GlobalSearchModal({
               ? "videos"
               : "all"
     const ac = new AbortController()
+    setServerStatus("loading")
     void (async () => {
       try {
         const res = await fetch(
@@ -163,8 +170,10 @@ export function GlobalSearchModal({
           videos?: typeof serverVideos
           creators?: typeof serverCreators
         }
+        if (ac.signal.aborted) return
         if (!res.ok || !data.ok || !data.durable) {
           setServerOk(false)
+          setServerStatus("failed")
           return
         }
         setServerPeople(Array.isArray(data.people) ? data.people : [])
@@ -172,12 +181,16 @@ export function GlobalSearchModal({
         setServerVideos(Array.isArray(data.videos) ? data.videos : [])
         setServerCreators(Array.isArray(data.creators) ? data.creators : [])
         setServerOk(true)
+        setServerStatus("ready")
       } catch {
-        if (!ac.signal.aborted) setServerOk(false)
+        if (!ac.signal.aborted) {
+          setServerOk(false)
+          setServerStatus("failed")
+        }
       }
     })()
     return () => ac.abort()
-  }, [open, debouncedQuery, tab])
+  }, [open, debouncedQuery, tab, searchRetry])
 
   useEffect(() => {
     if (open) void loadRecentAsync().then(setRecent)
@@ -363,6 +376,7 @@ export function GlobalSearchModal({
     [commitRecent, debouncedQuery, onClose],
   )
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, onClose)
   if (!open) return null
 
   const showPeople = tab === "all" || tab === "people"
@@ -391,7 +405,17 @@ export function GlobalSearchModal({
     .sort((a, b) => b[1] - a[1])[0]
   const resultOutcome = !q
     ? null
-    : totalResults > 0
+    : totalResults === 0 && serverStatus === "loading"
+      ? {
+          title: "Searching GreenHaven…",
+          detail: "Checking people, posts and communities you are allowed to see.",
+        }
+      : totalResults === 0 && serverStatus === "failed"
+        ? {
+            title: "Network search is unavailable",
+            detail: "Only matches already on this device can be shown right now. Check your connection and try again.",
+          }
+        : totalResults > 0
       ? {
           title: `${totalResults} relevant result${totalResults === 1 ? "" : "s"} found`,
           detail: leadingResult ? `${leadingResult[1]} in ${leadingResult[0]}. Use the categories to narrow the result set without losing your search.` : "Use the categories to narrow your search.",
@@ -416,8 +440,11 @@ export function GlobalSearchModal({
     <button
       key={t}
       type="button"
+      role="tab"
+      aria-selected={tab === t}
+      tabIndex={tab === t ? 0 : -1}
       onClick={() => setSearchTab(t)}
-      className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold capitalize transition ${
+      className={`min-h-9 shrink-0 rounded-full px-3 py-1.5 text-xs font-bold capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
         tab === t ? "bg-emerald-600 text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"
       }`}
     >
@@ -426,13 +453,15 @@ export function GlobalSearchModal({
   )
 
   return (
-    <div className="fixed inset-0 z-[80] flex flex-col bg-black/40" role="dialog" aria-modal="true" aria-label="Search">
+    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-[80] flex flex-col bg-black/40" role="dialog" aria-modal="true" aria-label="Search">
       <button type="button" className="absolute inset-0 cursor-default" aria-label="Close search" onClick={onClose} />
       <div className="relative z-10 flex max-h-[82dvh] min-h-0 flex-col overflow-hidden rounded-b-[1.25rem] bg-card text-foreground shadow-2xl sm:mx-auto sm:mt-8 sm:max-h-[85dvh] sm:w-full sm:max-w-lg sm:rounded-[1.5rem]">
         <div className="flex items-center gap-2 border-b border-border px-3 py-3">
           <Search size={18} className="shrink-0 text-muted-foreground" />
           <input
             autoFocus
+            type="search"
+            enterKeyHint="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="People, GH-XXXXXX, posts, communities, marketplace…"
@@ -453,7 +482,7 @@ export function GlobalSearchModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-2 text-muted-foreground hover:bg-muted"
+            className="-m-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
             aria-label="Close search"
           >
             <X size={18} />
@@ -463,7 +492,7 @@ export function GlobalSearchModal({
         <div className="flex items-center gap-2 border-b border-border/60 px-3 pt-2 text-[10px] font-semibold text-muted-foreground">
           <SlidersHorizontal size={12} /> Search across GreenHaven
         </div>
-        <div className="flex gap-1 overflow-x-auto border-b border-border/60 px-3 py-2 scrollbar-hide">
+        <div className="flex gap-1 overflow-x-auto border-b border-border/60 px-3 py-2 scrollbar-hide" role="tablist" aria-label="Search categories" onKeyDown={onTablistKeyDown}>
           {tabBtn("all", "All")}
           {tabBtn("people", "People")}
           {tabBtn("creators", "Creators")}
@@ -518,7 +547,7 @@ export function GlobalSearchModal({
           )}
 
           {q && !stale && resultOutcome && (
-            <section className="mb-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-3" aria-label="Search outcome">
+            <section className="mb-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-3" aria-label="Search outcome" aria-live="polite">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
                   <Search size={16} />
@@ -540,7 +569,29 @@ export function GlobalSearchModal({
             </section>
           )}
 
-          {q && !hasAny && !stale && (
+          {q && !hasAny && !stale && serverStatus === "loading" && (
+            <div className="py-8 text-center" role="status" aria-live="polite">
+              <p className="text-sm font-semibold">Searching for “{debouncedQuery}”…</p>
+            </div>
+          )}
+
+          {q && !hasAny && !stale && serverStatus === "failed" && (
+            <div className="py-8 text-center" role="alert">
+              <p className="text-sm font-semibold">Search is unavailable right now</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Nothing on this device matches “{debouncedQuery}”. This is not the same as no results.
+              </p>
+              <button
+                type="button"
+                onClick={() => setSearchRetry((n) => n + 1)}
+                className="mt-3 inline-flex min-h-10 items-center rounded-full border border-border/70 bg-card px-4 text-xs font-bold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+
+          {q && !hasAny && !stale && serverStatus !== "loading" && serverStatus !== "failed" && (
             <div className="py-8 text-center">
               <p className="text-sm font-semibold">No results for “{debouncedQuery}”</p>
               <p className="mt-1 text-xs text-muted-foreground">

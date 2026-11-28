@@ -13,6 +13,7 @@ import {
   socialListPostViewers,
   socialListStoryViewers,
 } from "@/lib/social/client"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 export type RosterKind = "likes" | "upvotes" | "downvotes" | "viewers" | "story_viewers"
 
@@ -129,10 +130,11 @@ export function EngagementRosterSheet({
     }
   }, [open, kind, postId, storyId])
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, onClose)
   if (!open) return null
 
   return (
-    <div
+    <div ref={dialogRef} tabIndex={-1}
       className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
@@ -140,7 +142,7 @@ export function EngagementRosterSheet({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[70vh] w-full max-w-md flex-col rounded-t-2xl bg-background shadow-xl sm:rounded-2xl"
+        className="flex max-h-[70dvh] w-full max-w-md flex-col rounded-t-2xl bg-background shadow-xl sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">

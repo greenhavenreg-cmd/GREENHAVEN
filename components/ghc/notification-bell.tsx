@@ -13,6 +13,7 @@ import { useGHC } from "@/contexts/ghc-context"
 import { IdentityService } from "@/lib/identity/identity-service"
 import { useSectionRefresh } from "@/hooks/use-section-refresh"
 import { onCloseTransientUI, dispatchCloseTransientUI } from "@/lib/transient-ui"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 import {
   Bell,
   X,
@@ -58,8 +59,15 @@ import {
 import { buildAttentionSignals, resolvePrimaryAttention, type AttentionSignal } from "@/lib/unified-attention"
 import { AttentionCommandCard } from "@/components/ghc/attention-command-card"
 import { FilterSummary } from "@/components/ghc/filtering/filter-summary"
+import { onTablistKeyDown } from "@/lib/ui/tablist-keys"
+import { DATE_BUCKET_LABEL, dateBucketOf } from "@/lib/ui/date-buckets"
+import { plural } from "@/lib/ui/plural"
+
 import { isPriorityNotification, sortNotificationsByPriority, assessNotificationPriority } from "@/lib/notification-priority"
 import { resolveNotificationActions } from "@/lib/notification-actions"
+
+/** Notification threads mounted per page in the bell list. */
+const THREAD_PAGE_SIZE = 30
 
 const ICON: Partial<Record<NotificationType, React.ReactNode>> = {
   like: <Heart size={15} className="text-rose-500" />,
@@ -141,6 +149,8 @@ export function NotificationBell({
   const [identityUserId, setIdentityUserId] = useState(() => IdentityService.getCurrentUserId())
   const [items, setItems] = useState<Notification[]>([])
   const [unread, setUnread] = useState<number>(0)
+  const [markingAll, setMarkingAll] = useState(false)
+  const markAllInFlightRef = useRef(false)
   const [bucket, setBucket] = useState<NotificationCenterBucket>("all")
   const [readFilter, setReadFilter] = useState<"all" | "unread" | "priority">(() => {
     if (typeof window === "undefined") return "priority"
@@ -161,8 +171,10 @@ export function NotificationBell({
   const refreshQueuedRef = useRef(false)
   const refreshGenerationRef = useRef(0)
   const activeRefreshControllerRef = useRef<AbortController | null>(null)
-  const dialogRef = useRef<HTMLDivElement | null>(null)
-  const previousFocusRef = useRef<HTMLElement | null>(null)
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, () => {
+    setOpen(false)
+    try { dispatchCloseTransientUI({ reason: "notification-escape" }) } catch { /* */ }
+  })
   const ghc = useGHC() as { blockedUsers?: string[]; mutedUsers?: string[] }
   const blockedKey = Array.isArray(ghc.blockedUsers) ? ghc.blockedUsers.join("|") : ""
   const mutedKey = Array.isArray(ghc.mutedUsers) ? ghc.mutedUsers.join("|") : ""
@@ -554,44 +566,6 @@ export function NotificationBell({
     }
   }, [])
 
-  useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-      const frame = window.requestAnimationFrame(() => {
-        const first = dialogRef.current?.querySelector<HTMLElement>(
-          '[data-dialog-initial-focus], button:not([disabled]):not([data-dialog-dismiss]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        )
-        first?.focus()
-      })
-      return () => window.cancelAnimationFrame(frame)
-    }
-    previousFocusRef.current?.focus?.()
-    return
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        setOpen(false)
-        try { dispatchCloseTransientUI({ reason: "notification-escape" }) } catch { /* */ }
-        return
-      }
-      if (e.key !== "Tab" || !dialogRef.current) return
-      const focusable = (Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled]):not([data-dialog-dismiss]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      )) as HTMLElement[]).filter((element) => element.offsetParent !== null)
-      if (!focusable.length) { e.preventDefault(); return }
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [open])
-
   const attentionSignals = useMemo(() => buildAttentionSignals(items), [items])
   const primaryAttention = useMemo(() => resolvePrimaryAttention(attentionSignals), [attentionSignals])
   const openAttention = useCallback((signal: AttentionSignal) => {
@@ -622,6 +596,13 @@ export function NotificationBell({
     return counts
   }, [items])
   const threads = useMemo(() => groupNotificationsIntoThreads(filtered), [filtered])
+  // Render the list progressively so a long history does not mount hundreds of rows at once.
+  const [visibleThreadCount, setVisibleThreadCount] = useState(THREAD_PAGE_SIZE)
+  useEffect(() => {
+    setVisibleThreadCount(THREAD_PAGE_SIZE)
+  }, [bucket, readFilter])
+  const visibleThreads = useMemo(() => threads.slice(0, visibleThreadCount), [threads, visibleThreadCount])
+  const hiddenThreadCount = Math.max(0, threads.length - visibleThreads.length)
   const expanded = useMemo(
     () => (expandedId ? filtered.find((x) => x.id === expandedId) || null : null),
     [expandedId, filtered],
@@ -677,7 +658,7 @@ export function NotificationBell({
         setItems((prev) => prev.map((item) => item.id === n.id ? { ...item, read: false } : item))
         if (!n.read) setUnread((count) => count + 1)
         setFailedActionId(n.id)
-        setStatusMsg("Could not save this read state. Please retry.")
+        setStatusMsg(t("readStateSaveFailed"))
       })
       return
     }
@@ -721,9 +702,9 @@ export function NotificationBell({
           setItems((prev) => prev.map((item) => item.id === n.id ? { ...item, read: false } : item))
           if (!n.read) setUnread((count) => count + 1)
           setFailedActionId(n.id)
-          setStatusMsg("Could not save this read state. Please retry.")
+          setStatusMsg(t("readStateSaveFailed"))
         } else if (responses.slice(1).some((response) => !response?.ok)) {
-          setStatusMsg("Read state saved. Legacy notification sync will retry on refresh.")
+          setStatusMsg(t("readStateSavedLegacy"))
         }
         window.dispatchEvent(new CustomEvent("ghc:notifications-read"))
       })
@@ -766,18 +747,20 @@ export function NotificationBell({
       setExpandedId(null)
       setThreadKey(null)
     }
-    setStatusMsg("Notification hidden on this device")
+    setStatusMsg(t("hiddenOnDevice"))
     window.setTimeout(() => setStatusMsg(null), 2000)
     window.setTimeout(() => refresh(), 300)
   }
 
   const markAll = async () => {
+    // Single-flight: a second tap while the four stores are being written must not fire duplicate writes.
+    if (markAllInFlightRef.current) return
+    markAllInFlightRef.current = true
+    setMarkingAll(true)
+    try {
     try { notificationSystem.markAllAsRead?.() } catch { /* */ }
     setItems((prev) => prev.map((x) => ({ ...x, read: true })))
     setUnread(0)
-    try {
-      window.dispatchEvent(new CustomEvent("ghc:notifications-changed", { detail: { unread: 0 } }))
-    } catch { /* */ }
     const legacyEconomyIds: string[] = Array.from(new Set<string>(items.flatMap((item): string[] => {
       const data = (item.data || {}) as { sourceStore?: string; sourceType?: string }
       if (data.sourceStore !== "economy" && !(data.sourceStore === "unified" && data.sourceType === "economy")) return []
@@ -802,17 +785,26 @@ export function NotificationBell({
       }).catch(() => null),
     ])
     const failed = results.some((response) => !response || !response.ok)
-    window.dispatchEvent(new CustomEvent("ghc:notifications-read"))
-    setStatusMsg(failed ? "Some alerts could not be marked read. Please retry." : "Marked all as read")
     if (!failed) {
-      window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "All notifications marked read", type: "success" } }))
+      // Only a confirmed server write clears the app-level attention badge. After a failure the
+      // badge must keep counting, so signal a change (re-poll) instead of "read".
+      window.dispatchEvent(new CustomEvent("ghc:notifications-read"))
     } else {
-      // Reconcile optimistic local state with durable stores after partial failure.
-      refresh()
+      window.dispatchEvent(new CustomEvent("ghc:notifications-changed", { detail: { reason: "mark-all-failed" } }))
+    }
+    setStatusMsg(failed ? t("markAllReadFailed") : t("markedAllRead"))
+    if (!failed) {
+      window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: t("allNotificationsMarkedRead"), type: "success" } }))
+    } else {
+      window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: t("markAllReadFailed"), type: "error" } }))
     }
     window.setTimeout(() => setStatusMsg(null), 2500)
-    // refresh() queues behind an active poll and runs again after that poll settles.
+    // Reconcile optimistic local state with the durable stores (queues behind an active poll).
     refresh()
+    } finally {
+      markAllInFlightRef.current = false
+      setMarkingAll(false)
+    }
   }
 
 
@@ -829,7 +821,7 @@ export function NotificationBell({
       >
         <Bell size={20} strokeWidth={2.1} className="text-amber-500 dark:text-amber-300" />
         {unread > 0 ? (
-          <span aria-hidden="true" className="absolute right-0 top-0 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-extrabold text-white ring-2 ring-background">
+          <span aria-hidden="true" className="absolute right-0 top-0 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-extrabold text-white ring-2 ring-background">
             {unread > 99 ? "99+" : unread}
           </span>
         ) : null}
@@ -837,7 +829,7 @@ export function NotificationBell({
 
       {open && typeof document !== "undefined"
         ? createPortal(
-        <div ref={dialogRef} className="gh-world-notifications fixed inset-0 z-[200] isolate" data-gh-module="notifications" role="dialog" aria-modal="true" aria-label={t("notifications")}>
+        <div ref={dialogRef} tabIndex={-1} className="gh-world-notifications fixed inset-0 z-[200] isolate" data-gh-module="notifications" role="dialog" aria-modal="true" aria-label={t("notifications")}>
           <button type="button" data-dialog-dismiss="true" className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" aria-label={t("closeNotifications")} onClick={closePanel} />
           <div className="absolute inset-0 flex flex-col bg-background sm:inset-x-auto sm:left-1/2 sm:top-0 sm:h-full sm:w-full sm:max-w-[28rem] sm:-translate-x-1/2 sm:border-x sm:border-border sm:shadow-2xl">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border/50 bg-background/95 px-4 py-3.5 backdrop-blur-xl">
@@ -862,7 +854,9 @@ export function NotificationBell({
                   <button
                     type="button"
                     onClick={markAll}
-                    className="inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300"
+                    disabled={markingAll}
+                    aria-busy={markingAll}
+                    className="inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 dark:text-emerald-300"
                   >
                     <CheckCheck size={14} /> {t("markAllRead")}
                   </button>
@@ -870,7 +864,7 @@ export function NotificationBell({
                 <button
                   type="button"
                   onClick={closePanel}
-                  className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
+                  className="gh-hit-44 flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
                   aria-label={t("closeNotifications")}
                   data-dialog-initial-focus="true"
                 >
@@ -898,13 +892,14 @@ export function NotificationBell({
                 className="flex rounded-2xl bg-muted/70 p-1"
                 role="tablist"
                 aria-label={t("notificationFocus")}
+                onKeyDown={onTablistKeyDown}
               >
                 {([
                   { id: "all" as const, label: t("all") },
                   {
                     id: "unread" as const,
                     label:
-                      unread > 0 ? `Unread · ${unread > 99 ? "99+" : unread}` : "Unread",
+                      unread > 0 ? t("unreadWithCount", { count: unread > 99 ? "99+" : unread }) : t("unread"),
                   },
                   { id: "priority" as const, label: t("priority") },
                 ]).map((mode) => {
@@ -915,6 +910,7 @@ export function NotificationBell({
                       type="button"
                       role="tab"
                       aria-selected={active}
+                      tabIndex={active ? 0 : -1}
                       onClick={() => {
                         setReadFilter(mode.id)
                         try { window.sessionStorage.setItem(`ghc.notif.focus:${encodeURIComponent(identityUserId)}`, mode.id) } catch { /* */ }
@@ -947,24 +943,7 @@ export function NotificationBell({
               className="flex gap-1.5 overflow-x-auto border-b border-border/50 px-3 py-2.5 scrollbar-hide"
               role="tablist"
               aria-label={t("notificationCategories")}
-              onKeyDown={(e) => {
-                const ids = NOTIFICATION_CENTER_BUCKETS.map((b) => b.id as NotificationCenterBucket)
-                const idx = ids.indexOf(bucket)
-                if (idx < 0) return
-                if (e.key === "ArrowRight") {
-                  e.preventDefault()
-                  setBucket(ids[(idx + 1) % ids.length])
-                } else if (e.key === "ArrowLeft") {
-                  e.preventDefault()
-                  setBucket(ids[(idx - 1 + ids.length) % ids.length])
-                } else if (e.key === "Home") {
-                  e.preventDefault()
-                  setBucket(ids[0])
-                } else if (e.key === "End") {
-                  e.preventDefault()
-                  setBucket(ids[ids.length - 1])
-                }
-              }}
+              onKeyDown={onTablistKeyDown}
             >
               {NOTIFICATION_CENTER_BUCKETS.map((b) => {
                 const active = bucket === b.id
@@ -1084,7 +1063,7 @@ export function NotificationBell({
                               </p>
                             ) : null
                           })()}
-                          <div className="mt-3 flex flex-wrap gap-2" aria-label="Notification actions">
+                          <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t("notificationActions")}>
                             {resolveNotificationActions(expanded, { retryAvailable: failedActionId === expanded.id }).map((action) => (
                               <button
                                 key={action.id}
@@ -1144,11 +1123,22 @@ export function NotificationBell({
                     </ul>
                   </div>
                 ) : (
-                <ul className="divide-y divide-border" role="list" aria-label="Notification list">
-                  {threads.map((th) => {
+                <ul className="divide-y divide-border" role="list" aria-label={t("notificationList")}>
+                  {visibleThreads.map((th, threadIndex) => {
                     const n = th.latest
+                    // Date headers only when the list is chronological (Priority mode is ranked by signal).
+                    const threadBucket = readFilter === "priority" ? null : dateBucketOf(n.timestamp, liveNow)
+                    const previousThread = threadIndex > 0 ? visibleThreads[threadIndex - 1] : null
+                    const previousBucket =
+                      previousThread && readFilter !== "priority" ? dateBucketOf(previousThread.latest.timestamp, liveNow) : null
+                    const showDateHeader = threadBucket !== null && threadBucket !== previousBucket
                     return (
                     <li key={th.channelKey}>
+                      {showDateHeader && threadBucket ? (
+                        <p className="sticky top-0 z-[1] border-b border-border/60 bg-card/95 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground backdrop-blur">
+                          {DATE_BUCKET_LABEL[threadBucket]}
+                        </p>
+                      ) : null}
                       <div className="group flex w-full items-stretch gap-1 transition hover:bg-muted/45">
                       <button
                         type="button"
@@ -1193,7 +1183,7 @@ export function NotificationBell({
                         onClick={() => onTap(n)}
                         aria-label={`Notification details and history for ${n.title}`}
                         title="Details and history"
-                        className="mr-2 mt-3 flex h-9 w-9 shrink-0 items-center justify-center self-start rounded-full text-muted-foreground opacity-70 transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary/40 sm:opacity-0 sm:group-hover:opacity-100"
+                        className="gh-hit-44 mr-2 mt-3 flex h-9 w-9 shrink-0 items-center justify-center self-start rounded-full text-muted-foreground opacity-70 transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary/40 sm:opacity-0 sm:group-hover:opacity-100"
                       >
                         <MoreHorizontal size={17} />
                       </button>
@@ -1201,6 +1191,17 @@ export function NotificationBell({
                     </li>
                     )
                   })}
+                  {hiddenThreadCount > 0 ? (
+                    <li className="px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => setVisibleThreadCount((count) => count + THREAD_PAGE_SIZE)}
+                        className="min-h-11 w-full rounded-2xl border border-border bg-card px-4 text-[13px] font-semibold text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      >
+                        Show {Math.min(THREAD_PAGE_SIZE, hiddenThreadCount)} more · {plural(hiddenThreadCount, "conversation")} hidden
+                      </button>
+                    </li>
+                  ) : null}
                 </ul>
               )}
             </div>

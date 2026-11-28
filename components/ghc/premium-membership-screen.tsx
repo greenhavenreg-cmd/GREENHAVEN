@@ -1,8 +1,10 @@
 "use client"
 
+import { fetchWithTimeout } from "@/lib/client/fetch-timeout"
 import { MembershipScreenSkeleton } from "@/components/ghc/skeleton-loaders"
 
 import { useState, useEffect, useRef } from "react"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 import {
   ArrowLeft,
   Check,
@@ -284,6 +286,9 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
 
   const [confirmTier, setConfirmTier] = useState<Exclude<MembershipTierId, "free"> | null>(null)
   const [successStatus, setSuccessStatus] = useState<MembershipStatus | null>(null)
+  const confirmDialogRef = useDialogA11y<HTMLDivElement>(Boolean(confirmTier), busy ? undefined : () => setConfirmTier(null))
+  const successDialogOpen = Boolean(successStatus && (successStatus.tier === "vip" || successStatus.tier === "vvip"))
+  const successDialogRef = useDialogA11y<HTMLDivElement>(successDialogOpen, () => setSuccessStatus(null))
   const [expandedPlanBenefits, setExpandedPlanBenefits] = useState<Record<string, boolean>>({})
   const [membershipLifecycle, setMembershipLifecycle] = useState<Array<{
     id?: string
@@ -299,6 +304,7 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
   const lifecycleRequestRef = useRef<AbortController | null>(null)
   const lifecycleRequestSequenceRef = useRef(0)
   const [refreshing, setRefreshing] = useState(false)
+  const purchaseInFlightRef = useRef(false)
   /** Authoritative status from /api/membership/status */
   const [serverStatus, setServerStatus] = useState<MembershipStatus | null>(null)
   const [serverStatusState, setServerStatusState] = useState<
@@ -619,8 +625,9 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
         const { IdentityService } = await import("@/lib/identity/identity-service")
         Object.assign(headers, IdentityService.getAuthHeaders?.() || {})
       } catch { /* */ }
-      const res = await fetch("/api/membership/reconcile", {
+      const res = await fetchWithTimeout("/api/membership/reconcile", {
         method: "POST",
+        timeoutMs: 25_000,
         credentials: "include",
         headers,
       })
@@ -760,12 +767,20 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
       return
     }
     if (tier === "free" || tier === currentTier) return
-    setStatusMsg(method === "pi" ? "Opening Pi payment…" : "Processing GHC membership…")
-    if (method === "pi") {
-      await purchaseWithPiCoin(tier)
-      return
+    // One membership purchase at a time across BOTH payment methods: a π and a GHC
+    // purchase for the same account must never overlap (duplicate-charge protection).
+    if (purchaseInFlightRef.current) return
+    purchaseInFlightRef.current = true
+    try {
+      setStatusMsg(method === "pi" ? "Opening Pi payment…" : "Processing GHC membership…")
+      if (method === "pi") {
+        await purchaseWithPiCoin(tier)
+        return
+      }
+      await purchaseWithGhcCoin(tier)
+    } finally {
+      purchaseInFlightRef.current = false
     }
-    await purchaseWithGhcCoin(tier)
   }
 
   // Close success sheet on back navigation cleanup
@@ -785,24 +800,13 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
     }
   }, [])
 
-  useEffect(() => {
-    if (!confirmTier && !successStatus) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return
-      if (confirmTier) setConfirmTier(null)
-      else if (successStatus) setSuccessStatus(null)
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [confirmTier, successStatus])
-
   return (
     <div id="gh-membership-root" className="gh-world-membership gh-membership-shell relative flex h-full min-h-0 flex-col bg-background text-foreground" data-gh-module="membership">
       <header className="gh-page-header-slim flex shrink-0 items-center gap-2 border-b border-border/50 bg-card/95 px-2.5 py-1 backdrop-blur-md">
         <button
           type="button"
           onClick={onBack}
-          className="gh-icon-btn flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
+          className="gh-hit-44 gh-icon-btn flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
           aria-label="Back"
         >
           <ArrowLeft size={18} />
@@ -1224,7 +1228,7 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
                     >
                       {MEMBERSHIP_PLANS[t].label}
                       {membershipAuthorityReady && currentTier === t ? (
-                        <span className="mt-0.5 block text-[9px] font-semibold uppercase">You</span>
+                        <span className="mt-0.5 block text-[10px] font-semibold uppercase">You</span>
                       ) : null}
                     </th>
                   ))}
@@ -1258,7 +1262,7 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
               activeCount={Number(planTierFilter !== "all") + Number(Boolean(planSearch.trim()))}
               persistentContent={<label className="relative block">
                 <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden />
-                <input type="search" value={planSearch} onChange={(event) => setPlanSearch(event.target.value)} placeholder="Search benefits, tools or tier…" aria-label="Search membership plans and benefits" className="min-h-10 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-emerald-600/40" />
+                <input type="search" enterKeyHint="search" value={planSearch} onChange={(event) => setPlanSearch(event.target.value)} placeholder="Search benefits, tools or tier…" aria-label="Search membership plans and benefits" className="min-h-10 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-emerald-600/40" />
               </label>}
             >
               <div className="flex flex-wrap gap-1.5" role="group" aria-label="Membership tier filter">
@@ -1510,8 +1514,8 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
 
       {/* Honest confirm — no countdown / fake scarcity */}
       {confirmTier && (
-        <div className="absolute inset-0 z-40 flex items-end bg-black/40 sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Confirm membership">
-          <div className="w-full max-w-md rounded-t-[1.25rem] border border-border/50 bg-card p-5 shadow-2xl sm:rounded-[1.25rem]">
+        <div ref={confirmDialogRef} tabIndex={-1} className="absolute inset-0 z-40 flex items-end bg-black/40 sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Confirm membership">
+          <div className="max-h-[92dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-[1.25rem] border border-border/50 bg-card p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-[1.25rem]">
             <h3 className="text-base font-bold text-foreground">
               Confirm {MEMBERSHIP_PLANS[confirmTier].label}
             </h3>
@@ -1551,7 +1555,8 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
               {isPiPaymentsAvailable() ? (
                 <button
                   type="button"
-                  disabled={isOffline || (busy?.tier === confirmTier && busy?.method === "pi")}
+                  disabled={isOffline || Boolean(busy)}
+                  aria-busy={busy?.tier === confirmTier && busy?.method === "pi"}
                   onClick={() => void purchase(confirmTier, "pi")}
                   className="gh-btn gh-btn-primary flex min-h-11 w-full items-center justify-center gap-2 disabled:pointer-events-none disabled:opacity-60"
                 >
@@ -1567,7 +1572,8 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
               )}
               <button
                 type="button"
-                disabled={isOffline || (busy?.tier === confirmTier && busy?.method === "ghc")}
+                disabled={isOffline || Boolean(busy)}
+                aria-busy={busy?.tier === confirmTier && busy?.method === "ghc"}
                 onClick={() => void purchase(confirmTier, "ghc")}
                 className="gh-btn gh-btn-secondary flex min-h-11 w-full items-center justify-center gap-2 disabled:pointer-events-none disabled:opacity-60"
               >
@@ -1579,7 +1585,8 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
               <button
                 type="button"
                 onClick={() => setConfirmTier(null)}
-                className="gh-btn gh-btn-secondary w-full"
+                disabled={Boolean(busy)}
+                className="gh-btn gh-btn-secondary min-h-11 w-full disabled:opacity-60"
               >
                 Cancel
               </button>
@@ -1595,6 +1602,8 @@ export function PremiumMembershipScreen({ onBack }: { onBack: () => void }) {
       {successStatus &&
         (successStatus.tier === "vip" || successStatus.tier === "vvip") && (
         <div
+          ref={successDialogRef}
+          tabIndex={-1}
           className="absolute inset-0 z-50 flex items-end bg-black/45 sm:items-center sm:justify-center"
           role="dialog"
           aria-modal="true"

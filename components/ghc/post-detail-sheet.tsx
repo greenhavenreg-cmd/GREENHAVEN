@@ -7,6 +7,7 @@ import type { Post } from "@/lib/ghc-types"
 import { timeAgo } from "@/lib/ghc-data"
 import { LazyImage } from "./lazy-image"
 import { downloadMedia } from "@/lib/media/download-media"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 const REACTION_EMOJI: Record<string, string> = {
   like: "❤️", love: "😍", support: "💪", inspire: "✨", insight: "💡", celebrate: "🎉",
@@ -78,10 +79,11 @@ export function PostDetailSheet({
     }
   }, [open, onClose])
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(Boolean(open && post), onClose)
   if (!open || !post) return null
 
   return (
-    <div className="fixed inset-0 z-[84] flex items-end justify-center bg-black/60 backdrop-blur-[2px] sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={`Full post by ${post.authorName}`} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-[84] flex items-end justify-center bg-black/60 backdrop-blur-[2px] sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={`Full post by ${post.authorName}`} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <section className="relative flex max-h-[94dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl border border-border/60 bg-card shadow-2xl sm:max-h-[90dvh] sm:rounded-3xl">
         <header className="flex shrink-0 items-center justify-between border-b border-border/50 px-4 py-3">
           <div className="min-w-0">
@@ -124,7 +126,7 @@ export function PostDetailSheet({
             >
               <LazyImage variant="post-media" src={media[mediaIndex] || media[0]} alt={`Post media ${mediaIndex + 1}`} className="max-h-[65dvh] w-full object-contain" />
             </button>
-            {media.length > 1 ? <div className="flex items-center justify-center gap-2 bg-black px-3 py-2">{media.map((url, index) => <button key={`${url}-${index}`} type="button" onClick={() => setMediaIndex(index)} aria-label={`View image ${index + 1}`} aria-pressed={index === mediaIndex} className={`h-2.5 w-2.5 rounded-full ${index === mediaIndex ? "bg-white" : "bg-white/35"}`} />)}<span className="ml-1 text-[11px] text-white/70">{mediaIndex + 1} of {media.length}</span></div> : null}
+            {media.length > 1 ? <div className="flex items-center justify-center gap-2 bg-black px-3 py-2">{media.map((url, index) => <button key={`${url}-${index}`} type="button" onClick={() => setMediaIndex(index)} aria-label={`View image ${index + 1}`} aria-pressed={index === mediaIndex} className={`gh-hit-44 h-2.5 w-2.5 rounded-full ${index === mediaIndex ? "bg-white" : "bg-white/35"}`} />)}<span className="ml-1 text-[11px] text-white/70">{mediaIndex + 1} of {media.length}</span></div> : null}
           </div> : null}
           {post.pdf ? <a href={post.pdf} target="_blank" rel="noopener noreferrer" className="mx-4 my-3 flex items-center gap-2 rounded-xl border border-border p-3 text-sm font-semibold text-foreground"><ImageIcon size={18} />{post.pdfName || "Open attached document"}</a> : null}
           <div className="mx-4 mt-3 rounded-2xl border border-border/60 bg-muted/25 p-3">

@@ -6,7 +6,10 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react"
 import { IdentityService } from "@/lib/identity/identity-service"
+import { fetchWithTimeout } from "@/lib/client/fetch-timeout"
+import { sanitizeAmountInput } from "@/lib/wallet/amount-input"
 import {
+  GHC_INPUT_DECIMALS,
   floorGhc,
   ghcInputMessage,
   ghcToPiPreview,
@@ -68,6 +71,9 @@ export function WithdrawGhcPanel() {
   const [success, setSuccess] = useState<string | null>(null)
   /** Stable across retries of the same submit; rotated only after success */
   const idempotencyKeyRef = useRef(newWithdrawalIdempotencyKey())
+  /** Payload the current key was issued for; a changed amount/wallet must never reuse the key. */
+  const idempotencyPayloadRef = useRef<string>("")
+  const submittingRef = useRef(false)
 
   const lastQuoteRef = useRef<Quote | null>(null)
   const lastItemsRef = useRef<WdRequest[]>([])
@@ -78,13 +84,14 @@ export function WithdrawGhcPanel() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/economy/withdrawals", {
+      const res = await fetchWithTimeout("/api/economy/withdrawals", {
         credentials: "include",
         headers: {
           Accept: "application/json",
           ...IdentityService.getAuthHeaders(),
         },
         cache: "no-store",
+        timeoutMs: 15_000,
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || data.ok === false) {
@@ -146,8 +153,10 @@ export function WithdrawGhcPanel() {
   const amountError = ghcAmount.trim() && !parsed.ok ? ghcInputMessage(parsed.code) : null
   const overWithdrawable = parsed.ok && quote ? amountNum > maxGhc : false
   const minPi = quote?.minPi ?? 100
+  const walletLooksInvalid = wallet.trim().length > 0 && !looksLikePiWalletAddress(wallet)
 
   const submit = async () => {
+    if (submittingRef.current) return
     if (!quote?.eligible) return
     if (!parsed.ok) {
       setError(ghcInputMessage(parsed.code))
@@ -169,12 +178,20 @@ export function WithdrawGhcPanel() {
       setError("Confirm the Pi wallet address")
       return
     }
+    const payloadSignature = `${amountNum}|${wallet.trim()}`
+    if (idempotencyPayloadRef.current && idempotencyPayloadRef.current !== payloadSignature) {
+      // Different amount or destination: this is a new request, not a retry.
+      idempotencyKeyRef.current = newWithdrawalIdempotencyKey()
+    }
+    idempotencyPayloadRef.current = payloadSignature
+    submittingRef.current = true
     setBusy(true)
     setError(null)
     setSuccess(null)
     try {
-      const res = await fetch("/api/economy/withdrawals", {
+      const res = await fetchWithTimeout("/api/economy/withdrawals", {
         method: "POST",
+        timeoutMs: 25_000,
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
@@ -194,6 +211,7 @@ export function WithdrawGhcPanel() {
       }
       // New key only after accepted request so double-click / retry stays idempotent
       idempotencyKeyRef.current = newWithdrawalIdempotencyKey()
+      idempotencyPayloadRef.current = ""
       setSuccess(
         data.message ||
           "Withdrawal request created. Pi is not sent instantly — GreenHaven will process settlement."
@@ -201,12 +219,21 @@ export function WithdrawGhcPanel() {
       setGhcAmount("")
       setConfirmWallet(false)
       await load()
-    } catch {
-      setError("Network error")
+    } catch (cause) {
+      // A timed-out request may have been accepted. The idempotency key is
+      // intentionally kept, so retrying cannot create a second withdrawal.
+      setError(
+        cause instanceof DOMException && cause.name === "AbortError"
+          ? "This is taking longer than expected. Your request may already be recorded — check your withdrawal history before trying again."
+          : "Network error. Check your connection and retry; your request will not be duplicated."
+      )
     } finally {
+      submittingRef.current = false
       setBusy(false)
     }
   }
+
+  const hasPendingRequest = items.some((w) => /pending|review|queued|processing|requested/i.test(String(w.status)))
 
   return (
     <section
@@ -298,20 +325,23 @@ export function WithdrawGhcPanel() {
                 Max · {maxGhc.toFixed(2)}
               </button>
             </span>
-            <input
+            <input aria-label="0.00"
               type="text"
               inputMode="decimal"
               autoComplete="off"
               spellCheck={false}
               value={ghcAmount}
-              onChange={(e) => setGhcAmount(e.target.value.replace(/[^\d.,]/g, ""))}
+              onChange={(e) => setGhcAmount(sanitizeAmountInput(e.target.value, GHC_INPUT_DECIMALS))}
               aria-invalid={amountError || overWithdrawable ? true : undefined}
-              className="mt-1 w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm text-foreground"
+              aria-describedby={amountError || overWithdrawable ? "wd-amount-error" : undefined}
+              disabled={busy}
+              enterKeyHint="next"
+              className="mt-1 min-h-11 w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-base text-foreground disabled:opacity-60"
               placeholder="0.00"
             />
           </label>
           {amountError || overWithdrawable ? (
-            <p className="text-[11px] text-red-600 dark:text-red-400" role="alert">
+            <p id="wd-amount-error" className="text-[11px] text-red-600 dark:text-red-400" role="alert">
               {amountError ?? `Only ${maxGhc.toFixed(2)} GHC is withdrawable. Locked GHC stays in your wallet.`}
             </p>
           ) : null}
@@ -328,23 +358,42 @@ export function WithdrawGhcPanel() {
                 setWallet(e.target.value)
                 setConfirmWallet(false)
               }}
-              className="mt-1 w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm text-foreground"
+              aria-invalid={walletLooksInvalid ? true : undefined}
+              aria-describedby={walletLooksInvalid ? "wd-wallet-error" : undefined}
+              disabled={busy}
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="done"
+              className="mt-1 min-h-11 w-full rounded-xl border border-border/60 bg-background px-3 py-2 font-mono text-base text-foreground disabled:opacity-60"
               placeholder="Paste Pi wallet address"
               autoComplete="off"
             />
           </label>
+          {walletLooksInvalid ? (
+            <p id="wd-wallet-error" className="text-[11px] text-red-600 dark:text-red-400" role="alert">
+              Pi wallet addresses are 56 characters and start with G. Check for missing or extra characters.
+            </p>
+          ) : null}
+          {hasPendingRequest ? (
+            <p className="rounded-lg bg-muted/50 px-2.5 py-1.5 text-[11px] text-muted-foreground" role="status">
+              You already have a request in review. A new request is separate and will be reviewed on its own.
+            </p>
+          ) : null}
           <label className="flex items-start gap-2 text-[12px] text-foreground">
             <input
               type="checkbox"
               checked={confirmWallet}
               onChange={(e) => setConfirmWallet(e.target.checked)}
-              className="mt-0.5"
+              disabled={busy}
+              className="mt-0.5 h-5 w-5 shrink-0"
             />
             I confirm this Pi address is correct. Pi is not sent instantly.
           </label>
           <button
             type="button"
-            disabled={busy || !parsed.ok || overWithdrawable}
+            disabled={busy || !parsed.ok || overWithdrawable || walletLooksInvalid || !confirmWallet}
+            aria-busy={busy}
             onClick={() => void submit()}
             className="w-full min-h-11 rounded-xl bg-emerald-600 text-sm font-semibold text-white disabled:opacity-50"
           >

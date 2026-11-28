@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { AlertCircle } from "lucide-react"
 import type { GlobalInteractionRequest } from "@/lib/ui/global-interactions"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 export function GlobalInteractionDialog() {
   const [request, setRequest] = useState<GlobalInteractionRequest | null>(null)
@@ -34,6 +35,14 @@ export function GlobalInteractionDialog() {
     if (request) requestAnimationFrame(() => inputRef.current?.focus())
   }, [request])
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(Boolean(request), () => {
+    if (!request) return
+    const resolver = request.resolve as (value: boolean | string | null) => void
+    resolver(request.kind === "prompt" ? null : false)
+    setRequest(null)
+    setValue("")
+  })
+
   if (!request) return null
 
   const close = (result: boolean | string | null) => {
@@ -52,7 +61,7 @@ export function GlobalInteractionDialog() {
   return (
     <div className="fixed inset-0 z-[260] flex items-end justify-center bg-black/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" role="presentation">
       <button type="button" aria-label="Close dialog" className="absolute inset-0 cursor-default" onClick={() => close(isPrompt ? null : false)} />
-      <div role="dialog" aria-modal="true" aria-labelledby="gh-global-dialog-title" className="relative w-full max-w-md rounded-t-[1.75rem] border border-border bg-card p-5 text-card-foreground shadow-2xl sm:rounded-[1.75rem] sm:p-6">
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="gh-global-dialog-title" className="relative w-full max-w-md rounded-t-[1.75rem] border border-border bg-card p-5 text-card-foreground shadow-2xl sm:rounded-[1.75rem] sm:p-6">
         <div className="flex items-start gap-3">
           {danger ? <AlertCircle size={22} className="mt-0.5 shrink-0 text-destructive" /> : null}
           <div className="min-w-0 flex-1">
@@ -62,8 +71,8 @@ export function GlobalInteractionDialog() {
         </div>
         {isPrompt ? (
           <div className="mt-5">
-            <label className="mb-2 block text-xs font-semibold text-muted-foreground">{isPrompt ? request.label || "Value" : "Value"}</label>
-            <input
+            <label htmlFor="gh-global-dialog-input" className="mb-2 block text-xs font-semibold text-muted-foreground">{isPrompt ? request.label || "Value" : "Value"}</label>
+            <input id="gh-global-dialog-input"
               ref={inputRef}
               type={isPrompt ? request.inputType || "text" : "text"}
               value={value}

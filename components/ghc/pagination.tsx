@@ -34,9 +34,10 @@ export function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage
       </div>
 
       <div className="flex items-center gap-1">
-        <button
+        <button type="button"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
+          aria-label="Previous page"
           className="min-h-11 min-w-11 rounded-2xl p-2 transition hover:bg-muted disabled:opacity-50"
         >
           <ChevronLeft size={18} />
@@ -44,7 +45,7 @@ export function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage
 
         {start > 1 && (
           <>
-            <button onClick={() => onPageChange(1)} className="min-h-11 min-w-11 rounded-2xl px-3 py-2 transition hover:bg-muted">
+            <button type="button" onClick={() => onPageChange(1)} className="min-h-11 min-w-11 rounded-2xl px-3 py-2 transition hover:bg-muted">
               1
             </button>
             {start > 2 && <span className="px-2">...</span>}
@@ -52,7 +53,7 @@ export function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage
         )}
 
         {pageNumbers.map((page) => (
-          <button
+          <button type="button"
             key={page}
             onClick={() => onPageChange(page)}
             className={`min-h-11 min-w-11 rounded-2xl px-3 py-2 transition ${
@@ -66,15 +67,16 @@ export function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage
         {end < totalPages && (
           <>
             {end < totalPages - 1 && <span className="px-2">...</span>}
-            <button onClick={() => onPageChange(totalPages)} className="min-h-11 min-w-11 rounded-2xl px-3 py-2 transition hover:bg-muted">
+            <button type="button" onClick={() => onPageChange(totalPages)} className="min-h-11 min-w-11 rounded-2xl px-3 py-2 transition hover:bg-muted">
               {totalPages}
             </button>
           </>
         )}
 
-        <button
+        <button type="button"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
+          aria-label="Next page"
           className="min-h-11 min-w-11 rounded-2xl p-2 transition hover:bg-muted disabled:opacity-50"
         >
           <ChevronRight size={18} />

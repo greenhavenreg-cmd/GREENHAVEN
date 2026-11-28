@@ -50,7 +50,7 @@ export function HomeJourneyCard({ journey }: { journey: { steps: JourneyStep[]; 
                   <span className={`flex h-7 w-7 items-center justify-center rounded-xl ${step.done ? "bg-emerald-600 text-white" : active ? "bg-emerald-600/10 text-emerald-700 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
                     {step.done ? <Check size={14} aria-hidden /> : <Icon size={14} aria-hidden />}
                   </span>
-                  <span className="line-clamp-1 text-[9px] font-bold text-foreground">{step.title.replace("Complete your identity", "Identity").replace("Discover your interests", "Discover").replace("Build your circle", "Connect").replace("Take part", "Participate")}</span>
+                  <span className="line-clamp-1 text-[10px] font-bold text-foreground">{step.title.replace("Complete your identity", "Identity").replace("Discover your interests", "Discover").replace("Build your circle", "Connect").replace("Take part", "Participate")}</span>
                 </button>
               </li>
             )

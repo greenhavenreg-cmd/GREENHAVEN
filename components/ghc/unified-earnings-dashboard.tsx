@@ -440,7 +440,10 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
 
   const [releaseBusy, setReleaseBusy] = useState(false)
   const [releaseStatus, setReleaseStatus] = useState<string | null>(null)
+  const releaseInFlightRef = useRef(false)
   const onReleaseReservedEarnings = async () => {
+    if (releaseInFlightRef.current) return
+    releaseInFlightRef.current = true
     setReleaseBusy(true)
     setReleaseStatus(null)
     try {
@@ -456,6 +459,7 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
     } catch {
       setReleaseStatus("Could not contact server.")
     } finally {
+      releaseInFlightRef.current = false
       setReleaseBusy(false)
     }
   }
@@ -687,7 +691,7 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
         <button
           type="button"
           onClick={() => void refresh()}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+          className="gh-hit-44 inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
           aria-label="Refresh Pi balance"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -710,14 +714,14 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
                       : "Wallet address permission required"}
             </p>
           </div>
-          <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-bold ${snap.walletAuthorization?.walletAddressSource === "provider_payment" || snap.walletAuthorization?.walletAddressSource === "platform_api" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200" : snap.walletAuthorization?.walletAddressSource === "pi_sdk_scope" ? "bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-200" : "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"}`}>
+          <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${snap.walletAuthorization?.walletAddressSource === "provider_payment" || snap.walletAuthorization?.walletAddressSource === "platform_api" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200" : snap.walletAuthorization?.walletAddressSource === "pi_sdk_scope" ? "bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-200" : "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"}`}>
             {walletAuthLoading ? "Checking" : snap.walletAuthorization?.walletAddressSource === "provider_payment" ? "Provider-confirmed" : snap.walletAuthorization?.walletAddressSource === "platform_api" ? "Pi API" : snap.walletAuthorization?.walletAddressSource === "pi_sdk_scope" ? "Pi SDK" : snap.walletAuthorization?.authorizationActive === true ? "Permission verified" : "Reconnect"}
           </span>
         </div>
         {snap.walletAuthorization?.piWalletAddress ? (
           <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-background/80 px-2.5 py-2">
             <div className="min-w-0">
-              <p className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">Pi wallet address</p>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pi wallet address</p>
               <p className="mt-0.5 break-all font-mono text-[11px] font-semibold text-foreground" data-pi-wallet-address>
                 {`${snap.walletAuthorization.piWalletAddress.slice(0, 7)}…${snap.walletAuthorization.piWalletAddress.slice(-6)}`}
               </p>
@@ -746,11 +750,11 @@ export function UnifiedEarningsDashboard({ compact = false }: { compact?: boolea
           </p>
         )}
         {snap.walletAuthorization?.walletAddressVerifiedAt ? (
-          <p className="mt-1.5 text-[9px] text-muted-foreground">
+          <p className="mt-1.5 text-[10px] text-muted-foreground">
             Last verified: {new Date(snap.walletAuthorization.walletAddressVerifiedAt).toLocaleString()}
           </p>
         ) : null}
-        <p className="mt-2 text-[9px] leading-relaxed text-muted-foreground">
+        <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
           A2U payouts are addressed by Pi's app-specific user ID. This public address is reported by Pi for that same authenticated account; it is not a manually entered payout destination. GreenHaven checks the provider's actual `to_address` against it before submission and settlement.
         </p>
       </div>

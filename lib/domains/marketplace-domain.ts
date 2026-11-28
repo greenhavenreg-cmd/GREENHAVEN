@@ -80,8 +80,15 @@ export interface MarketplaceOrder {
   updatedAt: number
   confirmedAt?: number
   fulfilledAt?: number
+  deliveredAt?: number
+  buyerConfirmedAt?: number
+  sellerConfirmedAt?: number
   completedAt?: number
   cancelledAt?: number
+  disputeReason?: string
+  cancellationReason?: string
+  buyerNote?: string
+  sellerNote?: string
   notes?: string
   /** Payment is separate — never auto-complete on payment request alone */
   paymentStatus?: "none" | "requested" | "pending" | "held" | "captured" | "verified" | "refunded"

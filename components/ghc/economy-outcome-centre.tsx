@@ -52,7 +52,7 @@ export function EconomyOutcomeCentre({
         <button type="button" onClick={run} className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-2xl bg-emerald-700 px-4 text-[12px] font-black text-white shadow-sm transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 active:scale-[0.99]">
           {next.cta}<ArrowRight size={15} aria-hidden />
         </button>
-        <p className="mt-2 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{next.kicker} · GHC and Pi remain separate rails</p>
+        <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{next.kicker} · GHC and Pi remain separate rails</p>
       </div>
     </section>
   )
@@ -60,5 +60,5 @@ export function EconomyOutcomeCentre({
 
 function Metric({ label, value }: { label: string; value: number }) {
   const safe = Number.isFinite(value) ? value : 0
-  return <div className="rounded-2xl border border-border/60 bg-card/80 px-2.5 py-2.5"><p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-0.5 truncate text-[12px] font-black tabular-nums text-foreground">₲ {safe.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p></div>
+  return <div className="rounded-2xl border border-border/60 bg-card/80 px-2.5 py-2.5"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-0.5 truncate text-[12px] font-black tabular-nums text-foreground">₲ {safe.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p></div>
 }

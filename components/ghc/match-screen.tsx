@@ -39,6 +39,7 @@ import { CollapsingAppHeader } from "./collapsing-app-header"
 import { PremiumSurfaceActions } from "./premium-surface-actions"
 import { FilterPanel } from "./filtering/filter-panel"
 import { FilterSummary } from "./filtering/filter-summary"
+import { plural } from "@/lib/ui/plural"
 
 export function MatchScreen() {
   useSectionRefresh("discover", () => {
@@ -389,14 +390,14 @@ export function MatchScreen() {
             persistentContent={<label className="relative block">
               <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden />
               <input
-                type="search"
+                type="search" enterKeyHint="search"
                 value={matchSearchQuery}
                 onChange={(event) => setMatchSearchQuery(event.target.value)}
                 placeholder="Search matches by name, location or interests…"
                 aria-label="Search matches by name, location or interests"
                 className="min-h-10 w-full rounded-xl border border-border bg-background py-2 pl-9 pr-10 text-sm text-foreground outline-none transition focus:border-primary/40 focus-visible:ring-2 focus-visible:ring-primary/20"
               />
-              {matchSearchQuery ? <button type="button" onClick={() => setMatchSearchQuery("")} className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Clear match search"><X size={14} aria-hidden /></button> : null}
+              {matchSearchQuery ? <button type="button" onClick={() => setMatchSearchQuery("")} className="gh-hit-44 absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Clear match search"><X size={14} aria-hidden /></button> : null}
             </label>}
           >
             <MatchTabs
@@ -449,15 +450,15 @@ export function MatchScreen() {
           </div>
           <div className="mt-3 grid grid-cols-3 gap-2">
             <div className="rounded-xl bg-muted/35 px-2.5 py-2.5">
-              <div className="flex items-center gap-1.5 text-muted-foreground"><Heart size={12} /><span className="text-[9px] font-bold uppercase tracking-wide">Matches</span></div>
+              <div className="flex items-center gap-1.5 text-muted-foreground"><Heart size={12} /><span className="text-[10px] font-bold uppercase tracking-wide">Matches</span></div>
               <p className="mt-1 text-lg font-black leading-none text-foreground">{baseAll.length}</p>
             </div>
             <button type="button" onClick={() => setActiveTab("likes_you")} className="rounded-xl bg-muted/35 px-2.5 py-2.5 text-left transition hover:bg-muted/60">
-              <div className="flex items-center gap-1.5 text-muted-foreground"><Compass size={12} /><span className="text-[9px] font-bold uppercase tracking-wide">Likes you</span></div>
+              <div className="flex items-center gap-1.5 text-muted-foreground"><Compass size={12} /><span className="text-[10px] font-bold uppercase tracking-wide">Likes you</span></div>
               <p className="mt-1 text-lg font-black leading-none text-foreground">{likesYouRows.length}</p>
             </button>
             <button type="button" onClick={() => setShowRequestInbox(true)} className="rounded-xl bg-muted/35 px-2.5 py-2.5 text-left transition hover:bg-muted/60">
-              <div className="flex items-center gap-1.5 text-muted-foreground"><UserPlus size={12} /><span className="text-[9px] font-bold uppercase tracking-wide">Requests</span></div>
+              <div className="flex items-center gap-1.5 text-muted-foreground"><UserPlus size={12} /><span className="text-[10px] font-bold uppercase tracking-wide">Requests</span></div>
               <p className="mt-1 text-[11px] font-extrabold leading-tight text-foreground">Review</p>
             </button>
           </div>
@@ -502,7 +503,7 @@ export function MatchScreen() {
           ) : (
             <div className="flex flex-col gap-3 px-4 pb-6 pt-4" role="list" aria-label="People who liked you">
               <p className="text-[11px] font-medium text-muted-foreground">
-                {filteredLikesYouRows.length} people liked you · like back to Match
+                {plural(filteredLikesYouRows.length, "person", "people")} liked you · like back to Match
               </p>
               {filteredLikesYouRows.map((row) => (
                 <div

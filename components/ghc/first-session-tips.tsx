@@ -85,7 +85,7 @@ export function FirstSessionTips({
         <button
           type="button"
           onClick={dismiss}
-          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
           aria-label="Dismiss tips"
         >
           <X size={16} />

@@ -3,6 +3,7 @@
  * Safe Pioneer-authenticated quality status. No private calibration, no vote weights, no GHC.
  */
 import { NextResponse } from "next/server"
+import { canViewSocialPost } from "@/lib/server/social/post-visibility"
 import { requireAccountSecurityContext } from "@/lib/server/identity/auth-integrity"
 import { socialDbConfigured, socialRpc } from "@/lib/server/social/rpc"
 
@@ -17,9 +18,13 @@ export async function GET(
   if (!access.ok) return access.response
   const { id } = await ctx.params
   const postId = String(id || "").trim()
-  if (!postId || postId.length > 128) {
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(postId)) {
     return NextResponse.json({ ok: false, error: "INVALID_ID" }, { status: 400 })
   }
+  // Review status and reward amounts follow the post's own visibility rules.
+  const canView = await canViewSocialPost(access.auth.userId, postId)
+  if (canView === null) return NextResponse.json({ ok: false, error: "POST_VISIBILITY_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store" } })
+  if (!canView) return NextResponse.json({ ok: false, error: "POST_NOT_FOUND" }, { status: 404, headers: { "Cache-Control": "no-store" } })
   if (!socialDbConfigured()) {
     return NextResponse.json({
       ok: true,

@@ -8,6 +8,7 @@
 import { useMemo, useState } from "react"
 import { X, Trophy, Target, Flame, Sparkles } from "lucide-react"
 import { useGHC } from "@/contexts/ghc-context"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 const TEMPLATES = [
   {
@@ -71,6 +72,7 @@ export function ChallengeComposer({
 
   const tpl = useMemo(() => TEMPLATES.find((t) => t.id === templateId) || TEMPLATES[0], [templateId])
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, () => onOpenChange(false))
   if (!open) return null
 
   const publish = async () => {
@@ -130,7 +132,7 @@ export function ChallengeComposer({
   }
 
   return (
-    <div className="fixed inset-0 z-[90] flex flex-col bg-background" role="dialog" aria-modal="true" aria-label="Create challenge">
+    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-[90] flex flex-col bg-background" role="dialog" aria-modal="true" aria-label="Create challenge">
       <header className="flex items-center justify-between border-b border-border px-3 py-2.5">
         <button type="button" onClick={() => onOpenChange(false)} className="rounded-full p-2 hover:bg-muted" aria-label="Close">
           <X size={20} />
@@ -173,13 +175,13 @@ export function ChallengeComposer({
         </div>
         {templateId === "custom" ? (
           <div className="space-y-2">
-            <input
+            <input aria-label="Challenge title"
               value={customTitle}
               onChange={(e) => setCustomTitle(e.target.value.slice(0, 80))}
               placeholder="Challenge title"
               className="min-h-11 w-full rounded-xl border border-border bg-card px-3 text-sm"
             />
-            <textarea
+            <textarea aria-label="What should people do?"
               value={customBlurb}
               onChange={(e) => setCustomBlurb(e.target.value.slice(0, 240))}
               placeholder="What should people do?"

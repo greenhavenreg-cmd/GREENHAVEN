@@ -166,7 +166,7 @@ const SuggestedGroupsCardComponent = ({
 
       {/* Quick action buttons - optimized for mobile */}
       <div className="flex gap-2 pt-1">
-        <button
+        <button type="button"
           onClick={handleJoinClick}
           disabled={hasJoined || isJoining}
           className={`px-3 py-2.5 text-xs font-bold rounded-lg transition-all active:scale-95 flex-1 flex items-center justify-center gap-1.5 ${
@@ -182,7 +182,7 @@ const SuggestedGroupsCardComponent = ({
           {hasJoined ? "Joined" : isJoining ? "Joining..." : "Join Now"}
         </button>
 
-        <button
+        <button type="button"
           onClick={() => onView(groupId)}
           className="px-3 py-2.5 text-xs font-bold border-2 border-border/80 rounded-lg hover:border-gray-400 hover:bg-muted/40 transition-all active:scale-95 text-foreground/90 flex-1"
           aria-label={`Open ${groupName}`}

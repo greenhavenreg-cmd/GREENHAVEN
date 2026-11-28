@@ -3,6 +3,7 @@ import { resolveAuthenticatedUser } from "@/lib/server/economy/auth"
 import { readGhcServerEnv } from "@/lib/server/economy/env"
 import { checkDurableRateLimit } from "@/lib/server/security/control-plane"
 import { nonDurableWriteResponse } from "@/lib/server/production-guard"
+import { supabaseRest, supabaseRpc } from "@/lib/server/supabase/rest-client"
 import { emitSocialNotification } from "@/lib/server/social/notifications"
 import { readBoundedJson } from "@/lib/server/http/read-bounded-json"
 import { humanizeRelationshipError, sanitizeTargetUserId } from "@/lib/server/social/relationship-integrity"
@@ -57,54 +58,32 @@ export async function POST(req: Request) {
       return NextResponse.json(nd.body, { status: nd.status })
     }
 
-    const res = await fetch(
-      `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_match_signal_upsert`,
-      {
-        method: "POST",
-        headers: {
-          apikey: env.supabaseServiceRoleKey,
-          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          p_from_user_id: auth.userId,
-          p_to_user_id: safeTarget,
-          p_signal: signal,
-        }),
-      }
-    )
+    const upsert = await supabaseRpc("ghc_match_signal_upsert", {
+      p_from_user_id: auth.userId,
+      p_to_user_id: safeTarget,
+      p_signal: signal,
+    }, { timeoutMs: 10_000 })
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => "")
+    if (!upsert.ok) {
       const nd = nonDurableWriteResponse("Match signal", {
-        extra: { message: "RPC_UNAVAILABLE", detail: text.slice(0, 200) },
+        extra: { message: "RPC_UNAVAILABLE", detail: upsert.error },
       })
       return NextResponse.json(nd.body, { status: nd.status })
     }
 
-    const row = await res.json().catch(() => null)
+    const row = upsert.data
 
-    // Detect mutual interest (they liked us + we like them)
+    // Detect mutual interest (they liked us + we like them). A failed lookup degrades to
+    // "not mutual" rather than failing a signal that was already stored.
     let mutual = false
     if (signal === "like" || signal === "superlike") {
-      const base = env.supabaseUrl.replace(/\/$/, "")
-      const q =
-        `${base}/rest/v1/ghc_match_signals` +
-        `?from_user_id=eq.${encodeURIComponent(safeTarget)}` +
-        `&to_user_id=eq.${encodeURIComponent(auth.userId)}` +
-        `&signal=in.(like,superlike)&select=id&limit=1`
-      const peer = await fetch(q, {
-        headers: {
-          apikey: env.supabaseServiceRoleKey,
-          Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
-          Accept: "application/json",
-        },
-        cache: "no-store",
-      })
-      if (peer.ok) {
-        const rows = (await peer.json().catch(() => [])) as unknown[]
-        mutual = Array.isArray(rows) && rows.length > 0
-      }
+      const peer = await supabaseRest<unknown[]>(
+        `ghc_match_signals?from_user_id=eq.${encodeURIComponent(safeTarget)}` +
+          `&to_user_id=eq.${encodeURIComponent(auth.userId)}` +
+          `&signal=in.(like,superlike)&select=id&limit=1`,
+        { timeoutMs: 8_000 },
+      )
+      mutual = peer.ok && Array.isArray(peer.data) && peer.data.length > 0
     }
 
     // Phase 8: notify peer of interest / mutual match

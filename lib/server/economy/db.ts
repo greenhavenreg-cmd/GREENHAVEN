@@ -491,9 +491,10 @@ export async function rpcListMaturedDailyClaimHolds(
   cutoff: Date,
   env: GhcServerEnv = readGhcServerEnv()
 ): Promise<Array<{ id: string; amount: number; createdAt: number; metadata: Record<string, unknown> }> | null> {
-  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null
+  if (!env.supabaseUrl || !env.supabaseServiceRoleKey || !userId?.trim() || userId.length > 160
+    || !(cutoff instanceof Date) || !Number.isFinite(cutoff.getTime())) return null
   const params = new URLSearchParams({
-    select: "id,amount,created_at,metadata",
+    select: "id,user_id,amount,created_at,metadata",
     user_id: `eq.${userId}`,
     status: "eq.pending",
     source_event: "eq.DAILY_CLAIM_V12",
@@ -509,14 +510,30 @@ export async function rpcListMaturedDailyClaimHolds(
     )
     if (!restResult.ok) return null
     const rows = (Array.isArray(restResult.data) ? restResult.data : []) as Array<Record<string, unknown>>
+    // The service-role query is already owner-filtered; verify the returned rows
+    // again before allowing their identifiers to reach a claim RPC. A malformed
+    // or cross-account row makes the whole read unavailable rather than silently
+    // shrinking the candidate set and presenting a partial reconciliation.
+    if (rows.length > 100 || rows.some((row) => {
+      if (!row || typeof row !== "object" || Array.isArray(row)) return true
+      const id = typeof row.id === "string" ? row.id.trim() : ""
+      const amount = Number(row.amount)
+      const createdAt = typeof row.created_at === "string" ? Date.parse(row.created_at) : Number.NaN
+      const metadata = row.metadata
+      return !id || id.length > 160 || /[\u0000-\u001f\u007f]/.test(id)
+        || String(row.user_id || "") !== userId
+        || !Number.isFinite(amount) || amount <= 0
+        || !Number.isFinite(createdAt)
+        || (metadata != null && (typeof metadata !== "object" || Array.isArray(metadata)))
+    })) return null
     return rows.map((row) => ({
-      id: String(row.id),
+      id: String(row.id).trim(),
       amount: Number(row.amount),
-      createdAt: row.created_at ? new Date(String(row.created_at)).getTime() : 0,
+      createdAt: Date.parse(String(row.created_at)),
       metadata: row.metadata && typeof row.metadata === "object"
         ? row.metadata as Record<string, unknown>
         : {},
-    })).filter((row) => row.id && Number.isFinite(row.amount) && row.amount > 0 && Number.isFinite(row.createdAt))
+    }))
   } catch {
     return null
   }
@@ -670,6 +687,10 @@ export async function rpcClaimPending(
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
     return { ok: false, error: "SERVER_UNAVAILABLE" }
   }
+  if (!userId?.trim() || userId.length > 160 || !holdId?.trim() || holdId.length > 160
+    || /[\u0000-\u001f\u007f]/.test(userId + holdId)) {
+    return { ok: false, error: "INVALID_INPUT" }
+  }
   try {
     const rpcResult = await supabaseRpc('ghc_claim_pending', { p_user_id: userId, p_hold_id: holdId }, { timeoutMs: 8000 })
     const res = {
@@ -681,20 +702,39 @@ export async function rpcClaimPending(
 if (!res.ok) {
       return { ok: false, error: "SERVER_UNAVAILABLE" }
     }
-    const data = (await res.json()) as Record<string, unknown>
-    if (!data || data.ok === false) {
-      return {
-        ok: false,
-        error: String(data?.error || "NOT_CLAIMABLE"),
-        redeemableAt: data?.redeemableAt != null ? String(data.redeemableAt) : undefined,
-      }
+    const data = (await res.json()) as unknown
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      return { ok: false, error: "SERVER_UNAVAILABLE" }
     }
+    const payload = data as Record<string, unknown>
+    if (payload.ok === false) {
+      const error = typeof payload.error === "string" && /^[A-Z0-9_]{2,80}$/.test(payload.error)
+        ? payload.error
+        : "NOT_CLAIMABLE"
+      const redeemableAt = typeof payload.redeemableAt === "string" && Number.isFinite(Date.parse(payload.redeemableAt))
+        ? payload.redeemableAt
+        : undefined
+      return { ok: false, error, redeemableAt }
+    }
+    // The RPC is the transaction authority. Never infer success from an HTTP
+    // 200 or a truthy string: an incomplete response is ambiguous and must be
+    // retried through the RPC's existing idempotency path.
+    const transactionId = typeof payload.transactionId === "string" ? payload.transactionId.trim() : ""
+    const amount = Number(payload.amount)
+    if (payload.ok !== true || typeof payload.alreadyClaimed !== "boolean"
+      || !transactionId || transactionId.length > 160 || /[\u0000-\u001f\u007f]/.test(transactionId)
+      || !Number.isFinite(amount) || amount <= 0) {
+      return { ok: false, error: "SERVER_UNAVAILABLE" }
+    }
+    const redeemableAt = typeof payload.redeemableAt === "string" && Number.isFinite(Date.parse(payload.redeemableAt))
+      ? payload.redeemableAt
+      : undefined
     return {
       ok: true,
-      alreadyClaimed: Boolean(data.alreadyClaimed),
-      transactionId: data.transactionId != null ? String(data.transactionId) : undefined,
-      amount: data.amount != null ? Number(data.amount) : undefined,
-      redeemableAt: data.redeemableAt != null ? String(data.redeemableAt) : undefined,
+      alreadyClaimed: payload.alreadyClaimed,
+      transactionId,
+      amount,
+      redeemableAt,
     }
   } catch {
     return { ok: false, error: "SERVER_UNAVAILABLE" }

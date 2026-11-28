@@ -16,6 +16,7 @@ import { RULE_TEMPLATES } from "@/lib/domains/community-registry"
 import { IdentityService } from "@/lib/identity/identity-service"
 import { clearCommunityCreateDraft, loadCommunityCreateDraft, saveCommunityCreateDraft } from "@/lib/community/create-draft"
 import { confirmDialog } from "@/lib/ui/global-interactions"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 export interface CreateGroupFormData {
   /** Stable client-generated identity reused for payment retries. */
@@ -385,10 +386,11 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
     })
   }, [isOpen, onClose])
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(isOpen, onClose)
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end z-50" role="dialog" aria-modal="true" aria-labelledby="create-group-title">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end z-50" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="create-group-title">
       <div className="w-full bg-card text-foreground rounded-t-2xl max-h-[100dvh] overflow-hidden flex flex-col">
         {/* Header — always has a clear Back / Close control (Step 1 closes, later steps go previous) */}
         <div className="sticky top-0 flex items-center justify-between gap-2 px-3 py-3 border-b border-border/60 bg-card/95 backdrop-blur z-10">
@@ -471,7 +473,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
                 <label className="block text-sm font-semibold text-foreground mb-1 flex items-center gap-1">
                   Group Name <span className="text-red-500">*</span>
                 </label>
-                <input
+                <input aria-label="e.g., Tech Enthusiasts"
                   type="text"
                   placeholder="e.g., Tech Enthusiasts"
                   value={formData.name}
@@ -491,7 +493,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
               {/* Category - Quick selection */}
               <div>
                 <label className="block text-sm font-semibold text-foreground mb-1">Category</label>
-                <select
+                <select aria-label="Group category"
                   value={formData.category}
                   onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))}
                   className="w-full px-3 py-2 border border-border/70 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-background text-foreground"
@@ -509,7 +511,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
                 <label className="block text-sm font-semibold text-foreground mb-1 flex items-center gap-1">
                   Description <span className="text-red-500">*</span>
                 </label>
-                <textarea
+                <textarea aria-label="What is this group about? (min 10 chars)"
                   placeholder="What is this group about? (min 10 chars)"
                   value={formData.description}
                   onChange={(e) =>
@@ -562,7 +564,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
                     </button>
                   </div>
                 ) : (
-                  <button
+                  <button type="button"
                     onClick={() => fileInputRef.current?.click()}
                     className="w-full p-6 border-2 border-dashed border-border/80 rounded-lg hover:border-emerald-500 hover:bg-emerald-50/30 transition flex flex-col items-center gap-2"
                   >
@@ -587,7 +589,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
                 <label className="block text-sm font-semibold text-foreground mb-2.5">Privacy Setting <span className="text-red-500">*</span></label>
                 <div className="space-y-2">
                   {PRIVACY_OPTIONS.map((option) => (
-                    <button
+                    <button type="button"
                       key={option.value}
                       onClick={() => setFormData((prev) => ({ ...prev, privacy: option.value as any }))}
                       className={`w-full p-3 border rounded-lg text-left transition ${
@@ -622,7 +624,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
                 <label className="block text-sm font-semibold text-foreground mb-1 flex items-center gap-1">
                   Welcome Message <span className="text-xs text-muted-foreground">(optional)</span>
                 </label>
-                <textarea
+                <textarea aria-label="Welcome to our group! Share what you'd like members to know..."
                   placeholder="Welcome to our group! Share what you'd like members to know..."
                   value={formData.welcomeMessage}
                   onChange={(e) =>
@@ -662,7 +664,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
                     <div key={idx} className="flex items-start gap-2 p-2 bg-muted/40 rounded-lg">
                       <span className="text-sm font-semibold text-muted-foreground flex-shrink-0 mt-0.5">{idx + 1}.</span>
                       <p className="text-sm text-foreground/90 flex-1">{rule}</p>
-                      <button
+                      <button type="button"
                         onClick={() => removeRule(idx)}
                         className="p-1 hover:bg-red-100 rounded text-red-600"
                         aria-label={`Remove rule ${idx + 1}`}
@@ -674,7 +676,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
                 </div>
 
                 <div className="flex gap-2 mt-2">
-                  <input
+                  <input aria-label="Add a custom rule…"
                     type="text"
                     placeholder="Add a custom rule…"
                     value={currentRule}
@@ -688,7 +690,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
                     maxLength={100}
                     className="flex-1 px-3 py-2 border border-border/70 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
-                  <button
+                  <button type="button"
                     onClick={addRule}
                     disabled={!currentRule.trim() || formData.rules.length >= 5}
                     className="px-3 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 disabled:bg-muted disabled:cursor-not-allowed transition"
@@ -720,7 +722,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
                     {formData.invitedMembers.map((member, idx) => (
                       <div key={idx} className="flex items-center justify-between text-sm">
                         <span className="text-foreground/90">{member}</span>
-                        <button
+                        <button type="button"
                           onClick={() => removeMember(idx)}
                           className="p-0.5 hover:bg-red-100 rounded text-red-600"
                           aria-label={`Remove ${member}`}
@@ -733,7 +735,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
                 )}
 
                 <div className="flex gap-2">
-                  <input
+                  <input aria-label="Enter member name..."
                     type="text"
                     placeholder="Enter member name..."
                     value={currentMember}
@@ -747,7 +749,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
                     maxLength={50}
                     className="flex-1 px-3 py-2 border border-border/70 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
-                  <button
+                  <button type="button"
                     onClick={addMember}
                     disabled={!currentMember.trim() || formData.invitedMembers.length >= 10}
                     className="px-3 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 disabled:bg-muted disabled:cursor-not-allowed transition"
@@ -825,7 +827,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
             
             <div className="flex gap-2 flex-1 justify-end">
               {step > 1 && (
-                <button
+                <button type="button"
                   onClick={handlePrevious}
                   disabled={isLoading}
                   className="px-4 py-2 border border-border/80 rounded-lg font-semibold text-foreground hover:bg-muted/40 disabled:opacity-50 transition"
@@ -836,7 +838,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
               )}
 
               {step < 4 ? (
-                <button
+                <button type="button"
                   onClick={handleNext}
                   disabled={isLoading}
                   className="min-h-11 flex-1 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
@@ -845,7 +847,7 @@ export function CreateGroupModal({ isOpen = true, onClose, onSubmit, isLoading =
                   Next →
                 </button>
               ) : (
-                <button
+                <button type="button"
                   onClick={handleSubmit}
                   disabled={isLoading || coverUploading}
                   className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"

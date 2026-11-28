@@ -105,15 +105,15 @@ export function ConversationSearchBar({ searchQuery, onSearchChange }: { searchQ
     <div className="relative">
       <div className="relative flex items-center">
         <Search size={16} className="pointer-events-none absolute left-3 text-muted-foreground" />
-        <input
-          type="search"
+        <input aria-label="Search name or message…"
+          type="search" enterKeyHint="search"
           placeholder="Search name or message…"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           className="min-h-10 w-full rounded-xl border border-border bg-background py-2 pl-9 pr-9 text-sm text-foreground placeholder:text-muted-foreground transition focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20"
         />
         {searchQuery && (
-          <button type="button" onClick={() => onSearchChange("")} className="absolute right-1 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Clear search">
+          <button type="button" onClick={() => onSearchChange("")} className="gh-hit-44 absolute right-1 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Clear search">
             <X size={16} aria-hidden />
           </button>
         )}
@@ -205,7 +205,7 @@ function ConversationItemBase({
             (conversation as { isCommunity?: boolean }).isCommunity ||
             (conversation as { kind?: string }).kind === "community" ? (
               <span
-                className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-md border-2 border-white bg-sky-500 text-[8px] font-bold text-white"
+                className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-md border-2 border-white bg-sky-500 text-[10px] font-bold text-white"
                 aria-label="Community"
               >
                 C
@@ -230,11 +230,11 @@ function ConversationItemBase({
                   ? `Community · ${displayName}`
                   : displayName}
                 {(conversation as { isRequest?: boolean }).isRequest ? (
-                  <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">Request</span>
+                  <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">Request</span>
                 ) : conversation.conversationType === "group" || (conversation as { isCommunity?: boolean }).isCommunity ? (
-                  <span className="ml-1.5 rounded-full bg-sky-100 px-1.5 py-0.5 text-[9px] font-bold text-sky-800">Community</span>
+                  <span className="ml-1.5 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">Community</span>
                 ) : (
-                  <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground">DM</span>
+                  <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">DM</span>
                 )}
               </p>
               <time dateTime={conversation.lastMessageTime ? new Date(conversation.lastMessageTime).toISOString() : undefined} className={`shrink-0 text-[11px] ${hasUnread ? "font-bold text-emerald-600" : "text-muted-foreground"}`}>

@@ -5,7 +5,7 @@
  * Does not invent success — calls server recover/fulfill only when user acts.
  */
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react"
 
 type RecoveryItem = {
@@ -54,8 +54,10 @@ export function PaymentRecoveryPanel({ className = "" }: { className?: string })
     void load()
   }, [load])
 
+  const fulfillInFlightRef = useRef(false)
   const fulfill = async (item: RecoveryItem) => {
-    if (busyId) return
+    if (busyId || fulfillInFlightRef.current) return
+    fulfillInFlightRef.current = true
     setBusyId(item.id)
     setMessage(null)
     try {
@@ -81,6 +83,7 @@ export function PaymentRecoveryPanel({ className = "" }: { className?: string })
     } catch {
       setMessage("Network error during fulfilment")
     } finally {
+      fulfillInFlightRef.current = false
       setBusyId(null)
     }
   }

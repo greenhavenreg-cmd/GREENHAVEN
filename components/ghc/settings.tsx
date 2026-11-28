@@ -89,6 +89,50 @@ async function ensureBrowserNotificationPermission(): Promise<boolean> {
   }
 }
 
+/**
+ * Age bound field with a local draft. The stored value is clamped on every change by the settings
+ * handler, so a controlled number input made it impossible to type a number whose first digit is
+ * below the minimum (typing "3" jumped to 18). The draft is committed on blur or Enter and resyncs
+ * with the stored value afterwards.
+ */
+function AgeBoundInput({ label, value, onCommit }: { label: string; value: number; onCommit: (next: number) => void }) {
+  const [draft, setDraft] = useState(String(value))
+  useEffect(() => {
+    setDraft(String(value))
+  }, [value])
+  const commit = () => {
+    const parsed = parseInt(draft, 10)
+    if (!Number.isFinite(parsed)) {
+      setDraft(String(value))
+      return
+    }
+    onCommit(parsed)
+  }
+  return (
+    <label className="flex-1 text-[11px] font-semibold text-muted-foreground">
+      {label}
+      <input
+        type="number"
+        inputMode="numeric"
+        enterKeyHint="done"
+        min={18}
+        max={80}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault()
+            commit()
+            e.currentTarget.blur()
+          }
+        }}
+        className="mt-1 w-full min-h-11 rounded-xl border border-border bg-background px-3 text-sm font-semibold"
+      />
+    </label>
+  )
+}
+
 function SectionFallback({ label }: { label: string }) {
   return (
     <div className="flex h-full items-center justify-center text-[13px] text-muted-foreground">
@@ -741,7 +785,7 @@ export function SettingsScreen({
           })()}
           <div>
             <p className="text-[14px] font-bold mb-3">Online Status</p>
-            <select
+            <select aria-label="Online status"
               value={settings.onlineStatus}
               onChange={(e) => handleSelect("onlineStatus", e.target.value)}
               className="w-full px-4 py-2 rounded-lg border border-border bg-input"
@@ -754,7 +798,7 @@ export function SettingsScreen({
           <div>
             <p className="text-[15px] font-semibold mb-1">Who can message you</p>
             <p className="mb-2 text-[12px] text-muted-foreground">Example: Matches only blocks cold messages from strangers.</p>
-            <select
+            <select aria-label="Who can message you"
               value={settings.whoCanMessage}
               onChange={(e) => handleSelect("whoCanMessage", e.target.value)}
               className="min-h-12 w-full rounded-xl border border-border bg-input px-4 py-2.5 text-[15px]"
@@ -766,7 +810,7 @@ export function SettingsScreen({
           </div>
           <div>
             <p className="text-[14px] font-bold mb-3">Profile Visibility</p>
-            <select
+            <select aria-label="Profile visibility"
               value={settings.profileVisibility}
               onChange={(e) => handleSelect("profileVisibility", e.target.value)}
               className="w-full px-4 py-2 rounded-lg border border-border bg-input"
@@ -779,7 +823,7 @@ export function SettingsScreen({
           </div>
           <div>
             <p className="text-[14px] font-bold mb-3">Who Can Discover Me</p>
-            <select
+            <select aria-label="Who can discover me"
               value={(settings as any).whoCanDiscover || "everyone"}
               onChange={(e) => handleSelect("whoCanDiscover" as any, e.target.value)}
               className="w-full px-4 py-2 rounded-lg border border-border bg-input"
@@ -791,7 +835,7 @@ export function SettingsScreen({
           </div>
           <div>
             <p className="text-[14px] font-bold mb-3">Who Can Follow Me</p>
-            <select
+            <select aria-label="Who can follow me"
               value={(settings as any).whoCanFollow || "everyone"}
               onChange={(e) => handleSelect("whoCanFollow" as any, e.target.value)}
               className="w-full px-4 py-2 rounded-lg border border-border bg-input"
@@ -803,7 +847,7 @@ export function SettingsScreen({
           </div>
           <div>
             <p className="text-[14px] font-bold mb-3">Who Can Connect With Me</p>
-            <select
+            <select aria-label="Who can connect with me"
               value={(settings as any).whoCanConnect || "everyone"}
               onChange={(e) => handleSelect("whoCanConnect" as any, e.target.value)}
               className="w-full px-4 py-2 rounded-lg border border-border bg-input"
@@ -837,7 +881,7 @@ export function SettingsScreen({
           </div>
           <div>
             <p className="text-[14px] font-bold mb-3">Who Can View My Stories</p>
-            <select value={settings.storyVisibility} onChange={(e) => handleSelect("storyVisibility", e.target.value)} className="w-full px-4 py-2 rounded-lg border border-border bg-input">
+            <select aria-label="Who can view my stories" value={settings.storyVisibility} onChange={(e) => handleSelect("storyVisibility", e.target.value)} className="w-full px-4 py-2 rounded-lg border border-border bg-input">
               <option value="everyone">Everyone</option>
               <option value="matches-only">Matches Only</option>
               <option value="no-one">No One</option>
@@ -912,10 +956,9 @@ export function SettingsScreen({
                         onClick={() => {
                           void (async () => {
                             try {
+                              // unblockUser reports its own success or failure toast and never throws on a
+                              // rejected write, so a second success toast here would contradict a failure.
                               await unblockUser?.(id)
-                              try {
-                                window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "User unblocked", type: "success" } }))
-                              } catch { /* */ }
                             } catch {
                               try {
                                 window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "Could not unblock", type: "error" } }))
@@ -1025,28 +1068,8 @@ export function SettingsScreen({
             <div>
               <p className="mb-2 text-[14px] font-bold">Age range</p>
               <div className="flex gap-3">
-                <label className="flex-1 text-[11px] font-semibold text-muted-foreground">
-                  Min
-                  <input
-                    type="number"
-                    min={18}
-                    max={80}
-                    value={settings.ageMin}
-                    onChange={(e) => handleSelect("ageMin", parseInt(e.target.value, 10) || 18)}
-                    className="mt-1 w-full min-h-11 rounded-xl border border-border bg-background px-3 text-sm font-semibold"
-                  />
-                </label>
-                <label className="flex-1 text-[11px] font-semibold text-muted-foreground">
-                  Max
-                  <input
-                    type="number"
-                    min={18}
-                    max={80}
-                    value={settings.ageMax}
-                    onChange={(e) => handleSelect("ageMax", parseInt(e.target.value, 10) || 45)}
-                    className="mt-1 w-full min-h-11 rounded-xl border border-border bg-background px-3 text-sm font-semibold"
-                  />
-                </label>
+                <AgeBoundInput label="Min" value={Number(settings.ageMin) || 18} onCommit={(next) => handleSelect("ageMin", next)} />
+                <AgeBoundInput label="Max" value={Number(settings.ageMax) || 45} onCommit={(next) => handleSelect("ageMax", next)} />
               </div>
             </div>
             <div>
@@ -1611,7 +1634,7 @@ export function SettingsScreen({
         <div className="relative">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <input
-            type="search"
+            type="search" enterKeyHint="search"
             value={settingsQuery}
             onChange={(e) => setSettingsQuery(e.target.value)}
             placeholder={msg("searchSettings")}
@@ -1620,7 +1643,7 @@ export function SettingsScreen({
             aria-describedby="settings-search-hint"
           />
           {settingsQuery ? (
-            <button type="button" onClick={() => setSettingsQuery("")} className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Clear settings search">
+            <button type="button" onClick={() => setSettingsQuery("")} className="gh-hit-44 absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Clear settings search">
               <span aria-hidden="true">×</span>
             </button>
           ) : null}

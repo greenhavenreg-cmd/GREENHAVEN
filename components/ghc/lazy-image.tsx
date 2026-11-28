@@ -2,6 +2,7 @@
 
 import { memo, useEffect, useState } from "react"
 import { ImageSkeleton } from "./skeleton-loaders"
+import { activatableProps } from "@/lib/ui/activate-keys"
 import { isMediaFacadeUrl, resolveDisplayMediaUrl, clearDisplayMediaCache, extractMediaFacadeId } from "@/lib/media/resolve-display-url"
 
 interface LazyImageProps {
@@ -155,7 +156,7 @@ function LazyImageInner({
     }
 
     return (
-      <div onClick={onClick} className={`relative overflow-hidden bg-muted ${className}`}>
+      <div {...(onClick ? activatableProps(onClick, safeAlt) : {})} className={`relative overflow-hidden bg-muted ${className}`}>
         <div className="flex h-full min-h-[2.5rem] w-full items-center justify-center bg-gradient-to-br from-muted to-muted/60 text-[11px] font-bold text-muted-foreground">
           {initials}
         </div>
@@ -205,7 +206,7 @@ function LazyImageInner({
             <span className="h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 shadow-sm" aria-hidden="true" />
           )}
           {verified && (
-            <span className="rounded-full bg-sky-500 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-sm" aria-hidden="true">
+            <span className="rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm" aria-hidden="true">
               ✓
             </span>
           )}

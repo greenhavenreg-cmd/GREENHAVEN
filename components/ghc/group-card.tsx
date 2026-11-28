@@ -96,7 +96,7 @@ function GroupCardContent({
     <article className="relative rounded-[1.35rem] border border-border/60 bg-card p-3.5 shadow-[var(--gh-card-shadow)] transition hover:border-emerald-400/50 hover:shadow-[var(--gh-card-shadow-lg)]">
       {isPinned ? <span className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-[var(--gh-green)]" aria-hidden /> : null}
       {isSample ? (
-        <span className="absolute right-2 top-2 z-10 rounded-md bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm">Sample</span>
+        <span className="absolute right-2 top-2 z-10 rounded-md bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">Sample</span>
       ) : null}
 
       <button

@@ -92,7 +92,7 @@ export function UnifiedActivityCenter({ limit = 30 }: { limit?: number }) {
   return <section className="rounded-2xl border border-border/70 bg-card p-3" aria-label="Activity Center">
     <div className="flex items-center justify-between gap-2">
       <div><h3 className="text-sm font-bold">Activity Center</h3><p className="text-[11px] text-muted-foreground">One timeline for wallet, rewards and linked product activity</p></div>
-      <button type="button" onClick={refresh} className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Refresh activity"><RefreshCw size={15} className={refreshing ? "animate-spin" : ""}/></button>
+      <button type="button" onClick={refresh} className="gh-hit-44 flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Refresh activity"><RefreshCw size={15} className={refreshing ? "animate-spin" : ""}/></button>
     </div>
     <label className="mt-3 block"><span className="sr-only">Search activity</span><input value={query} onChange={(event) => filters.update("query", event.target.value)} placeholder="Search activity" className="min-h-10 w-full rounded-xl border border-border bg-background px-3 text-xs outline-none focus-visible:ring-2 focus-visible:ring-primary" /></label>
     <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1" role="group" aria-label="Activity type filter">

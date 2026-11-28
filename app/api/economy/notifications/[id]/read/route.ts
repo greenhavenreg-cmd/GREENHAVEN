@@ -12,7 +12,8 @@ export async function POST(
   const __rateLimited = await enforceUserMutationRateLimit(auth.userId, "economy/notifications/[id]/read:POST", 60, 60_000, { failClosed: false })
   if (__rateLimited) return __rateLimited
   const { id } = await ctx.params
-  const ok = await markGhcNotificationRead(auth.userId, id)
-  if (!ok) return jsonErr("NOT_FOUND", "Notification not found", 404)
+  const result = await markGhcNotificationRead(auth.userId, id)
+  if (result === "unavailable") return jsonErr("NOTIFICATION_STORE_UNAVAILABLE", "Could not save the read state. Please retry.", 503)
+  if (result === "not_found") return jsonErr("NOT_FOUND", "Notification not found", 404)
   return jsonOk({ id, read: true })
 }

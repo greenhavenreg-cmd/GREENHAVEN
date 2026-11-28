@@ -10,6 +10,7 @@ import { isOwnAuthor, canEditComment, canDeleteComment } from "@/lib/ownership"
 import { timeAgo } from "@/lib/ghc-data"
 import { LazyImage } from "./lazy-image"
 import { ReportChooser } from "./report-chooser"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 // Post Menu with all actions
 interface PostMenuProps {
@@ -66,37 +67,49 @@ export function PostMenu({
     }
   }, [isOpen, onClose])
 
+  const menuPanelRef = useDialogA11y<HTMLDivElement>(isOpen)
+
   if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end bg-black/40" onClick={onClose}>
       <div
-        className="mb-[calc(4.25rem+env(safe-area-inset-bottom))] max-h-[min(70vh,28rem)] w-full space-y-1 overflow-y-auto overscroll-contain rounded-t-3xl border border-border bg-card p-3 shadow-2xl"
+        ref={menuPanelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Post options"
+        tabIndex={-1}
+        className="outline-none mb-[calc(4.25rem+env(safe-area-inset-bottom))] max-h-[min(70dvh,28rem)] w-full space-y-1 overflow-y-auto overscroll-contain rounded-t-3xl border border-border bg-card p-3 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-foreground">Post Options</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground/90">
-            <X size={20} />
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close post options"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground/90"
+          >
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
 
         {/* Owner actions */}
         {onEdit && (
-          <button onClick={onEdit} className="w-full text-left px-4 py-2 hover:bg-muted/40 rounded-lg text-sm font-semibold text-foreground">
+          <button type="button" onClick={onEdit} className="w-full text-left px-4 py-2 hover:bg-muted/40 rounded-lg text-sm font-semibold text-foreground">
             Edit post
           </button>
         )}
 
         {onDelete && (
-          <button onClick={onDelete} className="w-full text-left px-4 py-2 hover:bg-red-50 rounded-lg text-sm font-semibold text-red-600">
+          <button type="button" onClick={onDelete} className="w-full text-left px-4 py-2 hover:bg-red-50 rounded-lg text-sm font-semibold text-red-600">
             Delete post
           </button>
         )}
 
         {/* Engagement actions */}
         {onBookmark && (
-          <button
+          <button type="button"
             onClick={onBookmark}
             className="w-full text-left px-4 py-2 hover:bg-blue-50 rounded-lg text-sm font-semibold text-foreground flex items-center gap-2"
           >
@@ -106,7 +119,7 @@ export function PostMenu({
         )}
 
         {onCopyLink && (
-          <button
+          <button type="button"
             onClick={onCopyLink}
             className="w-full text-left px-4 py-2 hover:bg-emerald-50 rounded-lg text-sm font-semibold text-foreground flex items-center gap-2"
           >
@@ -117,7 +130,7 @@ export function PostMenu({
 
         {/* Hide/Filter actions */}
         {onHide && (
-          <button
+          <button type="button"
             onClick={onHide}
             className="w-full text-left px-4 py-2 hover:bg-muted rounded-lg text-sm font-semibold text-foreground flex items-center gap-2"
           >
@@ -127,7 +140,7 @@ export function PostMenu({
         )}
 
         {onNotInterested && (
-          <button
+          <button type="button"
             onClick={onNotInterested}
             className="w-full text-left px-4 py-2 hover:bg-muted rounded-lg text-sm font-semibold text-foreground flex items-center gap-2"
           >
@@ -137,7 +150,7 @@ export function PostMenu({
         )}
 
         {onMute && (
-          <button
+          <button type="button"
             onClick={onMute}
             className="w-full text-left px-4 py-2 hover:bg-muted rounded-lg text-sm font-semibold text-foreground flex items-center gap-2"
           >
@@ -148,7 +161,7 @@ export function PostMenu({
 
         {/* Danger zone */}
         {!showReportOptions && onReport && (
-          <button
+          <button type="button"
             onClick={() => setShowReportOptions(true)}
             className="w-full text-left px-4 py-2 hover:bg-red-50 rounded-lg text-sm font-semibold text-red-600 flex items-center gap-2"
           >
@@ -160,7 +173,7 @@ export function PostMenu({
         {showReportOptions && (
           <div className="space-y-1">
             {reportReasons.map((reason) => (
-              <button
+              <button type="button"
                 key={reason}
                 onClick={() => {
                   onReport?.(reason)
@@ -175,7 +188,7 @@ export function PostMenu({
         )}
 
         {onBlock && (
-          <button
+          <button type="button"
             onClick={onBlock}
             className="w-full text-left px-4 py-2 hover:bg-red-50 rounded-lg text-sm font-semibold text-red-600 flex items-center gap-2"
           >
@@ -205,7 +218,7 @@ export function CommentReactions({
   return (
     <div className="flex items-center gap-1 flex-wrap">
       {Object.entries(reactions).map(([emoji, users]) => (
-        <button
+        <button type="button"
           key={emoji}
           onClick={() => onRemoveReaction?.(emoji)}
           className="px-2 py-1 bg-muted hover:bg-muted/80 rounded-full text-xs font-semibold flex items-center gap-1 transition-colors"
@@ -214,12 +227,12 @@ export function CommentReactions({
         </button>
       ))}
       {onAddReaction && (
-        <button
+        <button type="button"
           onClick={() => {
             const emoji = commonEmojis[Math.floor(Math.random() * commonEmojis.length)]
             onAddReaction(emoji)
           }}
-          className="w-6 h-6 flex items-center justify-center bg-muted hover:bg-muted/80 rounded-full text-xs transition-colors"
+          className="gh-hit-44 w-6 h-6 flex items-center justify-center bg-muted hover:bg-muted/80 rounded-full text-xs transition-colors"
           title="Add reaction"
         >
           <Smile size={14} />
@@ -290,7 +303,7 @@ export function EnhancedComment({
           {/* Comment content / inline edit */}
           {isEditing ? (
             <div className="mt-1 space-y-2">
-              <textarea
+              <textarea aria-label="Edit post text"
                 value={localEditText}
                 onChange={(e) => setLocalEditText(e.target.value.slice(0, 1000))}
                 className="w-full resize-none rounded-xl border border-emerald-300 bg-card p-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-emerald-100"
@@ -479,7 +492,7 @@ export function EnhancedPostContent({
       {parts.map((part, idx) => {
         if (part.startsWith("@")) {
           return (
-            <button
+            <button type="button"
               key={idx}
               onClick={() => onMentionClick?.(part.slice(1))}
               className="text-blue-600 hover:underline"
@@ -490,7 +503,7 @@ export function EnhancedPostContent({
         }
         if (part.startsWith("#")) {
           return (
-            <button
+            <button type="button"
               key={idx}
               onClick={() => onHashtagClick?.(part.slice(1))}
               className="text-blue-600 hover:underline"
@@ -501,7 +514,7 @@ export function EnhancedPostContent({
         }
         if (part.startsWith("http")) {
           return (
-            <button
+            <button type="button"
               key={idx}
               onClick={() => onLinkClick?.(part)}
               className="text-blue-600 hover:underline"
@@ -582,7 +595,7 @@ export function QuoteRepost({
       </div>
       <p className="text-xs text-foreground font-semibold">{quoteText}</p>
       {onViewOriginal && (
-        <button
+        <button type="button"
           onClick={onViewOriginal}
           className="mt-1 text-xs text-blue-600 hover:underline"
         >
@@ -619,7 +632,7 @@ export function ShareMenu({
   return (
     <div className="absolute bottom-full right-0 mb-2 bg-card border border-border/70 rounded-lg shadow-lg p-2 space-y-1 z-50">
       {platforms.map((platform) => (
-        <button
+        <button type="button"
           key={platform.id}
           onClick={() => {
             onShare(platform.id as "twitter" | "facebook" | "linkedin" | "copy")
@@ -662,7 +675,7 @@ export function CommentInput({
 
   return (
     <div className="border-t border-border/70 p-3 space-y-2">
-      <textarea
+      <textarea aria-label="Write a comment"
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder={placeholder}
@@ -678,14 +691,14 @@ export function CommentInput({
         <div className="flex gap-1">
           {showMediaButtons && (
             <>
-              <button
+              <button type="button"
                 onClick={onMediaClick}
                 className="p-2 hover:bg-muted rounded transition-colors text-muted-foreground hover:text-foreground/90"
                 title="Add media"
               >
                 <ImageIcon size={14} />
               </button>
-              <button
+              <button type="button"
                 onClick={onMediaClick}
                 className="p-2 hover:bg-muted rounded transition-colors text-muted-foreground hover:text-foreground/90"
                 title="Add voice"
@@ -695,7 +708,7 @@ export function CommentInput({
             </>
           )}
           {onEmojiClick && (
-            <button
+            <button type="button"
               onClick={onEmojiClick}
               className="p-2 hover:bg-muted rounded transition-colors text-muted-foreground hover:text-foreground/90"
               title="Add emoji"
@@ -704,7 +717,7 @@ export function CommentInput({
             </button>
           )}
         </div>
-        <button
+        <button type="button"
           onClick={handleSubmit}
           disabled={!text.trim()}
           className="px-3 py-1.5 bg-[var(--gh-green)] hover:brightness-105 disabled:bg-muted disabled:text-muted-foreground text-white rounded-full text-xs font-bold transition-colors"

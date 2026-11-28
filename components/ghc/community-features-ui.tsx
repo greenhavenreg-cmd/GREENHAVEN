@@ -33,8 +33,8 @@ export function AnnouncementCard({ announcement, onDismiss }: { announcement: An
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">{typeLabels[type]}</span>
-            {announcement.pinned ? <span className="inline-flex items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 text-[9px] font-semibold text-muted-foreground ring-1 ring-border/60"><Pin size={10} /> Pinned</span> : null}
+            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">{typeLabels[type]}</span>
+            {announcement.pinned ? <span className="inline-flex items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground ring-1 ring-border/60"><Pin size={10} /> Pinned</span> : null}
             {createdAt && Number.isFinite(createdAt.getTime()) ? (
               <time className="ml-auto text-[10px] text-muted-foreground" dateTime={createdAt.toISOString()}>{new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(createdAt)}</time>
             ) : null}
@@ -43,7 +43,7 @@ export function AnnouncementCard({ announcement, onDismiss }: { announcement: An
           <p className="mt-1 whitespace-pre-wrap break-words text-[12px] leading-[1.6] text-current/80">{announcement.content}</p>
         </div>
         {onDismiss ? (
-          <button type="button" onClick={onDismiss} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-background/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50" aria-label="Dismiss announcement">
+          <button type="button" onClick={onDismiss} className="gh-hit-44 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-background/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50" aria-label="Dismiss announcement">
             <X size={15} />
           </button>
         ) : null}
@@ -86,7 +86,7 @@ export function PollCard({
           const userVotedThis = userVoted?.includes(option.id) === true
 
           return (
-            <button
+            <button type="button"
               key={option.id}
               onClick={() => isActive && onVote?.(option.id)}
               disabled={!isActive}
@@ -188,7 +188,7 @@ export function EventCard({ event, onAttend }: { event: ScheduledEvent; onAttend
         )}
       </div>
 
-      <button
+      <button type="button"
         onClick={handleAttend}
         className={`min-h-10 w-full rounded-xl px-3 py-2 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
           isAttending
@@ -233,7 +233,7 @@ export function PinnedResourceCard({ resource, onRemove }: { resource: PinnedRes
         )}
       </div>
       {onRemove && (
-        <button
+        <button type="button"
           onClick={onRemove}
           className="p-1 hover:bg-amber-200 rounded transition flex-shrink-0"
           aria-label="Remove"
@@ -258,7 +258,7 @@ export function WelcomeMessageBanner({ message }: { message: WelcomeMessage }) {
         <h2 className="font-semibold text-sm text-indigo-900 mb-2">Welcome to this group!</h2>
         <p className="text-sm text-indigo-800">{message.content}</p>
       </div>
-      <button
+      <button type="button"
         onClick={() => setDismissed(true)}
         className="p-1 hover:bg-indigo-200 rounded transition flex-shrink-0"
         aria-label="Dismiss"

@@ -4,6 +4,7 @@ import assert from "node:assert/strict"
 
 const read = (path) => fs.readFileSync(path, "utf8")
 const comments = read("components/ghc/comment-sheet.tsx")
+const hook = read("hooks/use-dialog-a11y.ts")
 const card = read("components/ghc/enhanced-post-card.tsx") + "\n" + read("components/ghc/post-action-bar.tsx")
 const pkg = JSON.parse(read("package.json"))
 const lock = JSON.parse(read("package-lock.json"))
@@ -12,9 +13,9 @@ const checks = [
   ["comment video attachments open an accessible player preview", comments.includes('kind: "video" })} className="flex min-h-20') && comments.includes("controls autoPlay playsInline")],
   ["attachment preview exposes a separate download action", comments.includes("downloadMedia(mediaPreview.url, { kind: mediaPreview.kind })")],
   ["attachment preview preserves media aspect ratio", comments.includes("max-h-[82dvh] max-w-full rounded-lg object-contain")],
-  ["Escape closes the nested preview before the comments sheet", comments.includes("if (mediaPreview) setMediaPreview(null)\n      else onClose()")],
-  ["preview traps its own keyboard focus and restores focus", comments.includes("mediaPreviewRef.current") && comments.includes("previousOverflow = document.body.style.overflow") && comments.includes("previousFocus?.focus()")],
-  ["comments sheet traps keyboard focus without stealing nested preview focus", comments.includes("const onTab = (event: KeyboardEvent)") && comments.includes(`event.key !== "Tab" || mediaPreview`) && comments.includes("document.body.style.overflow = previousOverflow")],
+  ["Escape closes the nested preview before the comments sheet", /useDialogA11y<HTMLDivElement>\(Boolean\(mediaPreview\), \(\) => setMediaPreview\(null\)\)/.test(comments) && /useDialogA11y<HTMLDivElement>\(open, onClose\)/.test(comments)],
+  ["preview traps its own keyboard focus and restores focus", /ref=\{mediaPreviewRef\}/.test(comments) && /data-comment-media-preview-close/.test(comments) && /scrollLockCount/.test(hook) && /opener/.test(hook)],
+  ["comments sheet traps keyboard focus without stealing nested preview focus", /ref=\{dialogRef\}/.test(comments) && /dialogStack\[dialogStack\.length - 1\] !== token/.test(hook)],
   ["comment loading uses an announced skeleton instead of a false empty state", comments.includes('role="status" aria-live="polite"') && comments.includes("commentsLoading && tree.length === 0")],
   ["comment image previews are explicitly labelled for assistive technology", comments.includes("View photo attached by ${c.authorName}")],
   ["comment text and attachment gallery use valid block structure", comments.includes('<div className="mt-0.5 text-sm text-foreground">') && comments.includes('<p className="whitespace-pre-wrap">{c.text}</p>')],

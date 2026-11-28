@@ -34,6 +34,7 @@ import { FilterSummary } from "./filtering/filter-summary"
 import { FilterPanel } from "./filtering/filter-panel"
 import { GroupInvitesPanel } from "./group-invites-panel"
 import { matchesFilterQuery } from "@/lib/filtering/filter-utils"
+import { plural } from "@/lib/ui/plural"
 
 const MESSAGE_WINDOW = 40
 const WINDOW_STEP = 24
@@ -919,7 +920,7 @@ export function MessageScreen() {
                   }).then((r) => {
                     if (!r.ok && r.message) {
                       try {
-                        window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: r.message, tone: "warning" } }))
+                        window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: r.message, type: "error" } }))
                       } catch { /* */ }
                     }
                   })
@@ -947,7 +948,7 @@ export function MessageScreen() {
                   }).then((r) => {
                     if (!r.ok && r.message) {
                       try {
-                        window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: r.message, tone: "warning" } }))
+                        window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: r.message, type: "error" } }))
                       } catch { /* */ }
                     }
                   })
@@ -1027,7 +1028,7 @@ export function MessageScreen() {
             <div className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-3">
               <div className="min-w-0">
                 <h2 id="gh-shared-media-title" className="text-sm font-bold text-foreground">Shared media</h2>
-                <p className="text-[11px] text-muted-foreground">{sharedMedia.length} items in the loaded conversation history</p>
+                <p className="text-[11px] text-muted-foreground">{plural(sharedMedia.length, "item")} in the loaded conversation history</p>
               </div>
               <button type="button" onClick={() => setSharedMediaOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-muted" aria-label="Close shared media">
                 <X size={19} />
@@ -1095,6 +1096,15 @@ export function MessageScreen() {
                 type="search"
                 value={messageSearchQuery}
                 onChange={(event) => setMessageSearchQuery(event.target.value.slice(0, 120))}
+                onKeyDown={(event) => {
+                  if (event.key !== "Escape") return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  if (messageSearchQuery) setMessageSearchQuery("")
+                  else setMessageSearchOpen(false)
+                }}
+                enterKeyHint="search"
+                aria-describedby="gh-message-search-hint"
                 placeholder="Search entire conversation…"
                 maxLength={120}
                 className="min-h-10 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
@@ -1103,9 +1113,9 @@ export function MessageScreen() {
               <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground" aria-live="polite">
                 {messageSearchQuery.trim() ? (serverSearchLoading ? "Searching…" : `${serverSearchTotal} found`) : `${messages.length} loaded`}
               </span>
-              <button type="button" onClick={() => { setMessageSearchOpen(false); setMessageSearchQuery("") }} className="min-h-9 min-w-9 rounded-lg text-muted-foreground hover:bg-muted" aria-label="Close message search">×</button>
+              <button type="button" onClick={() => { setMessageSearchOpen(false); setMessageSearchQuery("") }} className="gh-hit-44 min-h-9 min-w-9 rounded-lg text-muted-foreground hover:bg-muted" aria-label="Close message search">×</button>
             </div>
-            <p className="mt-1 pl-6 text-[10px] text-muted-foreground">Searches indexed message history on the server. Results are limited to this conversation.</p>{serverSearchError ? <p className="mt-1 pl-6 text-[10px] text-destructive" role="alert">Search unavailable: {serverSearchError}</p> : null}
+            <p id="gh-message-search-hint" className="mt-1 pl-6 text-[10px] text-muted-foreground">Searches indexed message history on the server. Results are limited to this conversation.</p>{serverSearchError ? <p className="mt-1 pl-6 text-[10px] text-destructive" role="alert">Search unavailable: {serverSearchError}</p> : null}
           </div>
         ) : null}
 
@@ -1185,12 +1195,13 @@ export function MessageScreen() {
                               setStatusMsg("Sent")
                               window.setTimeout(() => setStatusMsg(null), 1500)
                             } else {
-                              setDraft(msg.text)
+                              // Never overwrite a message the person is composing while the retry ran.
+                              setDraft((current) => (current.trim() ? current : msg.text))
                               setStatusMsg("Retry not confirmed — edit and send again")
                               window.setTimeout(() => setStatusMsg(null), 2500)
                             }
                           } catch {
-                            setDraft(msg.text)
+                            setDraft((current) => (current.trim() ? current : msg.text))
                             setStatusMsg("Retry failed — edit and send again")
                             window.setTimeout(() => setStatusMsg(null), 2500)
                           } finally {
@@ -1311,7 +1322,7 @@ export function MessageScreen() {
                 : () => {
                     if (!isVoiceNoteSupported()) {
                       try {
-                        window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "Voice notes are not supported on this device.", tone: "warning" } }))
+                        window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "Voice notes are not supported on this device.", type: "error" } }))
                       } catch { /* */ }
                       return
                     }
@@ -1319,7 +1330,7 @@ export function MessageScreen() {
                       const result = await recordVoiceNote({ maxMs: 60_000 })
                       if (!result.ok) {
                         try {
-                          window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: result.message, tone: "warning" } }))
+                          window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: result.message, type: "error" } }))
                         } catch { /* */ }
                         return
                       }
@@ -1328,22 +1339,20 @@ export function MessageScreen() {
                         const file = new File([result.blob], `voice-${Date.now()}.webm`, { type: result.mimeType })
                         const up = await uploadDurableMedia(file, { category: "audio" })
                         if (!up.ok) {
-                          window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: up.userMessage || "Voice note upload failed.", tone: "warning" } }))
+                          window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: up.userMessage || "Voice note upload failed.", type: "error" } }))
                           return
                         }
-                        // Prefer existing send path via attachment if available
-                        window.dispatchEvent(
-                          new CustomEvent("ghc:toast", {
-                            detail: {
-                              message: "Voice note recorded. Delivery follows the same durable attachment path as other media.",
-                              tone: "success",
-                            },
-                          }),
-                        )
+                        // Deliver the uploaded audio through the same durable attachment path as other files.
+                        // The message bubble itself reports sending / sent / failed; no success is claimed here.
+                        if (typeof sendMediaMessage !== "function" || !selectedId || !("url" in up && up.url)) {
+                          window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: "Voice note uploaded but could not be sent. Please try again.", type: "error" } }))
+                          return
+                        }
+                        await sendMediaMessage(selectedId, up.url, "file", file.name)
                       } catch (err) {
                         const msg = err instanceof Error ? err.message : "Voice note failed"
                         try {
-                          window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: msg, tone: "warning" } }))
+                          window.dispatchEvent(new CustomEvent("ghc:toast", { detail: { message: msg, type: "error" } }))
                         } catch { /* */ }
                       }
                     })()
@@ -1426,7 +1435,7 @@ export function MessageScreen() {
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[12px] font-extrabold text-foreground">{relationshipOutcome.title}</p>
-                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{relationshipOutcome.badge}</span>
+                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{relationshipOutcome.badge}</span>
               </div>
               <p className="mt-0.5 text-[10.5px] leading-relaxed text-muted-foreground">{relationshipOutcome.detail}</p>
               <button type="button" onClick={() => relationshipOutcome.action === "requests" ? setFilter("requests") : relationshipOutcome.action === "unread" ? setFilter("unread") : relationshipOutcome.action === "communities" ? setFilter("communities") : navigateTo("discover")} className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-full bg-[var(--gh-green)] px-3 text-[10.5px] font-bold text-white shadow-sm transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2">

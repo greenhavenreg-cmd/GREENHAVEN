@@ -108,7 +108,7 @@ export function StatusChip({ status }: { status: string }) {
   const cls = map[s] || "bg-muted text-muted-foreground"
   const label = statusLabel(s).text
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${cls}`}>
+    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${cls}`}>
       {label}
     </span>
   )

@@ -1,16 +1,41 @@
-> **Current candidate authority (26 November 2026):** The working source candidate is `gh-connect@0.338.162` / RUN450 Wallet, Withdrawal, Membership, Referral and Missions Repair. The last user-designated accepted source archive remains `GREENHAVEN-0.338.139-RUN426-PHASE0-SOCIAL-EXPERIENCE-FOUNDATION-2026-11-26.zip`. RUN450 repairs the wallet/withdrawal UX, membership REST reads, referral ID RPCs and landing path, and mission CTAs; RUN447 community role normalization and RUN443 migration closeout are preserved historical increments. Pi Testnet secrets remain operator-supplied; mission GHC issuance remains locked pending an approved schedule and reviewed migration. It has not been pushed or deployed. See `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-26.md`.
+> **Current candidate authority (27 November 2026):** The current working source candidate is `gh-connect@0.338.173` / RUN461 Reward Claim Response Integrity, derived from the user-designated RUN460 archive. RUN461 hardens the authoritative GHC reward-claim response parser and matured-hold read validation without changing reward economics, maturity, settlement, ledger authority, membership/referral rules or SQL migrations. RUN460 referral read/attribution hardening and earlier RUN454–RUN459 increments remain preserved. RUN461 is source-only, not accepted, pushed or deployed; Node 24.15+ dependency-backed build and browser/device/Testnet acceptance remain outstanding. RUN447 community role normalization and RUN443 Testnet migration closeout remain preserved historical evidence; the coordinated RUN385 programme remains documented in `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`. Production remains NOT APPROVED. See `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-27.md` and `docs/RUN461-REWARD-CLAIM-RESPONSE-INTEGRITY-2026-11-27.md`.
 
-## RUN450 — Wallet, Withdrawal, Membership, Referral and Missions Repair (26 November 2026)
+**Current package identity:** `gh-connect@0.338.173`  
+**Current source version:** `0.338.173`
+---
 
-**Current source version:** `0.338.162`
+> **Current candidate authority (27 November 2026):** The current working source candidate is `gh-connect@0.338.168` / RUN456 Read-only Impact History Release, derived from the user-uploaded RUN453 archive through RUN454. RUN455 activates and wires the existing authenticated Events discovery workflow while preserving server release, authentication, rate-limit and privacy controls. Donation-capable Charity remains gated; RUN456 exposes the existing read-only contribution summary as a separate Impact History service. RUN456 is not accepted, pushed or deployed; Node 24.15+ build and browser/device/Testnet acceptance remain outstanding. See `docs/CURRENT-SOURCE-OF-TRUTH-2026-11-27.md` and `docs/RUN455-EVENTS-SERVICE-UNBLOCK-2026-11-27.md`.
 
-See `docs/RUN450-WALLET-WITHDRAWAL-MEMBERSHIP-REFERRAL-MISSIONS-2026-11-26.md` for scope, safeguards and acceptance limits.
+## RUN455 — Events Discovery Service Unblock
+
+**Current source version:** `0.338.168`
+
+The existing Events discovery screen and authenticated RSVP workflow, plus the Services Directory and canonical Marketplace listing query, were implemented but unreachable. RUN455 activates both registry entries, routes them through canonical focus destinations and mounts the existing screens. Server-side release, authentication, rate limiting and private-community visibility checks remain enforced. Charity remains gated; no donation flow was invented.
+
+## RUN454 — Seller Centre Visibility and Navigation Unblock
+
+**Current source version:** `0.338.166`
+
+The already implemented Seller Command Centre was hidden behind a Coming Soon service registry entry. RUN454 makes the service active and routes it to the existing Marketplace `mine` bucket. No duplicate seller workflow or new financial behavior was added.
+
+## RUN453 — Shared Shell Viewport and Navigation (historical)
+
+**Source version:** `0.338.165`
+
+RUN453 is a focused shared-shell reliability increment based on RUN452. RUN447 community role normalization and RUN443 migration closeout remain preserved historical evidence. The coordinated RUN385 programme remains documented in `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`. Production remains **NOT APPROVED**.
+
+
+## RUN451 — Wallet, Withdrawal, Membership, Referral and Missions Repair (26 November 2026)
+
+**Current source version:** `0.338.164`
+
+See `docs/RUN451-TESTNET-ECONOMY-ACTIVATION-2026-11-26.md` for scope, safeguards and acceptance limits.
 
 ## RUN449 — Environment Template Restoration (26 November 2026)
 
 **Current source version:** `0.338.161`
 
-RUN449 restored the canonical credential-free `.env.example` missing from RUN448. This is historical context; RUN450 is current.
+RUN449 restored the canonical credential-free `.env.example` missing from RUN448. This is historical context; RUN451 is current.
 
 ## RUN448 — Discovery Toast and Operational Hash Repair (26 November 2026)
 
@@ -383,3 +408,8 @@ The working candidate is `gh-connect@0.338.157`. The React state snapshot in `co
 ## RUN446 — Marketplace Spend Signature Repair (26 November 2026)
 
 The working candidate is `gh-connect@0.338.158`. The in-memory marketplace GHC fallback now calls `executeAuthoritativeSpend` with its declared two-argument signature; the `transportError` option remains on the durable RPC call only. A focused regression gate is registered in static and prebuild checks. The supplied RUN445 Vercel log confirms bundle compilation but failed during TypeScript validation; a fresh Vercel production build is required to verify RUN446. No remote push, deployment, database mutation or provider transaction occurred. See `docs/RUN446-MARKETPLACE-SPEND-SIGNATURE-REPAIR-2026-11-26.md`.
+
+
+RUN451 activates the dedicated Testnet Preview configuration flags for GHC activity rewards, registration bonus, curation, referral settlement, Pi-to-GHC purchases, tips, withdrawals, marketplace seller payouts, Pi A2U, Pi earnings payout execution and Paystack test transfers. Public client flags are aligned. Provider credentials remain external Vercel Preview secrets and are not embedded in the archive. Generic `.env.example` remains fail-closed. Registration bonus still depends on the corresponding campaign migration/RPC being present in the Preview database; mission GHC issuance remains blocked by the current Daily-Claim-only issuance policy. See `docs/RUN451-TESTNET-ECONOMY-ACTIVATION-2026-11-26.md`.
+
+Historical continuity: RUN447 community role normalization and RUN443 Testnet migration closeout remain preserved as prior-run evidence only. The coordinated RUN385 programme remains documented in `docs/PHASE-7-8-HARMONIZED-PROGRAM-2026-11-24.md`. RUN455 performs no migration or live database action.

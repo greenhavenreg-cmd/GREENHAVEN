@@ -7,6 +7,7 @@
 
 import { MessageCircle, Compass, X, Heart } from "lucide-react"
 import { LazyImage } from "./lazy-image"
+import { useDialogA11y } from "@/hooks/use-dialog-a11y"
 
 export function MatchCelebration({
   open,
@@ -23,10 +24,11 @@ export function MatchCelebration({
   onContinue: () => void
   onClose: () => void
 }) {
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, onClose)
   if (!open) return null
 
   return (
-    <div
+    <div ref={dialogRef} tabIndex={-1}
       className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 p-4 sm:items-center"
       role="dialog"
       aria-modal="true"

@@ -32,6 +32,10 @@ import {
 import { PiSupporterBadge, PiStakingStatusNote } from "@/components/ghc/pi-supporter-badge"
 import { PiPlatformCapabilitiesCard } from "@/components/ghc/pi-platform-capabilities-card"
 import { openService } from "@/lib/navigation/navigate"
+import { EventsDiscoveryScreen } from "@/components/ghc/events-discovery-screen"
+import { ServicesDirectoryScreen } from "@/components/ghc/services-directory-screen"
+import { CharityImpactScreen } from "@/components/ghc/charity-impact-screen"
+import { navigateTo } from "@/lib/navigation/navigate"
 import { getServiceUpgradePlan } from "@/lib/navigation/service-upgrade-plan"
 import {
   SERVICE_CATEGORIES,
@@ -158,7 +162,7 @@ function ServiceCard({
             </span>
             {badge ? (
               <span
-                className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-bold tracking-wide sm:text-[10px] ${badge.className}`}
+                className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold tracking-wide sm:text-[10px] ${badge.className}`}
               >
                 {badge.label}
               </span>
@@ -264,14 +268,14 @@ function ComingSoonPanel({
               {getServiceUpgradePlan(service).map((track, index) => (
                 <li key={track.id} className="min-w-0 rounded-xl border border-[var(--gh-ref-line)] bg-card p-3">
                   {index % 5 === 0 ? (
-                    <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.12em] text-primary">{UPGRADE_WORKSTREAMS[Math.floor(index / 5)]}</p>
+                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-primary">{UPGRADE_WORKSTREAMS[Math.floor(index / 5)]}</p>
                   ) : null}
                   <div className="flex items-start gap-2.5">
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted text-[10px] font-bold tabular-nums text-foreground">{String(index + 1).padStart(2, "0")}</span>
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-xs font-bold leading-snug text-foreground">{track.title}</span>
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-[9px] font-semibold text-muted-foreground">Planned</span>
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">Planned</span>
                       </span>
                       <span className="mt-1 block text-[11px] leading-relaxed text-muted-foreground">{track.objective}</span>
                       <span className="mt-2 block border-t border-[var(--gh-ref-line)] pt-2 text-[10px] leading-relaxed text-foreground/80"><strong>Release gate:</strong> {track.launchGate}</span>
@@ -350,6 +354,10 @@ export function GreenHavenEcosystemScreen({
   }, [filtered, featured, isSearching])
 
   const handleSelect = useCallback((service: EcosystemService) => {
+    if (service.id === "events" || service.id === "services-ip" || service.id === "impact-history") {
+      setFocusId(service.id)
+      return
+    }
     if (service.id === "field-research") {
       window.location.assign("/field/studio")
       return
@@ -363,6 +371,16 @@ export function GreenHavenEcosystemScreen({
     }
     setDetailService(service)
   }, [])
+
+  if (focusId === "events") {
+    return <EventsDiscoveryScreen onBack={() => setFocusId(null)} />
+  }
+  if (focusId === "services-ip") {
+    return <ServicesDirectoryScreen onBack={() => setFocusId(null)} onOpenMarketplace={(listingId) => navigateTo("marketplace", { listingId })} />
+  }
+  if (focusId === "impact-history") {
+    return <CharityImpactScreen onBack={() => setFocusId(null)} />
+  }
 
   if (detailService) {
     return (

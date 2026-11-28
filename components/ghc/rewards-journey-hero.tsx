@@ -238,7 +238,7 @@ export function RewardsJourneyHero({
               <p className="mt-0.5 text-[13px] font-bold tabular-nums text-foreground">
                 {walletBal == null ? "—" : formatGhc(walletBal)}
               </p>
-              <p className="text-[9px] text-muted-foreground">Wallet</p>
+              <p className="text-[10px] text-muted-foreground">Wallet</p>
             </div>
             <div className="rounded-[1.25rem] border border-border/50 bg-card/90 px-2.5 py-3 text-center shadow-sm">
               <div className="mx-auto mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 ring-1 ring-emerald-100 dark:bg-emerald-950/40 dark:ring-emerald-900/40">
@@ -322,7 +322,7 @@ export function RewardsJourneyHero({
                   >
                     {done ? <Check size={14} strokeWidth={3} aria-hidden /> : d}
                   </div>
-                  <span className="text-[9px] font-semibold tabular-nums text-muted-foreground">
+                  <span className="text-[10px] font-semibold tabular-nums text-muted-foreground">
                     {ghcLabel != null ? formatGhc(ghcLabel) : ""}
                   </span>
                 </div>

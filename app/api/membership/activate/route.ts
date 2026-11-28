@@ -42,6 +42,14 @@ async function rpcPurchaseMembership(input: {
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
     return { ok: false, error: "SERVER_UNAVAILABLE" }
   }
+  if (!input.userId?.trim() || input.userId.length > 160 || !input.referenceId?.trim()
+    || input.referenceId.length > 160 || /[\u0000-\u001f\u007f]/.test(input.userId + input.referenceId)
+    || !Number.isFinite(input.amount) || input.amount <= 0
+    || String(input.row?.user_id || "") !== input.userId
+    || String(input.row?.purchase_ref || "") !== input.referenceId
+    || !["vip", "vvip"].includes(String(input.row?.tier || ""))) {
+    return { ok: false, error: "INVALID_INPUT" }
+  }
   try {
     const res = await fetch(
       `${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/ghc_purchase_membership`,
@@ -59,13 +67,49 @@ async function rpcPurchaseMembership(input: {
           p_reason: input.reason,
           p_row: input.row,
         }),
+        signal: AbortSignal.timeout(10_000),
       }
     )
-    const data = await res.json().catch(() => null)
-    if (!res.ok || !data?.ok) {
-      return { ok: false, error: String(data?.error || "MEMBERSHIP_PURCHASE_FAILED") }
+    const data = await res.json().catch(() => null) as unknown
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      return { ok: false, error: "SERVER_UNAVAILABLE" }
     }
-    return { ok: true, idempotent: Boolean(data.idempotent), spend: data.spend }
+    const payload = data as Record<string, unknown>
+    if (!res.ok || payload.ok === false) {
+      const error = typeof payload.error === "string" && /^[A-Z0-9_]{2,80}$/.test(payload.error)
+        ? payload.error
+        : "MEMBERSHIP_PURCHASE_FAILED"
+      return { ok: false, error }
+    }
+    const spend = payload.spend && typeof payload.spend === "object" && !Array.isArray(payload.spend)
+      ? payload.spend as Record<string, unknown>
+      : null
+    const entitlement = payload.entitlement && typeof payload.entitlement === "object" && !Array.isArray(payload.entitlement)
+      ? payload.entitlement as Record<string, unknown>
+      : null
+    const idempotent = payload.idempotent
+    const spendIdempotent = spend?.idempotent
+    const linkedEntitlement = !!entitlement
+      && String(entitlement.user_id || "") === input.userId
+      && String(entitlement.purchase_ref || "") === input.referenceId
+      && String(entitlement.tier || "") === String(input.row.tier)
+      && entitlement.active === true
+    const linkedSpend = !!spend && spend.ok === true
+      && typeof spendIdempotent === "boolean"
+      && String(spend.referenceId || "") === input.referenceId
+      && (idempotent === true
+        ? spendIdempotent === true
+        : spendIdempotent === false
+          && typeof spend.transactionId === "string" && !!spend.transactionId.trim()
+          && spend.transactionId.length <= 160
+          && Number.isFinite(Number(spend.amount)) && Number(spend.amount) > 0
+          && Math.abs(Number(spend.amount) - input.amount) <= 0.0001)
+    if (payload.ok !== true || typeof idempotent !== "boolean" || !linkedEntitlement || !linkedSpend) {
+      // The atomic RPC may have committed even if its response is incomplete.
+      // Treat it as ambiguous; retrying the same reference uses DB idempotency.
+      return { ok: false, error: "SERVER_UNAVAILABLE" }
+    }
+    return { ok: true, idempotent, spend: payload.spend }
   } catch {
     return { ok: false, error: "MEMBERSHIP_PURCHASE_RPC_FAILED" }
   }

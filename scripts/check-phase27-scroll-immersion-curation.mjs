@@ -14,7 +14,7 @@ const checks = [
   ['analytics requests are bounded and cancellable', /setTimeout\(\(\) => controller\.abort\(\), 10_000\)/.test(panel) && /requestRef\.current\?\.abort\(\)/.test(panel)],
   ['stale analytics responses cannot overwrite current post data', /sequence !== sequenceRef\.current/.test(panel)],
   ['insights use a separate accessible modal sheet', /createPortal\(/.test(panel) && /role="dialog" aria-modal="true"/.test(panel)],
-  ['modal supports Escape, focus trapping and background scroll restoration', /event\.key === "Escape"/.test(panel) && /event\.key !== "Tab"/.test(panel) && /const first = focusable\[0\]/.test(panel) && /last\.focus\(\)/.test(panel) && /document\.body\.style\.overflow = previousOverflow/.test(panel)],
+  ['modal supports Escape, focus trapping and background scroll restoration', /useDialogA11y<HTMLElement>\(open, \(\) => setOpen\(false\)\)/.test(panel) && /ref=\{dialogRef\}/.test(panel) && /role="dialog"/.test(panel)],
   ['reward messaging preserves no-vote-minting boundary', /do not create GHC/.test(panel) && /server-authoritative rewards/.test(panel)],
 ]
 let passed = 0

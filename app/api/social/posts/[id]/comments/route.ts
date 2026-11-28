@@ -19,6 +19,8 @@ import { hydratePublicProfileIdentity } from "@/lib/server/identity/public-profi
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
+const POST_ID_SHAPE = /^[a-zA-Z0-9_-]{1,128}$/
+
 function genId(): string {
   return `cmt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
 }
@@ -31,7 +33,7 @@ export async function GET(
   if (!auth) return NextResponse.json({ ok: false, error: "AUTH_REQUIRED" }, { status: 401 })
   const { id } = await ctx.params
   const postId = String(id || "").trim()
-  if (!postId) return NextResponse.json({ ok: false, error: "INVALID_ID" }, { status: 400 })
+  if (!POST_ID_SHAPE.test(postId)) return NextResponse.json({ ok: false, error: "INVALID_ID" }, { status: 400, headers: { "Cache-Control": "no-store" } })
   if (!socialDbConfigured()) return NextResponse.json({ ok: false, error: "SOCIAL_STORE_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store" } })
   const canView = await canViewSocialPost(auth.userId, postId)
   if (canView === null) return NextResponse.json({ ok: false, error: "POST_VISIBILITY_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store" } })
@@ -80,7 +82,6 @@ export async function GET(
     const state = reactionStates.get(String(comment.id || ""))
     return state ? { ...comment, reactionCounts: state.reactionCounts, viewerReactions: state.viewerReactions } : comment
   })
-  const rpcReadSucceeded = Boolean(chosen.ok && Array.isArray(data?.comments) && (data as { ok?: boolean })?.ok !== false)
   const publicComments = await hydratePublicProfileIdentity(hydratedComments.filter((row): row is Record<string, unknown> => Boolean(row && typeof row === "object")))
   return NextResponse.json({ ok: true, durable: true, comments: publicComments, nextCursor, stableCursor: true }, { headers: { "Cache-Control": "no-store" } })
 }
@@ -99,8 +100,8 @@ export async function POST(
   }
   const { id } = await ctx.params
   const postId = String(id || "").trim()
-  if (!postId) {
-    return NextResponse.json({ ok: false, error: "INVALID_ID" }, { status: 400 })
+  if (!POST_ID_SHAPE.test(postId)) {
+    return NextResponse.json({ ok: false, error: "INVALID_ID" }, { status: 400, headers: { "Cache-Control": "no-store" } })
   }
   const canView = await canViewSocialPost(auth.userId, postId)
   if (canView === null) return NextResponse.json({ ok: false, error: "POST_VISIBILITY_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store" } })
@@ -109,6 +110,12 @@ export async function POST(
   const parsedBody = await readBoundedJson(request, 24 * 1024)
   if (!parsedBody.ok) return NextResponse.json({ ok: false, error: parsedBody.error }, { status: parsedBody.error === "REQUEST_TOO_LARGE" ? 413 : 400, headers: { "Cache-Control": "no-store" } })
   const body = parsedBody.value
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ ok: false, error: "INVALID_BODY" }, { status: 400, headers: { "Cache-Control": "no-store" } })
+  }
+  if ((body.text != null && typeof body.text !== "string") || (body.content != null && typeof body.content !== "string")) {
+    return NextResponse.json({ ok: false, error: "INVALID_COMMENT_TEXT" }, { status: 400, headers: { "Cache-Control": "no-store" } })
+  }
   const text = String(body.text || body.content || "").trim()
   if (text.length > 2000) {
     return NextResponse.json({ ok: false, error: "TOO_LONG" }, { status: 400 })
@@ -248,19 +255,24 @@ export async function POST(
     if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return
     try {
       const u = new URL(`${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/gh_user_profiles`)
-      u.searchParams.set("or", `(${handles.map(h => `username.ilike.${h}`).join(",")})`)
+      // "_" is a LIKE wildcard; escape it so @a_b cannot resolve to "axb" and crowd out the real user.
+      u.searchParams.set("or", `(${handles.map(h => `username.ilike.${h.replace(/_/g, "\\_")}`).join(",")})`)
       u.searchParams.set("select", "gh_user_id,username")
       u.searchParams.set("limit", String(handles.length))
-      const r = await fetch(u.toString(), { headers: { apikey: env.supabaseServiceRoleKey, Authorization: `Bearer ${env.supabaseServiceRoleKey}` }, cache: "no-store" })
-      const rows = await r.json().catch(() => []) as Array<{ gh_user_id?: string; username?: string }>
+      const r = await fetch(u.toString(), { headers: { apikey: env.supabaseServiceRoleKey, Authorization: `Bearer ${env.supabaseServiceRoleKey}` }, cache: "no-store", signal: AbortSignal.timeout(8_000) })
+      if (!r.ok) return
+      const parsedRows = await r.json().catch(() => [])
+      const rows = (Array.isArray(parsedRows) ? parsedRows : []) as Array<{ gh_user_id?: string; username?: string }>
       await Promise.all(rows.map(async row => {
         const uid = String(row.gh_user_id || "")
         const handle = String(row.username || "").toLowerCase()
         if (!uid || uid === auth.userId || !handles.includes(handle)) return
+        // Never tell someone about a comment on a post they cannot open (private, community-only or blocked).
+        if ((await canViewSocialPost(uid, postId)) !== true) return
         await emitSocialNotification({ recipientUserId: uid, actorUserId: auth.userId, type: "mention", entityType: "comment", entityId: comment.id,
           title: "You were mentioned", body: "Someone mentioned you in a comment", dedupeKey: `mention:${comment.id}:${uid}`, metadata: { postId, commentId: comment.id, parentId: comment.parentId, threadRootId: participants.threadRootId, deepLink, handle } })
       }))
     } catch { /* mentions are non-critical */ }
-  })()
+  })().catch(() => undefined)
   return NextResponse.json({ ok: true, durable: true, idempotent: Boolean(data.idempotent), commentCount: Number.isFinite(data.commentCount) ? Math.max(0, Number(data.commentCount)) : undefined, comment: { ...comment, id: String(data.id || comment.id) } }, { headers: { "Cache-Control": "no-store" } })
 }

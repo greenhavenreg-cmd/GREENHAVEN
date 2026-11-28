@@ -79,30 +79,20 @@ export async function recordGhcNotification(input: {
   const dedupeKey = buildDedupe(userId, input.eventType, input.referenceId, input.dedupeKey)
 
   if (isDb()) {
-    const env = readGhcServerEnv()
-    const url = "rpc/ghc_record_notification_event"
     try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: env.supabaseServiceRoleKey!,
-          Authorization: `Bearer ${env.supabaseServiceRoleKey!}`,
-        },
-        body: JSON.stringify({
-          p_user_id: userId,
-          p_event_type: input.eventType,
-          p_title: input.title,
-          p_body: input.body,
-          p_reference_id: input.referenceId ?? null,
-          p_request_id: input.requestId ?? null,
-          p_payload: { ...(input.metadata || {}), correlation: buildCorrelationEnvelope({ kind: "transfer", event: input.eventType, counterpartyId: input.metadata?.counterpartyId ? String(input.metadata.counterpartyId) : undefined, requestId: input.requestId }) },
-          p_dedupe_key: dedupeKey,
-          p_expires_at: input.expiresAt ? new Date(input.expiresAt).toISOString() : null,
-        }),
-      })
-      if (!res.ok) return { ok: false }
-      const data = (await res.json()) as Record<string, unknown>
+      const res = await supabaseRpc<Record<string, unknown>>("ghc_record_notification_event", {
+        p_user_id: userId,
+        p_event_type: input.eventType,
+        p_title: input.title,
+        p_body: input.body,
+        p_reference_id: input.referenceId ?? null,
+        p_request_id: input.requestId ?? null,
+        p_payload: { ...(input.metadata || {}), correlation: buildCorrelationEnvelope({ kind: "transfer", event: input.eventType, counterpartyId: input.metadata?.counterpartyId ? String(input.metadata.counterpartyId) : undefined, requestId: input.requestId }) },
+        p_dedupe_key: dedupeKey,
+        p_expires_at: input.expiresAt ? new Date(input.expiresAt).toISOString() : null,
+      }, { timeoutMs: 8_000 })
+      if (!res.ok || !res.data || typeof res.data !== "object") return { ok: false }
+      const data = res.data as Record<string, unknown>
       return {
         ok: data.ok === true,
         idempotent: Boolean(data.idempotent),
@@ -141,13 +131,22 @@ export async function recordGhcNotification(input: {
   return { ok: true, idempotent: false, id: row.id }
 }
 
+/** Compatibility wrapper: an unavailable store reads as an empty list. Routes that must tell an outage from "no notifications" use listGhcNotificationsChecked. */
 export async function listGhcNotifications(
   userId: string,
   opts?: { limit?: number; unreadOnly?: boolean }
 ): Promise<GhcNotificationRecord[]> {
-  const limit = Math.min(opts?.limit ?? 50, 100)
+  return (await listGhcNotificationsChecked(userId, opts)) ?? []
+}
+
+/** Lists economy notifications, or null when the store could not be read (so callers can answer 503 instead of an empty 200). */
+export async function listGhcNotificationsChecked(
+  userId: string,
+  opts?: { limit?: number; unreadOnly?: boolean }
+): Promise<GhcNotificationRecord[] | null> {
+  const safeLimit = Number.isFinite(opts?.limit) ? Math.floor(opts!.limit as number) : 50
+  const limit = Math.max(1, Math.min(safeLimit, 100))
   if (isDb()) {
-    const env = readGhcServerEnv()
     const base = "ghc_economy_events"
     const params = new URLSearchParams()
     params.set("user_id", `eq.${userId}`)
@@ -155,14 +154,9 @@ export async function listGhcNotifications(
     params.set("limit", String(limit))
     if (opts?.unreadOnly) params.set("read_at", "is.null")
     try {
-      const res = await fetch(`${base}?${params}`, {
-        headers: {
-          apikey: env.supabaseServiceRoleKey!,
-          Authorization: `Bearer ${env.supabaseServiceRoleKey!}`,
-        },
-      })
-      if (!res.ok) return []
-      const rows = (await res.json()) as Array<Record<string, unknown>>
+      const res = await supabaseRest<Array<Record<string, unknown>>>(`${base}?${params}`, { method: "GET", timeoutMs: 8_000 })
+      if (!res.ok || !Array.isArray(res.data)) return null
+      const rows = res.data
       return rows.map((r) => ({
         id: String(r.id),
         userId: String(r.user_id),
@@ -178,67 +172,69 @@ export async function listGhcNotifications(
         dedupeKey: r.dedupe_key ? String(r.dedupe_key) : undefined,
       }))
     } catch {
-      return []
+      return null
     }
   }
 
-  if (!allowMemory()) return []
+  if (!allowMemory()) return null
   let list = memoryNotifs.filter((n) => n.userId === userId)
   if (opts?.unreadOnly) list = list.filter((n) => !n.readAt)
   return list.sort((a, b) => b.createdAt - a.createdAt).slice(0, limit)
 }
 
+export type MarkNotificationReadResult = "marked" | "not_found" | "unavailable"
+
+/**
+ * Mark one economy notification read. Only the owner's row is touched. An already-read row is a success
+ * (idempotent) so a retry or a second device never reports a false failure, and a missing row is distinguished
+ * from a store outage so callers can answer 404 versus 503.
+ */
 export async function markGhcNotificationRead(
   userId: string,
   notificationId: string
-): Promise<boolean> {
+): Promise<MarkNotificationReadResult> {
   if (isDb()) {
-    const env = readGhcServerEnv()
-    const url = "ghc_economy_events?id=eq.${encodeURIComponent(notificationId)}&user_id=eq.${encodeURIComponent(userId)}"
     try {
-      const res = await fetch(url, {
+      const owner = `id=eq.${encodeURIComponent(notificationId)}&user_id=eq.${encodeURIComponent(userId)}`
+      const patched = await supabaseRest<Array<{ id: string }>>(`ghc_economy_events?${owner}&read_at=is.null&select=id`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: env.supabaseServiceRoleKey!,
-          Authorization: `Bearer ${env.supabaseServiceRoleKey!}`,
-          Prefer: "return=minimal",
-        },
+        headers: { Prefer: "return=representation" },
         body: JSON.stringify({ read_at: new Date().toISOString() }),
+        timeoutMs: 8_000,
       })
-      return res.ok
+      if (!patched.ok) return "unavailable"
+      if (Array.isArray(patched.data) && patched.data.length > 0) return "marked"
+      const existing = await supabaseRest<Array<{ id: string }>>(`ghc_economy_events?${owner}&select=id&limit=1`, { method: "GET", timeoutMs: 8_000 })
+      if (!existing.ok) return "unavailable"
+      return Array.isArray(existing.data) && existing.data.length > 0 ? "marked" : "not_found"
     } catch {
-      return false
+      return "unavailable"
     }
   }
-  if (!allowMemory()) return false
+  if (!allowMemory()) return "unavailable"
   const row = memoryNotifs.find((n) => n.id === notificationId && n.userId === userId)
-  if (!row) return false
-  row.readAt = Date.now()
-  return true
+  if (!row) return "not_found"
+  if (!row.readAt) row.readAt = Date.now()
+  return "marked"
 }
 
-export async function markAllGhcNotificationsRead(userId: string): Promise<number> {
+/** Mark every unread economy notification read. Returns the number changed, or null when the store failed. */
+export async function markAllGhcNotificationsRead(userId: string): Promise<number | null> {
   if (isDb()) {
-    const env = readGhcServerEnv()
-    const url = "ghc_economy_events?user_id=eq.${encodeURIComponent(userId)}&read_at=is.null"
     try {
-      const res = await fetch(url, {
+      const res = await supabaseRest<Array<{ id: string }>>(`ghc_economy_events?user_id=eq.${encodeURIComponent(userId)}&read_at=is.null&select=id`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: env.supabaseServiceRoleKey!,
-          Authorization: `Bearer ${env.supabaseServiceRoleKey!}`,
-          Prefer: "return=minimal",
-        },
+        headers: { Prefer: "return=representation" },
         body: JSON.stringify({ read_at: new Date().toISOString() }),
+        timeoutMs: 10_000,
       })
-      return res.ok ? 1 : 0
+      if (!res.ok) return null
+      return Array.isArray(res.data) ? res.data.length : 0
     } catch {
-      return 0
+      return null
     }
   }
-  if (!allowMemory()) return 0
+  if (!allowMemory()) return null
   let n = 0
   for (const row of memoryNotifs) {
     if (row.userId === userId && !row.readAt) {
@@ -250,8 +246,31 @@ export async function markAllGhcNotificationsRead(userId: string): Promise<numbe
 }
 
 export async function unreadGhcNotificationCount(userId: string): Promise<number> {
-  const list = await listGhcNotifications(userId, { unreadOnly: true, limit: 100 })
-  return list.length
+  return (await unreadGhcNotificationCountChecked(userId)) ?? 0
+}
+
+/**
+ * Exact unread count (no 100-row cap) or null when the store failed, so the bell keeps its last known
+ * count on an outage instead of being reset to zero.
+ */
+export async function unreadGhcNotificationCountChecked(userId: string): Promise<number | null> {
+  if (isDb()) {
+    try {
+      const res = await supabaseRest<unknown[]>(
+        `ghc_economy_events?user_id=eq.${encodeURIComponent(userId)}&read_at=is.null&select=id&limit=1`,
+        { method: "GET", headers: { Prefer: "count=exact" }, timeoutMs: 8_000 },
+      )
+      if (!res.ok) return null
+      const range = res.headers.get("content-range") || ""
+      const total = /\/(\d+)$/.exec(range)
+      if (total) return Number(total[1])
+      return Array.isArray(res.data) ? res.data.length : null
+    } catch {
+      return null
+    }
+  }
+  const list = await listGhcNotificationsChecked(userId, { unreadOnly: true, limit: 100 })
+  return list ? list.length : null
 }
 
 /** Call after authoritative transfer success — records both sides with dedupe */
