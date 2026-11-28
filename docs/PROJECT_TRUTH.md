@@ -5,6 +5,10 @@
 **Parent baseline:** user-designated complete GreenHaven v0.338.174 / RUN503 archive.
 **Current status:** **NOT APPROVED** (source candidate only).
 
+## Canonical navigation
+
+Primary bottom navigation, in order: Home · Discover · Messages · Communities · Cart · Profile. The order is defined by `BOTTOM_NAV_IDS` in `lib/navigation/destinations.ts` and is asserted by `scripts/check-pass40-feed-reconciliation.mjs`.
+
 ## RUN504 — Notification outage and messaging presence durability
 
 - Unified notification count and list reads return HTTP 503 when their durable store reports failure. They no longer present store failure as a successful empty list or zero unread count.

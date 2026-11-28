@@ -3,13 +3,13 @@
 **Package:** `gh-connect@0.338.177`  
 **Candidate:** RUN506 — Direct-call control state and accessibility  
 **Baseline archive:** `GREENHAVEN-0.338.176-RUN505-CONVERSATION-INBOX-OUTAGE-INTEGRITY-2026-11-28.zip`  
-**Working archive:** `GREENHAVEN-0_338_177-RUN512-TESTNET-PROFILE-PARITY-2026-11-28.zip`  
+**Working archive:** `GREENHAVEN-0_338_177-RUN512B-PREBUILD-NAV-FIX-2026-11-28.zip`  
 **Date:** 28 November 2026  
 **Status:** Source candidate only; production NOT APPROVED.
 
 RUN506 resets microphone and camera UI state when a new call session replaces the previous one, exposes toggle state through `aria-pressed`, and announces call phase changes through a polite live region. It preserves server-authorized call signaling, media acquisition, call policy, and hangup behavior. See `docs/RUN506-DIRECT-CALL-CONTROL-STATE-2026-11-28.md`.
 
-RUN512 adds `PI_EARNINGS_ADAPTERS_ENABLED=true` and `GH_WITHDRAWAL_OPERATOR_IDS` to the Testnet activation profile (`config/testnet-payments.env.example`; without the first, referral and other adapter credits are denied) and adds a parity guard between that profile and the flags the code gates on. Configuration and static check only; Production unchanged. See `docs/RUN512-TESTNET-PROFILE-PARITY-2026-11-28.md`.
+RUN512 adds `PI_EARNINGS_ADAPTERS_ENABLED=true` and `GH_WITHDRAWAL_OPERATOR_IDS` to the Testnet activation profile (`config/testnet-payments.env.example`; without the first, referral and other adapter credits are denied) and adds a parity guard between that profile and the flags the code gates on. Configuration and static check only; Production unchanged. See `docs/RUN512-TESTNET-PROFILE-PARITY-2026-11-28.md`. RUN512B also restores the canonical-navigation sentence in `docs/PROJECT_TRUTH.md` that prebuild check 177 (`check-pass40-feed-reconciliation`) requires; that check was failing in the RUN511 bundle and blocked the Vercel build.
 
 RUN511 requires a price greater than zero to publish a product (seller form and listings API; an empty price was previously treated as 0). See `docs/RUN511-MARKETPLACE-POSITIVE-PRICE-2026-11-28.md`.
 

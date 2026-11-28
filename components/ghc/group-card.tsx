@@ -6,7 +6,7 @@
  */
 
 import { useState, memo } from "react"
-import { Users, MessageSquare, LayoutGrid, ChevronRight } from "lucide-react"
+import { Users, MessageSquare, LayoutGrid, ChevronRight, Pin } from "lucide-react"
 import { LazyImage } from "./lazy-image"
 import { formatCommunityRole, communityRoleBadgeClass } from "@/lib/community/role-labels"
 import { communityPrivacyLabel, normalizeCommunityPrivacy } from "@/lib/community/discovery"
@@ -96,7 +96,7 @@ function GroupCardContent({
     <article className="relative rounded-[1.35rem] border border-border/60 bg-card p-3.5 shadow-[var(--gh-card-shadow)] transition hover:border-emerald-400/50 hover:shadow-[var(--gh-card-shadow-lg)]">
       {isPinned ? <span className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-[var(--gh-green)]" aria-hidden /> : null}
       {isSample ? (
-        <span className="absolute right-2 top-2 z-10 rounded-md bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">Sample</span>
+        <span className="absolute right-2 top-2 z-10 rounded-md bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm">Sample</span>
       ) : null}
 
       <button
@@ -108,7 +108,7 @@ function GroupCardContent({
       >
         <span className="relative flex h-[4.25rem] w-[4.25rem] shrink-0 items-center justify-center overflow-hidden rounded-[1.1rem] bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 text-lg font-bold text-white shadow-md ring-2 ring-emerald-500/15">
           {coverImage || groupAvatar ? (
-            <LazyImage src={coverImage || groupAvatar || ""} alt="Community cover" className="h-full w-full object-cover" />
+            <LazyImage src={coverImage || groupAvatar || ""} alt={`Community cover for ${groupName}`} className="h-full w-full object-cover" />
           ) : initial}
           {onlineCount > 0 ? <span className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card bg-emerald-400" aria-label={`${onlineCount} online`} /> : null}
         </span>
@@ -126,6 +126,12 @@ function GroupCardContent({
                 <span className="inline-flex items-center gap-0.5"><Users size={12} aria-hidden />{safeMemberCount.toLocaleString()} {safeMemberCount === 1 ? "member" : "members"}</span>
                 <span aria-hidden>·</span>
                 <span>{activityTime}</span>
+                {onlineCount > 0 ? (
+                  <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
+                    {Math.floor(onlineCount).toLocaleString()} online
+                  </span>
+                ) : null}
                 {role && role !== "guest" ? <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${communityRoleBadgeClass(role)}`}>{formatCommunityRole(role)}</span> : null}
               </span>
             </span>
@@ -146,6 +152,7 @@ function GroupCardContent({
         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${chatUnreadResolved > 0 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200" : "bg-muted text-muted-foreground"}`}>
           <MessageSquare size={11} aria-hidden />Chat{chatUnreadResolved > 0 ? <span className="tabular-nums">{chatUnreadResolved > 99 ? "99+" : chatUnreadResolved}</span> : null}
         </span>
+        {isPinned ? <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground"><Pin size={11} aria-hidden />Pinned</span> : null}
         {isMuted ? <span className="text-[10px] font-medium text-muted-foreground">Muted</span> : null}
         {membershipStatus === "pending" && !isJoined ? <span className="ml-auto rounded-full border border-amber-300/70 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100" role="status">Request pending</span> : null}
         {membershipStatus === "invited" && !isJoined ? (

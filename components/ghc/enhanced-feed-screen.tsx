@@ -18,7 +18,7 @@ import { shouldSendAttention } from "@/lib/social/attention-client"
 import { usePermissions } from "@/hooks/usePermissions"
 import { ShareSheet } from "./share-sheet"
 import type { ShareResult } from "@/lib/share-service"
-import { Bookmark, Plus, Search, Filter, Zap, Clock, TrendingUp, Users, MapPin, RefreshCw, MessageCircle, Send, X, UsersRound, Hash, Compass, Store } from "lucide-react"
+import { Bookmark, Plus, Search, Filter, Zap, Clock, TrendingUp, Users, MapPin, RefreshCw, MessageCircle, Send, X, UsersRound, Hash, Compass, Store, ArrowUp } from "lucide-react"
 import { MOBILE_PAGE_SIZES, getAdaptiveFeedPageSize, prefetchMediaFacades, preferReducedData, setPreferReducedData } from "@/lib/mobile-performance"
 import { getBoundDomainServices } from "@/lib/domains/compat"
 import { GlobalSearchModal } from "./global-search"
@@ -138,6 +138,10 @@ export function EnhancedFeedScreen({ onCompose, onProfile }: EnhancedFeedScreenP
   const [locationLane, setLocationLane] = useState<FeedLocationLane>("worldwide")
   const [intentionBias, setIntentionBias] = useState<FeedIntentionBias>("balanced")
   const [focusMode, setFocusMode] = useState(false)
+  // Back-to-top appears once the reader is well past the first screens.
+  const [showBackToTop, setShowBackToTop] = useState(false)
+  const feedTabsRef = useRef<HTMLDivElement>(null)
+  const feedTabsMountedRef = useRef(false)
   const [showFeedControls, setShowFeedControls] = useState(false)
   // Device-local data saver; browser/network constrained-data signals always take precedence.
   const [reducedData, setReducedData] = useState(() => preferReducedData())
@@ -147,6 +151,18 @@ export function EnhancedFeedScreen({ onCompose, onProfile }: EnhancedFeedScreenP
     setDisplayedPostsCount(getAdaptiveFeedPageSize())
     if (containerRef.current) containerRef.current.scrollTo({ top: 0, behavior: "smooth" })
   }, [])
+
+  // Keep the selected filter tab visible when the strip overflows.
+  useEffect(() => {
+    if (!feedTabsMountedRef.current) {
+      feedTabsMountedRef.current = true
+      return
+    }
+    const el = feedTabsRef.current?.querySelector<HTMLElement>(`[data-feed-filter="${activeFilter}"]`)
+    if (!el || typeof el.scrollIntoView !== "function") return
+    const reduce = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    el.scrollIntoView({ block: "nearest", inline: "center", behavior: reduce ? "auto" : "smooth" })
+  }, [activeFilter])
 
   // Owner-only Create → Others → Saved posts shortcut. The feed owns the saved filter
   // and applies the same account-scoped saved-post query as the visible filter tabs.
@@ -1043,7 +1059,25 @@ export function EnhancedFeedScreen({ onCompose, onProfile }: EnhancedFeedScreenP
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="gh-premium-feed-toolbar sticky top-0 z-20 border-b border-border/50 bg-background/95 px-3 py-2 backdrop-blur-md">
           <div className="flex items-center gap-2">
-            <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto scrollbar-hide" role="tablist" aria-label={t("feedFilters")}>
+            <div
+              ref={feedTabsRef}
+              className="flex min-w-0 flex-1 snap-x snap-proximity items-center gap-1 overflow-x-auto scrollbar-hide"
+              role="tablist"
+              aria-label={t("feedFilters")}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") return
+                const current = Math.max(0, FEED_FILTERS.findIndex((item) => item.value === activeFilter))
+                const next =
+                  event.key === "Home" ? 0
+                  : event.key === "End" ? FEED_FILTERS.length - 1
+                  : event.key === "ArrowRight" ? (current + 1) % FEED_FILTERS.length
+                  : (current - 1 + FEED_FILTERS.length) % FEED_FILTERS.length
+                event.preventDefault()
+                const target = FEED_FILTERS[next]
+                handleFeedFilterChange(target.value)
+                window.requestAnimationFrame(() => feedTabsRef.current?.querySelector<HTMLButtonElement>(`[data-feed-filter="${target.value}"]`)?.focus())
+              }}
+            >
               {FEED_FILTERS.map((filter) => {
                 const active = activeFilter === filter.value
                 return (
@@ -1052,9 +1086,11 @@ export function EnhancedFeedScreen({ onCompose, onProfile }: EnhancedFeedScreenP
                   type="button"
                   role="tab"
                   aria-selected={active}
+                  data-feed-filter={filter.value}
+                  tabIndex={active || (!FEED_FILTERS.some((item) => item.value === activeFilter) && filter.value === FEED_FILTERS[0].value) ? 0 : -1}
                   title={t(filter.label)}
                   onClick={() => handleFeedFilterChange(filter.value)}
-                  className={`relative inline-flex min-h-10 shrink-0 items-center gap-1.5 border-b-2 px-2.5 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                  className={`relative inline-flex min-h-10 shrink-0 snap-center items-center gap-1.5 border-b-2 px-2.5 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
                     active
                       ? "border-[var(--gh-green)] text-foreground"
                       : "border-transparent text-muted-foreground hover:text-foreground"
@@ -1167,10 +1203,27 @@ export function EnhancedFeedScreen({ onCompose, onProfile }: EnhancedFeedScreenP
         ) : null}
         {feedError ? <div className="mx-3 mt-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-[11px] text-destructive" role="alert">{feedError.message}</div> : null}
 
+        {showBackToTop ? (
+          <button
+            type="button"
+            onClick={() => {
+              const reduce = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+              containerRef.current?.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" })
+            }}
+            aria-label="Back to top"
+            className="fixed bottom-[calc(var(--gh-screen-bottom-inset,5rem)+0.75rem)] right-4 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/60 bg-card/95 text-foreground shadow-lg backdrop-blur transition hover:bg-muted active:scale-95 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <ArrowUp size={18} aria-hidden />
+          </button>
+        ) : null}
         <div
           ref={containerRef}
           className="gh-premium-feed-scroll min-h-0 flex-1 overflow-y-auto [touch-action:pan-y] pb-[var(--gh-screen-bottom-inset)] scrollbar-hide [-webkit-overflow-scrolling:touch]"
-          onScroll={onHeaderScroll}
+          onScroll={(event) => {
+            onHeaderScroll(event)
+            const past = event.currentTarget.scrollTop > 900
+            setShowBackToTop((previous) => (previous === past ? previous : past))
+          }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={() => void handleTouchEnd()}

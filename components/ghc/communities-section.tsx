@@ -76,7 +76,7 @@ export function CommunitiesSection({
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-[#7C3AED]" aria-hidden="true" />
-          <h2 id="communities-heading" className="text-lg font-bold text-black">
+          <h2 id="communities-heading" className="text-lg font-bold text-foreground">
             Communities
           </h2>
         </div>
@@ -86,7 +86,12 @@ export function CommunitiesSection({
       </div>
 
       {status === "loading" ? (
-        <p className="text-sm text-muted-foreground">Loading communities…</p>
+        <div role="status" aria-live="polite" className="flex flex-wrap gap-2">
+          <span className="sr-only">Loading communities…</span>
+          {[88, 120, 72, 104, 96].map((w) => (
+            <span key={w} aria-hidden="true" className="h-8 animate-pulse rounded-full bg-muted motion-reduce:animate-none" style={{ width: w }} />
+          ))}
+        </div>
       ) : null}
 
       {status === "error" ? (
@@ -117,12 +122,20 @@ export function CommunitiesSection({
               <button
                 type="button"
                 onClick={() => onViewCommunity(c.name)}
-                className="rounded-full border border-border/70 bg-muted/40 px-3 py-1.5 text-sm font-medium text-foreground transition hover:border-emerald-300 hover:bg-emerald-50"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border/70 bg-muted/40 px-3 py-1.5 text-sm font-medium text-foreground transition hover:border-emerald-300 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 motion-reduce:transition-none dark:hover:border-emerald-700 dark:hover:bg-emerald-950/40"
                 title={c.purpose || c.description || c.name}
+                aria-label={
+                  typeof c.memberCount === "number" && c.memberCount > 0
+                    ? `${c.name}, ${c.memberCount.toLocaleString()} ${c.memberCount === 1 ? "member" : "members"}`
+                    : c.name
+                }
               >
                 {c.name}
                 {typeof c.memberCount === "number" && c.memberCount > 0 ? (
-                  <span className="ml-1 text-xs text-muted-foreground">{c.memberCount}</span>
+                  <span className="inline-flex items-center gap-0.5 text-xs tabular-nums text-muted-foreground" aria-hidden="true">
+                    <Users className="h-3 w-3" />
+                    {c.memberCount.toLocaleString()}
+                  </span>
                 ) : null}
               </button>
             </li>

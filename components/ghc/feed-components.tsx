@@ -20,11 +20,11 @@ import { plural } from "@/lib/ui/plural"
 // Skeleton loader for posts
 export function PostSkeleton() {
   return (
-    <div className="bg-card border border-border/60 rounded-[1.45rem] overflow-hidden shadow-sm animate-pulse">
+    <div role="status" aria-busy="true" aria-label="Loading post" className="bg-card border border-border/60 rounded-[var(--gh-fb-card-radius,1.45rem)] overflow-hidden shadow-sm animate-pulse motion-reduce:animate-none">
       {/* Header skeleton */}
       <div className="p-3 border-b border-border/50 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-full bg-muted"></div>
+          <div className="h-10 w-10 rounded-full bg-muted sm:h-11 sm:w-11"></div>
           <div className="space-y-1">
             <div className="h-3 w-24 bg-muted rounded"></div>
             <div className="h-2 w-16 bg-muted/70 rounded"></div>
@@ -465,18 +465,19 @@ export function ModeFilter({ currentMode, selectedFilter, onFilterChange }: Mode
   const relevantModes = modes.filter((m) => m.id === "all" || m.mode === currentMode)
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-2 px-4 scrollbar-hide">
+    <div className="flex gap-2 overflow-x-auto pb-2 px-4 scrollbar-hide" role="group" aria-label="Filter feed by relationship mode">
       {relevantModes.map((mode) => (
         <button type="button"
           key={mode.id}
           onClick={() => onFilterChange(mode.id)}
-          className={`flex items-center gap-1 whitespace-nowrap py-1.5 px-3 rounded-full font-semibold text-xs transition-all active:scale-95 ${
+          aria-pressed={selectedFilter === mode.id}
+          className={`flex min-h-9 items-center gap-1 whitespace-nowrap py-1.5 px-3 rounded-full font-semibold text-xs transition-all active:scale-95 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
             selectedFilter === mode.id
               ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md"
               : "bg-muted text-foreground/90 hover:bg-muted/80"
           }`}
         >
-          <span>{mode.emoji}</span>
+          <span aria-hidden="true">{mode.emoji}</span>
           {mode.label}
         </button>
       ))}
@@ -495,10 +496,13 @@ export function FloatingCreateButton({ onClick, isVisible }: FloatingCreateButto
   return (
     <button type="button"
       onClick={onClick}
-      className={`fixed bottom-24 right-4 w-14 h-14 rounded-full gh-create-fab text-white shadow-lg hover:shadow-xl active:scale-90 transition-all flex items-center justify-center z-40 ${
+      className={`fixed bottom-24 right-4 w-14 h-14 rounded-full gh-create-fab text-white shadow-lg hover:shadow-xl active:scale-90 transition-all motion-reduce:transition-none flex items-center justify-center z-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${
         isVisible ? "translate-y-0 opacity-100" : "translate-y-20 opacity-0 pointer-events-none"
       }`}
       title="Create Post"
+      aria-label="Create post"
+      aria-hidden={!isVisible}
+      tabIndex={isVisible ? 0 : -1}
     >
       <Plus size={24} strokeWidth={3} />
     </button>
@@ -515,8 +519,8 @@ export function PeopleRecommendation({ people, onFollow }: PeopleRecommendationP
   if (people.length === 0) return null
 
   return (
-    <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-200">
-      <p className="text-xs font-bold text-emerald-900 mb-3 uppercase tracking-wide">
+    <section aria-label="People you may know" className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-200 dark:from-emerald-950/40 dark:to-teal-950/30 dark:border-emerald-900">
+      <p className="text-xs font-bold text-emerald-900 mb-3 dark:text-emerald-200">
         People You May Know
       </p>
       <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
@@ -526,7 +530,7 @@ export function PeopleRecommendation({ people, onFollow }: PeopleRecommendationP
               <DurableImage
                 src={person.photo || "/placeholder.svg"}
                 alt={person.name}
-                className="w-14 h-14 rounded-full object-cover border-2 border-emerald-300 mx-auto"
+                className="w-14 h-14 rounded-full object-cover border-2 border-emerald-300 mx-auto dark:border-emerald-700"
                 loading="lazy"
                 decoding="async"
                 onError={(event) => {
@@ -538,13 +542,14 @@ export function PeopleRecommendation({ people, onFollow }: PeopleRecommendationP
             <p className="text-xs font-bold text-foreground truncate w-14">{person.name}</p>
             <button type="button"
               onClick={() => onFollow(person.id)}
-              className="text-xs text-pink-600 font-semibold mt-1 hover:text-pink-700 active:scale-90 transition-all"
+              aria-label={`Follow ${person.name}`}
+              className="mt-1 inline-flex min-h-9 items-center rounded-full px-3 text-xs font-semibold text-pink-600 transition-all hover:bg-pink-50 hover:text-pink-700 active:scale-90 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 dark:text-pink-300 dark:hover:bg-pink-950/40"
             >
               Follow
             </button>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   )
 }

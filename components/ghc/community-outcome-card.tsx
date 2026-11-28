@@ -22,8 +22,18 @@ export function CommunityOutcomeCard({ outcome, onAction }: { outcome: Community
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">What matters now</p>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">{outcome.priority}</span>
+            <p className="text-[11px] font-semibold text-muted-foreground">What matters now</p>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                outcome.priority === "high"
+                  ? "bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
+                  : outcome.priority === "medium"
+                    ? "bg-sky-100 text-sky-900 dark:bg-sky-950/50 dark:text-sky-200"
+                    : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {outcome.priority}
+            </span>
           </div>
           <h2 id="community-outcome-title" className="mt-0.5 text-[13px] font-bold text-foreground">{outcome.title}</h2>
           <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">{outcome.detail}</p>

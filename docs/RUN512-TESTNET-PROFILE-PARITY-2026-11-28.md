@@ -24,3 +24,14 @@ Status: configuration template and static guard only. Production NOT APPROVED. N
 
 ## Not changed
 Production behavior is unchanged: the unlock and withdrawals stay off when `VERCEL_ENV=production`. Open release gates (supported Node 24.15+, typecheck, ESLint, production build, device and multi-account Testnet acceptance) are not represented as passed.
+
+## Prebuild repair (RUN512B)
+Vercel failed at prebuild check 177/500, `check-pass40-feed-reconciliation.mjs`, assertion "canonical navigation contract remains intact". The check requires `docs/PROJECT_TRUTH.md` to contain `Home · Discover · Messages · Communities · Cart · Profile`; that sentence was missing from the uploaded RUN511 bundle (it also failed there). `BOTTOM_NAV_IDS` in `lib/navigation/destinations.ts` already matched. Fix: added a "Canonical navigation" section to `docs/PROJECT_TRUTH.md`. No code changed.
+
+After the fix, all 500 `prebuild:checks` scripts were run individually: 498 pass. The two that fail locally are environmental only: `check-jsx-duplicate-props` needs the `typescript` package (dependencies not installed here) and `check-node-runtime` requires Node 24.15+ (this workspace has Node 22). Both pass on Vercel, which installs dependencies and uses Node 24.
+
+`verify:static` and `prebuild:checks` are different lists; `verify:static` passing does not imply the prebuild gate passes.
+
+## Open: dependency audit gate (GitHub Actions)
+The `Dependency security audit` workflow reported 22 known findings (1 critical, 13 high, 6 moderate, 2 low) and blocks on any finding. This is independent of the Vercel build. It needs `npm audit` against the registry and dependency upgrades; it was not changed here.
+

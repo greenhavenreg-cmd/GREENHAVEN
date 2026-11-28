@@ -25,6 +25,14 @@ import {
   Copy,
   ImagePlus,
   Loader2,
+  Image as ImageGlyph,
+  Video as VideoGlyph,
+  BarChart3,
+  Trophy,
+  ShoppingBag,
+  Globe,
+  Clock,
+  Info,
 } from "lucide-react"
 import { SafeTextWithLinks } from "./safe-external-links"
 import { absoluteTimeLabel, formatRelativeTime } from "@/lib/product/essentials"
@@ -70,6 +78,22 @@ function formatGhcAmount(value: unknown): string {
   if (!Number.isFinite(n)) return "0"
   const fixed = n.toFixed(4)
   return fixed.includes(".") ? fixed.replace(/0+$/, "").replace(/\.$/, "") : fixed
+}
+
+/** ISO + readable timestamps for the <time> element; undefined when the value is not a real date. */
+function postTimeAttrs(value: unknown): { dateTime: string; title: string } | null {
+  const ms = Number(value)
+  if (!Number.isFinite(ms) || ms <= 0) return null
+  const date = new Date(ms)
+  if (Number.isNaN(date.getTime())) return null
+  try {
+    return {
+      dateTime: date.toISOString(),
+      title: new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date),
+    }
+  } catch {
+    return null
+  }
 }
 
 function toastEvent(message: string, type: "success" | "error" | "info") {
@@ -184,6 +208,9 @@ function EnhancedPostCardInner({
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [editingPost, editMediaBusy])
   const [imageIndex, setImageIndex] = useState<number>(0)
+  // Horizontal swipe between gallery images (touch). A completed swipe must not also open the lightbox.
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null)
+  const swipeConsumedRef = useRef(false)
   const [mediaToolsOpen, setMediaToolsOpen] = useState(false)
   const mediaLongPressRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mediaLongPressFiredRef = useRef(false)
@@ -538,7 +565,7 @@ function EnhancedPostCardInner({
       tabIndex={onOpenPost ? 0 : undefined}
       aria-busy={curationBusy || undefined}
       aria-label={post.authorName ? `Post by ${displayAuthor}` : "Post"}
-      className={`gh-post-card gh-card-interactive group/post relative max-w-full overflow-x-hidden overflow-hidden rounded-[var(--gh-fb-card-radius,0.75rem)] border border-border/60 bg-card text-card-foreground shadow-[var(--gh-card-shadow)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${onOpenPost ? "cursor-pointer" : "cursor-default"}`}
+      className={`gh-post-card gh-card-interactive group/post relative max-w-full overflow-x-hidden overflow-hidden rounded-[var(--gh-fb-card-radius,0.75rem)] border border-border/60 bg-card text-card-foreground shadow-[var(--gh-card-shadow)] transition-colors hover:border-border focus-within:border-emerald-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${onOpenPost ? "cursor-pointer" : "cursor-default"}`}
       onClick={(event) => {
         const target = event.target as HTMLElement | null
         if (target?.closest("button, a, input, textarea, select, video, [role=button], [data-post-no-open]")) return
@@ -585,7 +612,14 @@ function EnhancedPostCardInner({
               })()}
               {!(readOnly && !(Number(post.createdAt) > 0)) ? (
                 <p className="gh-fb-meta-line text-[11px] leading-4">
-                  {timeAgo(post.createdAt)}
+                  {(() => {
+                    const stamp = postTimeAttrs(post.createdAt)
+                    return stamp ? (
+                      <time dateTime={stamp.dateTime} title={stamp.title}>{timeAgo(post.createdAt)}</time>
+                    ) : (
+                      timeAgo(post.createdAt)
+                    )
+                  })()}
                   {(post.isEdited || post.editedAt) && (
                     <span className="ml-1 text-[10px] font-semibold">· Edited</span>
                   )}
@@ -602,14 +636,37 @@ function EnhancedPostCardInner({
                 const isListing = Boolean((post as Post & { listingId?: string }).listingId)
                 const label = isListing ? "Listing" : isPoll ? "Poll" : isChallenge ? "Challenge" : hasVideo ? "Video" : hasImage ? "Photo" : null
                 if (!label) return null
+                const KindIcon = isListing ? ShoppingBag : isPoll ? BarChart3 : isChallenge ? Trophy : hasVideo ? VideoGlyph : ImageGlyph
+                const kindTone = isListing
+                  ? "bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
+                  : isPoll
+                    ? "bg-violet-100 text-violet-900 dark:bg-violet-950/50 dark:text-violet-200"
+                    : isChallenge
+                      ? "bg-orange-100 text-orange-900 dark:bg-orange-950/50 dark:text-orange-200"
+                      : "bg-sky-100 text-sky-900 dark:bg-sky-950/50 dark:text-sky-200"
                 return (
-                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                  <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${kindTone}`}>
+                    <KindIcon size={11} aria-hidden />
                     {label}
                   </span>
                 )
               })()}
-              {post.isScheduled && <span className="text-[10px] bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded">Scheduled</span>}
-              {post.isDraft && <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">Draft</span>}
+              {post.isScheduled && <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[11px] font-semibold text-sky-900 dark:bg-sky-950/50 dark:text-sky-200"><Clock size={11} aria-hidden />Scheduled</span>}
+              {post.isDraft && <span className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground"><Pencil size={11} aria-hidden />Draft</span>}
+              {(() => {
+                // Quality-vote summary from real vote counts; stays hidden until there are enough votes to mean something.
+                const total = safeCommunityCountTotal([upvoteCount, downvoteCount])
+                if (readOnly || total < 5) return null
+                const ratio = upvoteCount / total
+                const label = ratio >= 0.7 ? "Mostly upvoted" : ratio <= 0.35 ? "Mostly downvoted" : "Mixed votes"
+                const tone = ratio >= 0.7 ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200" : "bg-muted text-muted-foreground"
+                return (
+                  <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${tone}`} title={`${upvoteCount.toLocaleString()} up · ${downvoteCount.toLocaleString()} down`}>
+                    <ThumbsUp size={11} aria-hidden />
+                    {label}
+                  </span>
+                )
+              })()}
             </div>
           </div>
         </div>
@@ -619,11 +676,12 @@ function EnhancedPostCardInner({
             <button
               type="button"
               onClick={() => onShowVisibilityReason(post.id)}
-              className="max-w-[9rem] truncate rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200"
+              className="inline-flex max-w-[9rem] items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 transition hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:bg-emerald-950/40 dark:text-emerald-200"
               title={visibilityReason.reason || "Why am I seeing this?"}
               aria-label={`Why am I seeing this: ${visibilityReason.reason}`}
             >
-              {(visibilityReason as { shortLabel?: string }).shortLabel || visibilityReason.reason?.split(" ")[0] || "Why"}
+              <Info size={12} className="shrink-0" aria-hidden />
+              <span className="truncate">{(visibilityReason as { shortLabel?: string }).shortLabel || visibilityReason.reason?.split(" ")[0] || "Why"}</span>
             </button>
           )}
           {!readOnly ? (
@@ -932,6 +990,10 @@ function EnhancedPostCardInner({
                 className="mb-3 min-h-9 rounded-lg px-1 text-[13px] font-bold text-[var(--gh-green)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 {contentExpanded ? "Show less" : "Read more"}
+                {(() => {
+                  const words = String(post.content || "").trim().split(/\s+/).filter(Boolean).length
+                  return words >= 100 ? <span className="ml-1 font-medium text-muted-foreground no-underline">· {Math.max(1, Math.ceil(words / 200))} min read</span> : null
+                })()}
               </button>
             )}
           </>
@@ -955,7 +1017,7 @@ function EnhancedPostCardInner({
               )}
               <div className="flex-1 min-w-0">
                 <p className="truncate text-xs font-semibold text-foreground">{post.linkPreview.title}</p>
-                <p className="text-xs text-muted-foreground truncate">{post.linkPreview.domain}</p>
+                <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><Globe size={11} className="shrink-0" aria-hidden /><span className="truncate">{post.linkPreview.domain}</span></p>
               </div>
             </div>
           </a>
@@ -964,8 +1026,31 @@ function EnhancedPostCardInner({
         {/* Media gallery with improved viewing */}
         {realImages.length > 0 && (
           <div
-            className="group relative mb-2 aspect-[4/5] max-h-[26rem] w-full cursor-pointer overflow-hidden rounded-2xl bg-muted/50 ring-1 ring-inset ring-black/5 sm:aspect-video sm:max-h-[30rem]"
-            onClick={handleImageTap}
+            className="group relative mb-2 aspect-[4/5] max-h-[26rem] w-full cursor-pointer [touch-action:pan-y] overflow-hidden rounded-2xl bg-muted/50 ring-1 ring-inset ring-black/5 sm:aspect-video sm:max-h-[30rem]"
+            onClick={(event) => {
+              if (swipeConsumedRef.current) {
+                swipeConsumedRef.current = false
+                return
+              }
+              handleImageTap(event)
+            }}
+            onTouchStart={(event) => {
+              const touch = event.touches[0]
+              swipeStartRef.current = touch && realImages.length > 1 ? { x: touch.clientX, y: touch.clientY } : null
+              swipeConsumedRef.current = false
+            }}
+            onTouchEnd={(event) => {
+              const start = swipeStartRef.current
+              swipeStartRef.current = null
+              const touch = event.changedTouches[0]
+              if (!start || !touch) return
+              const dx = touch.clientX - start.x
+              const dy = touch.clientY - start.y
+              if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+              swipeConsumedRef.current = true
+              setImageIndex((current) => (dx < 0 ? Math.min(realImages.length - 1, current + 1) : Math.max(0, current - 1)))
+            }}
+            onTouchCancel={() => { swipeStartRef.current = null }}
             onPointerDown={(e) => {
               if (e.button !== 0) return
               if ((e.target as HTMLElement).closest("button")) return
@@ -1006,6 +1091,14 @@ function EnhancedPostCardInner({
                 <button type="button" onClick={handleNextImage} disabled={imageIndex >= realImages.length - 1} aria-label="Next post image" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-2.5 text-white opacity-100 shadow-md transition-opacity hover:bg-black/80 disabled:opacity-35 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100">
                   <span aria-hidden="true">→</span>
                 </button>
+                <div className="pointer-events-none absolute bottom-10 left-1/2 flex -translate-x-1/2 items-center gap-1" aria-hidden="true">
+                  {realImages.slice(0, 10).map((_, dot) => (
+                    <span
+                      key={dot}
+                      className={`h-1.5 rounded-full bg-white shadow-sm transition-all motion-reduce:transition-none ${dot === Math.min(imageIndex, realImages.length - 1) ? "w-4 opacity-100" : "w-1.5 opacity-60"}`}
+                    />
+                  ))}
+                </div>
                 <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/65 px-2.5 py-1 text-xs font-semibold tabular-nums text-white" aria-live="polite">
                   {Math.min(imageIndex + 1, realImages.length)} / {realImages.length}
                 </div>
@@ -1060,7 +1153,7 @@ function EnhancedPostCardInner({
       {post.engagement && Number(post.engagement.saves || 0) > 0 ? (
         <div className="border-t border-border/40 bg-muted/25 px-3.5 py-1.5 text-[11px] text-muted-foreground">
           <div className="flex justify-end">
-            <span className="tabular-nums">{Number(post.engagement.saves).toLocaleString()} saved</span>
+            <span className="inline-flex items-center gap-1 tabular-nums"><Bookmark size={11} aria-hidden />{Number(post.engagement.saves).toLocaleString()} saved</span>
           </div>
         </div>
       ) : null}

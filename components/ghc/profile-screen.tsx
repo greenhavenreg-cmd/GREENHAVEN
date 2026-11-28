@@ -31,6 +31,10 @@ import {
   Gift,
   MessagesSquare,
   Sparkles,
+  MapPin,
+  GraduationCap,
+  Home as HomeIcon,
+  Copy,
 } from "lucide-react"
 import { LazyImage } from "./lazy-image"
 import type { Post, Profile } from "@/lib/ghc-types"
@@ -85,6 +89,14 @@ function mapProfilePostComments(raw: unknown): Post["comments"] {
       mediaAttachments: Array.isArray(row.mediaAttachments) ? row.mediaAttachments as Post["comments"][number]["mediaAttachments"] : [],
     }
   }).filter((comment) => comment.id) as Post["comments"]
+}
+
+const compactProfileStat = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 })
+
+/** Real counts only: numbers get locale grouping (compact from 10,000); placeholders such as "—" or "12+" pass through. */
+function formatProfileStat(value: string | number): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return String(value)
+  return value >= 10000 ? compactProfileStat.format(value) : value.toLocaleString()
 }
 
 export function ProfileScreen({
@@ -870,7 +882,29 @@ export function ProfileScreen({
               <PiSupporterBadge showCtaWhenNone />
               <TrustBadge userId={p.id || meId} showWhenNew />
             </h2>
-            <p className="mt-0.5 text-[13px] font-semibold text-muted-foreground">{handle}</p>
+            <p className="mt-0.5 flex items-center gap-1 text-[13px] font-semibold text-muted-foreground">
+              <span className="min-w-0 truncate">{handle}</span>
+              {handle.startsWith("@") ? (
+                <button
+                  type="button"
+                  className="gh-hit-44 -my-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none"
+                  aria-label="Copy username"
+                  onClick={() => {
+                    void (async () => {
+                      try {
+                        if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable")
+                        await navigator.clipboard.writeText(handle)
+                        ghc.addToast?.("Username copied", "success")
+                      } catch {
+                        ghc.addToast?.("Could not copy username. You can select it and copy it manually.", "error")
+                      }
+                    })()
+                  }}
+                >
+                  <Copy size={13} aria-hidden />
+                </button>
+              ) : null}
+            </p>
             <div className="mt-0.5 flex flex-wrap items-center gap-2">
               <p className="font-mono text-[12px] font-bold tracking-wide text-emerald-800 dark:text-emerald-300">
                 {ghDisplay}
@@ -897,13 +931,13 @@ export function ProfileScreen({
               </button>
             </div>
             {locationLine ? (
-              <p className="mt-1 text-[12px] text-muted-foreground">📍 {locationLine}</p>
+              <p className="mt-1 flex items-center gap-1.5 text-[12px] text-muted-foreground"><MapPin size={13} className="shrink-0 text-emerald-600" aria-hidden /><span className="sr-only">Location: </span><span className="min-w-0 truncate">{locationLine}</span></p>
             ) : null}
             {p.hometown ? (
-              <p className="mt-0.5 text-[12px] text-muted-foreground">Home · {p.hometown}</p>
+              <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted-foreground"><HomeIcon size={13} className="shrink-0 text-emerald-600" aria-hidden /><span className="sr-only">Hometown: </span><span className="min-w-0 truncate">{p.hometown}</span></p>
             ) : null}
             {p.education ? (
-              <p className="mt-0.5 text-[12px] text-muted-foreground">🎓 {p.education}</p>
+              <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted-foreground"><GraduationCap size={13} className="shrink-0 text-emerald-600" aria-hidden /><span className="sr-only">Education: </span><span className="min-w-0 truncate">{p.education}</span></p>
             ) : null}
             {p.bio ? (
               <p className="mt-2 text-[13px] leading-snug text-foreground/90">{p.bio}</p>
@@ -932,8 +966,8 @@ export function ProfileScreen({
                 { label: "Followers" as const, value: authoritativeFollowCounts?.followers ?? "—" },
               ].map((s) => (
                 <button key={s.label} type="button" onClick={() => setSocialList(s.label)} className="flex min-w-0 flex-col items-center rounded-xl py-2.5 text-center transition hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label={`Open ${s.label.toLowerCase()} list`}>
-                  <span className="text-[15px] font-bold tabular-nums text-foreground">{s.value}</span>
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{s.label}</span>
+                  <span className="text-[15px] font-bold tabular-nums text-foreground" title={typeof s.value === "number" ? s.value.toLocaleString() : undefined}>{formatProfileStat(s.value)}</span>
+                  <span className="text-[11px] font-semibold text-muted-foreground">{s.label}</span>
                 </button>
               ))}
             </div>
